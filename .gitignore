@@ -26,3 +26,10 @@
 *.exe
 *.out
 *.app
+
+# Data formats
+*.h5
+
+# Directories
+bin/
+
