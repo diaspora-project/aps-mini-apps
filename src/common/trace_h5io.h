@@ -476,6 +476,7 @@ namespace trace_io {
     H5Fclose(file_id);
 
     free(dataset_ddims);
+    free(d_offset);
   }
 
   void WriteRecon(

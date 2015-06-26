@@ -153,36 +153,36 @@ namespace trace_utils {
   }
 
   void CalculateDistanceLengths(
-      int len, int num_grid,
+      int len, int num_grids,
       float *coorx, float *coory, 
       float *leng, float *leng2, int *indi)
   {
-    int n, x1, x2, i1, i2;
+    int x1, x2, i1, i2;
     float diffx, diffy, midx, midy;
     int indx, indy;
 
-    for (n = 0; n < len-1; n++) {
-      diffx = coorx[n+1] - coorx[n];
-      diffy = coory[n+1] - coory[n];
-      leng2[n] = diffx * diffx + diffy * diffy;
-      leng[n] = sqrt(leng2[n]);
+    for (int i = 0; i<len-1; ++i) {
+      diffx = coorx[i+1] - coorx[i];
+      diffy = coory[i+1] - coory[i];
+      leng2[i] = diffx*diffx + diffy*diffy;
+      leng[i] = sqrt(leng2[i]);
 
       /* Calculate the recon locations */
-      midx = (coorx[n+1] + coorx[n])/2.;
+      midx = (coorx[i+1] + coorx[i])/2.;
       /* XXX
        * In some calculations midy value points to the boundary,
        * this situation results in segmentation faults. coory and coorx
        * calculation, therefore, need to be revised.
        */
-      midy = (coory[n+1] + coory[n])/2.;
+      midy = (coory[i+1] + coory[i])/2.;
 
-      x1 = midx + num_grid/2.;
-      x2 = midy + num_grid/2.;
-      i1 = (int)(midx + num_grid/2.);
-      i2 = (int)(midy + num_grid/2.);
+      x1 = midx + num_grids/2.;
+      x2 = midy + num_grids/2.;
+      i1 = (int)(midx + num_grids/2.);
+      i2 = (int)(midy + num_grids/2.);
       indx = i1 - (i1 > x1);
       indy = i2 - (i2 > x2);
-      indi[n] = (indx+(indy*num_grid));
+      indi[i] = indx+(indy*num_grids);
 
       /* Below is kept for debugging purposes 
        * For num_gridxnum_grid slice area, it catches the exceeding indices.

@@ -1,5 +1,5 @@
 # Compiler
-CC = clang++
+CC = g++
 
 # Directories
 ROOTDIR = ../../
