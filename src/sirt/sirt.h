@@ -117,7 +117,7 @@ class SIRTReconSpace :
     }
 
     virtual ~SIRTReconSpace(){
-      //PrintProfileInfo();
+      PrintProfileInfo();
       Finalize();
     }
 

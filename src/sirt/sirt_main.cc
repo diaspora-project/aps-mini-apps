@@ -21,7 +21,28 @@ std::string const kThetaDatasetPath="/exchange/theta";
 std::string const kReconOutputPath="./13id_i1.h5";
 std::string const kReconDatasetPath="/data";
 
-int const iteration=1;
+int const iteration=10;
+
+struct {
+  std::string const kProjectionFilePath="/Users/bicer/Projects/data/original/13-ID/13id1_fixed_1s.h5";
+  //std::string const kProjectionFilePath="/Users/bicer/Projects/data/original/13-ID/13id1_fixed_16s.h5";
+  //std::string const kProjectionFilePath="/Users/bicer/Projects/tomopy/shepp-tekin.h5";
+  //std::string const kProjectionFilePath="/Users/bicer/Projects/data/original/13-ID/13id_x8_16s.h5";
+  //std::string const kProjectionFilePath="/Users/bicer/Projects/data/original/13-ID/13id_x8.h5";
+  std::string const kProjectionDatasetPath="/exchange/data";
+  std::string const kThetaFilePath="/Users/bicer/Projects/data/original/13-ID/13id1_fixed_1s.h5";
+  //std::string const kThetaFilePath="/Users/bicer/Projects/data/original/13-ID/13id1_fixed_16s.h5";
+  //std::string const kThetaFilePath="/Users/bicer/Projects/tomopy/shepp-tekin.h5";
+  //std::string const kThetaFilePath="/Users/bicer/Projects/data/original/13-ID/13id_x8_16s.h5";
+  //std::string const kThetaFilePath="/Users/bicer/Projects/data/original/13-ID/13id_x8.h5";
+  std::string const kThetaDatasetPath="/exchange/theta";
+  std::string const kReconOutputPath="./13id_i1.h5";
+  std::string const kReconDatasetPath="/data";
+
+  int const iteration=2;
+  int const thread_count=0;
+
+} TraceRuntimeConfig;
 
 int main(int argc, char **argv)
 {
@@ -91,7 +112,7 @@ int main(int argc, char **argv)
     new DISPEngineReduction<SIRTReconSpace, float>(
         comm,
         main_recon_space,
-        4); /// # threads (0 for automatically assign the number of threads)
+        0); /// # threads (0 for automatically assign the number of threads)
   /**********************/
 
   /**************************/
@@ -117,8 +138,10 @@ int main(int argc, char **argv)
       kReconOutputPath, kReconDatasetPath);
 
   /* Clean-up the resources */
+  delete d_metadata->dims;
   delete d_metadata;
   delete slices;
+  delete t_metadata->dims;
   delete t_metadata;
   delete theta;
   delete engine;
