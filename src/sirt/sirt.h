@@ -31,16 +31,6 @@ class SIRTReconSpace :
 
     int num_grids;
 
-    /* Profiler variables */
-    std::chrono::time_point<std::chrono::system_clock> 
-      start, end, start_all, end_all,
-      start_replica, end_replica;
-    std::chrono::duration<double> 
-      timer_coordinates, timer_sort_int,
-      timer_dist, timer_simdata, timer_update_replica,
-      timer_update_replica_loop1, timer_update_replica_loop2,
-      timer_merge_trim, timer_all;
-
   protected:
     // Forward projection
     float CalculateSimdata(
@@ -64,7 +54,7 @@ class SIRTReconSpace :
       AReductionSpaceBase(rows, cols) {}
 
     virtual ~SIRTReconSpace(){
-      PrintProfileInfo();
+      // PrintProfileInfo();
       Finalize();
     }
 
