@@ -1,40 +1,37 @@
 #include "mpi.h"
 #include "trace_h5io.h"
-#include "trace_utils.h"
+//#include "trace_utils.h"
 #include "disp_comm_mpi.h"
 #include "data_region_base.h"
 #include "disp_engine_reduction.h"
 #include "sirt.h"
 
-std::string const kProjectionFilePath="/Users/bicer/Projects/data/original/13-ID/13id1_fixed_1s.h5";
-//std::string const kProjectionFilePath="/Users/bicer/Projects/data/original/13-ID/13id1_fixed_16s.h5";
-//std::string const kProjectionFilePath="/Users/bicer/Projects/tomopy/shepp-tekin.h5";
-//std::string const kProjectionFilePath="/Users/bicer/Projects/data/original/13-ID/13id_x8_16s.h5";
-//std::string const kProjectionFilePath="/Users/bicer/Projects/data/original/13-ID/13id_x8.h5";
-std::string const kProjectionDatasetPath="/exchange/data";
-std::string const kThetaFilePath="/Users/bicer/Projects/data/original/13-ID/13id1_fixed_1s.h5";
-//std::string const kThetaFilePath="/Users/bicer/Projects/data/original/13-ID/13id1_fixed_16s.h5";
-//std::string const kThetaFilePath="/Users/bicer/Projects/tomopy/shepp-tekin.h5";
-//std::string const kThetaFilePath="/Users/bicer/Projects/data/original/13-ID/13id_x8_16s.h5";
-//std::string const kThetaFilePath="/Users/bicer/Projects/data/original/13-ID/13id_x8.h5";
-std::string const kThetaDatasetPath="/exchange/theta";
-std::string const kReconOutputPath="./13id_i1.h5";
-std::string const kReconDatasetPath="/data";
+struct {
+  std::string const kProjectionFilePath="/Users/bicer/Projects/data/original/13-ID/13id1_fixed_16s.h5";
+  //std::string const kProjectionFilePath="/Users/bicer/Projects/tomopy/shepp-tekin.h5";
+  std::string const kProjectionDatasetPath="/exchange/data";
+  std::string const kThetaFilePath="/Users/bicer/Projects/data/original/13-ID/13id1_fixed_16s.h5";
+  //std::string const kThetaFilePath="/Users/bicer/Projects/tomopy/shepp-tekin.h5";
+  std::string const kThetaDatasetPath="/exchange/theta";
+  std::string const kReconOutputPath="./13id_i16.h5";
+  std::string const kReconDatasetPath="/data";
 
-int const iteration=1;
+  int const iteration=2;
+  float center=0.;
+  int const thread_count=0;
+} TraceRuntimeConfig;
 
 int main(int argc, char **argv)
 {
   /* Initiate middleware's communication layer */
   DISPCommBase<float> *comm =
         new DISPCommMPI<float>(&argc, &argv);
-  std::cout << "MPI size: " << comm->size() << std::endl;
-  std::cout << "MPI rank: " << comm->rank() << std::endl;
+  std::cout << "MPI rank: "<< comm->rank() << "; MPI size: " << comm->size() << std::endl;
 
   /* Read slice data and setup job information */
   auto d_metadata = trace_io::ReadMetadata(
-        kProjectionFilePath.c_str(), 
-        kProjectionDatasetPath.c_str());
+        TraceRuntimeConfig.kProjectionFilePath.c_str(), 
+        TraceRuntimeConfig.kProjectionDatasetPath.c_str());
   int beg_index, n_blocks;
   trace_io::DistributeSlices(
       comm->rank(), comm->size(), 
@@ -44,8 +41,8 @@ int main(int argc, char **argv)
 
   /* Read theta data */
   auto t_metadata = trace_io::ReadMetadata(
-        kThetaFilePath.c_str(), 
-        kThetaDatasetPath.c_str());
+        TraceRuntimeConfig.kThetaFilePath.c_str(), 
+        TraceRuntimeConfig.kThetaDatasetPath.c_str());
   auto theta = trace_io::ReadTheta(t_metadata);
   /* Convert degree values to radian */
   trace_utils::DegreeToRadian(*theta);
@@ -62,8 +59,7 @@ int main(int argc, char **argv)
       n_blocks,                           /// int const num_slices,
       input_slice->metadata->dims[2],     /// int const num_cols,
       input_slice->metadata->dims[2],     /// int const num_grids,
-      0);                                 /// float const center
-  // trace_metadata.Print();
+      TraceRuntimeConfig.center);         /// float const center
 
   // INFO: DataRegionBase destructor deletes input_slice.data pointer
   ADataRegion<float> *slices = 
@@ -91,7 +87,7 @@ int main(int argc, char **argv)
     new DISPEngineReduction<SIRTReconSpace, float>(
         comm,
         main_recon_space,
-        4); /// # threads (0 for automatically assign the number of threads)
+        TraceRuntimeConfig.thread_count); 
   /**********************/
 
   /**************************/
@@ -99,13 +95,15 @@ int main(int argc, char **argv)
   /* Define job size per thread request */
   int64_t req_number = trace_metadata.num_cols();
 
-  for(int i=0; i<iteration; ++i){
+  for(int i=0; i<TraceRuntimeConfig.iteration; ++i){
     std::cout << "Iteration: " << i << std::endl;
     engine->RunParallelReduction(*slices, req_number);  /// Reconstruction
     engine->ParInPlaceLocalSynchWrapper();              /// Local combination
+
+    /// Update reconstruction object
+    main_recon_space->UpdateRecon(trace_metadata.recon(), main_recon_replica);
     
-    trace_utils::UpdateRecon(trace_metadata.recon(), main_recon_replica);
-    // Reset iteration
+    /// Reset iteration
     engine->ResetReductionSpaces(init_val);
     slices->ResetMirroredRegionIter();
   }
@@ -114,11 +112,14 @@ int main(int argc, char **argv)
   /* Write reconstructed data to disk */
   trace_io::WriteRecon(
       trace_metadata, *d_metadata, 
-      kReconOutputPath, kReconDatasetPath);
+      TraceRuntimeConfig.kReconOutputPath, 
+      TraceRuntimeConfig.kReconDatasetPath);
 
   /* Clean-up the resources */
+  delete d_metadata->dims;
   delete d_metadata;
   delete slices;
+  delete t_metadata->dims;
   delete t_metadata;
   delete theta;
   delete engine;
