@@ -8,6 +8,7 @@ namespace trace_utils {
   constexpr float kPI = 3.14159265358979f;
 
   void DegreeToRadian(trace_io::H5Data &theta);
+  void Absolute(float *data, size_t count);
 
   // Backward projection
   void UpdateRecon(
@@ -41,5 +42,10 @@ namespace trace_utils {
       int len, int num_grids,
       float *coorx, float *coory, 
       float *leng, float *leng2, int *indi);
+
+  void CalculateDistanceLengths(
+      int len, int num_grids,
+      float *coorx, float *coory, 
+      float *leng, int *indi);
 }
 #endif /// DISP_APPS_RECONSTRUCTION_COMMON_TRACE_UTILS_H_

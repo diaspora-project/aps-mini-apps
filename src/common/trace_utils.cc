@@ -1,6 +1,12 @@
 #include <cmath>
 #include "trace_utils.h"
 
+void trace_utils::Absolute(float *data, size_t count)
+{
+  for(size_t i=0; i<count; ++i)
+    data[i] = std::fabs(data[i]);
+}
+
 void trace_utils::DegreeToRadian(trace_io::H5Data &theta)
 {
   int num_elem = theta.metadata->dims[0];
@@ -169,6 +175,35 @@ void trace_utils::CalculateDistanceLengths(
     midy = (coory[i+1]+coory[i])/2.;
     leng2[i] = diffx*diffx + diffy*diffy;
     leng[i] = sqrt(leng2[i]);
+
+    x1 = midx + mgrids;
+    i1 = static_cast<int>(x1);
+    indx = i1 - (i1>x1);
+    x2 = midy + mgrids;
+    i2 = static_cast<int>(x2);
+    indy = i2 - (i2>x2);
+    indi[i] = indx+(indy*num_grids);
+  }
+}
+
+void trace_utils::CalculateDistanceLengths(
+    int len, int num_grids,
+    float *coorx, float *coory, 
+    float *leng, int *indi)
+{
+  int x1, x2, i1, i2;
+  float diffx, diffy, midx, midy;
+  int indx, indy;
+
+  float mgrids = num_grids/2.;
+
+  for (int i=0; i<len-1; ++i) {
+    diffx = coorx[i+1]-coorx[i];
+    midx = (coorx[i+1]+coorx[i])/2.;
+    diffy = coory[i+1]-coory[i];
+    midy = (coory[i+1]+coory[i])/2.;
+    float sq = diffx*diffx + diffy*diffy;
+    leng[i] = sqrt(sq);
 
     x1 = midx + mgrids;
     i1 = static_cast<int>(x1);
