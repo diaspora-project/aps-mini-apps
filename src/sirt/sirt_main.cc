@@ -7,13 +7,13 @@
 #include "sirt.h"
 
 struct {
-  std::string const kProjectionFilePath="/Users/bicer/Projects/data/original/13-ID/13id1_fixed_16s.h5";
+  std::string const kProjectionFilePath="/Users/bicer/Projects/data/original/13-ID/13id1_fixed_1s.h5";
   //std::string const kProjectionFilePath="/Users/bicer/Projects/tomopy/shepp-tekin.h5";
   std::string const kProjectionDatasetPath="/exchange/data";
-  std::string const kThetaFilePath="/Users/bicer/Projects/data/original/13-ID/13id1_fixed_16s.h5";
+  std::string const kThetaFilePath="/Users/bicer/Projects/data/original/13-ID/13id1_fixed_1s.h5";
   //std::string const kThetaFilePath="/Users/bicer/Projects/tomopy/shepp-tekin.h5";
   std::string const kThetaDatasetPath="/exchange/theta";
-  std::string const kReconOutputPath="./13id_i16.h5";
+  std::string const kReconOutputPath="./13id_i1.h5";
   std::string const kReconDatasetPath="/data";
 
   int const iteration=2;
