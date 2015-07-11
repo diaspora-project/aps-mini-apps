@@ -1,7 +1,21 @@
-#include "sirt.h"
+#include "mlem.h"
+
+void MLEMReconSpace::UpdateRecon(
+    ADataRegion<float> &recon,                  // Reconstruction object
+    DataRegion2DBareBase<float> &comb_replica)  // Locally combined replica
+{
+  size_t rows = comb_replica.rows();
+  size_t cols = comb_replica.cols()/2;
+  for(size_t i=0; i<rows; ++i){
+    auto replica = comb_replica[i];
+    for(size_t j=0; j<cols; ++j)
+      recon[i*cols + j] *=
+        replica[j] / replica[cols+j];
+  }
+}
 
 /// Forward Projection
-float SIRTReconSpace::CalculateSimdata(
+float MLEMReconSpace::CalculateSimdata(
     float *recon,
     int len,
     int *indi,
@@ -13,31 +27,16 @@ float SIRTReconSpace::CalculateSimdata(
   return simdata;
 }
 
-void SIRTReconSpace::UpdateRecon(
-    ADataRegion<float> &recon,                  // Reconstruction object
-    DataRegion2DBareBase<float> &comb_replica)  // Locally combined replica
-{
-  size_t rows = comb_replica.rows();
-  size_t cols = comb_replica.cols()/2;
-  for(size_t i=0; i<rows; ++i){
-    auto replica = comb_replica[i];
-    for(size_t j=0; j<cols; ++j)
-      recon[i*cols + j] +=
-        replica[j] / replica[cols+j];
-  }
-}
-
-void SIRTReconSpace::UpdateReconReplica(
+void MLEMReconSpace::UpdateReconReplica(
     float simdata,
     float ray,
     int curr_slice,
     int const * const indi,
-    float *leng2,
     float *leng, 
     int len,
     int suma_beg_offset)
 {
-  float upd, a2=0.;
+  float upd;
 
   auto &slice_t = reduction_objects()[curr_slice];
   auto slice = &slice_t[0] + suma_beg_offset;
@@ -45,14 +44,13 @@ void SIRTReconSpace::UpdateReconReplica(
   start_replica = std::chrono::system_clock::now();
   for (int i=0; i<len-1; ++i) {
     if (indi[i] >= suma_beg_offset) continue;
-    a2 += leng2[i];
     slice[indi[i]] += leng[i];
   }
   slice -= suma_beg_offset;
   end_replica = std::chrono::system_clock::now();
   timer_update_replica_loop1 += end_replica-start_replica;
 
-  upd = (ray-simdata) / a2;
+  upd = (ray/simdata);
   start_replica = std::chrono::system_clock::now();
   for (int i=0; i <len-1; ++i) {
     if (indi[i] >= suma_beg_offset) continue;
@@ -63,7 +61,7 @@ void SIRTReconSpace::UpdateReconReplica(
 }
 
 
-void SIRTReconSpace::Initialize(int n_grids){
+void MLEMReconSpace::Initialize(int n_grids){
   num_grids = n_grids; 
 
   coordx = new float[num_grids+1]; 
@@ -75,11 +73,10 @@ void SIRTReconSpace::Initialize(int n_grids){
   coorx = new float[2*num_grids];
   coory = new float[2*num_grids];
   leng = new float[2*num_grids];
-  leng2 = new float[2*num_grids];
   indi = new int[2*num_grids];
 }
 
-void SIRTReconSpace::Finalize(){
+void MLEMReconSpace::Finalize(){
   delete [] coordx;
   delete [] coordy;
   delete [] ax;
@@ -89,13 +86,12 @@ void SIRTReconSpace::Finalize(){
   delete [] coorx;
   delete [] coory;
   delete [] leng;
-  delete [] leng2;
   delete [] indi;
 }
 
 /**********************/
 /* Execution Profiler */
-void SIRTReconSpace::PrintProfileInfo(){
+void MLEMReconSpace::PrintProfileInfo(){
   std::cout << 
     "Total time: " << timer_all.count() << std::endl <<
     "--Coordinate calculation: " << timer_coordinates.count() << std::endl <<
@@ -110,7 +106,7 @@ void SIRTReconSpace::PrintProfileInfo(){
 
 /**********************/
 
-void SIRTReconSpace::Reduce(MirroredRegionBareBase<float> &input)
+void MLEMReconSpace::Reduce(MirroredRegionBareBase<float> &input)
 {
   start_all = std::chrono::system_clock::now();
 
@@ -210,7 +206,7 @@ void SIRTReconSpace::Reduce(MirroredRegionBareBase<float> &input)
           len, 
           num_grids, 
           coorx, coory, 
-          leng, leng2, 
+          leng,
           indi);
       end = std::chrono::system_clock::now();
       timer_dist += end-start;
@@ -233,7 +229,7 @@ void SIRTReconSpace::Reduce(MirroredRegionBareBase<float> &input)
           rays[curr_col], 
           curr_slice, 
           indi, 
-          leng2, leng,
+          leng,
           len, 
           suma_beg_offset);
       end = std::chrono::system_clock::now();

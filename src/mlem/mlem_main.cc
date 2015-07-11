@@ -4,19 +4,19 @@
 #include "disp_comm_mpi.h"
 #include "data_region_base.h"
 #include "disp_engine_reduction.h"
-#include "sirt.h"
+#include "mlem.h"
 
 struct {
-  std::string const kProjectionFilePath="/Users/bicer/Projects/data/original/13-ID/13id1_fixed_16s.h5";
+  std::string const kProjectionFilePath="/Users/bicer/Projects/data/original/13-ID/13id1_fixed_1s.h5";
   //std::string const kProjectionFilePath="/Users/bicer/Projects/tomopy/shepp-tekin.h5";
   std::string const kProjectionDatasetPath="/exchange/data";
-  std::string const kThetaFilePath="/Users/bicer/Projects/data/original/13-ID/13id1_fixed_16s.h5";
+  std::string const kThetaFilePath="/Users/bicer/Projects/data/original/13-ID/13id1_fixed_1s.h5";
   //std::string const kThetaFilePath="/Users/bicer/Projects/tomopy/shepp-tekin.h5";
   std::string const kThetaDatasetPath="/exchange/theta";
-  std::string const kReconOutputPath="./13id_i16.h5";
+  std::string const kReconOutputPath="./13id_i1.h5";
   std::string const kReconDatasetPath="/data";
 
-  int const iteration=2;
+  int const iteration=6;
   float center=0.;
   int const thread_count=0;
 } TraceRuntimeConfig;
@@ -46,6 +46,9 @@ int main(int argc, char **argv)
   auto theta = trace_io::ReadTheta(t_metadata);
   /* Convert degree values to radian */
   trace_utils::DegreeToRadian(*theta);
+  trace_utils::Absolute(
+      static_cast<float *>(input_slice->data),
+      input_slice->count);
 
   /* Setup metadata data structure */
   // INFO: TraceMetadata destructor frees theta->data!
@@ -59,7 +62,8 @@ int main(int argc, char **argv)
       n_blocks,                           /// int const num_slices,
       input_slice->metadata->dims[2],     /// int const num_cols,
       input_slice->metadata->dims[2],     /// int const num_grids,
-      TraceRuntimeConfig.center);         /// float const center
+      TraceRuntimeConfig.center,          /// float const center,
+      1.);                                /// float const recon_init_val
 
   // INFO: DataRegionBase destructor deletes input_slice.data pointer
   ADataRegion<float> *slices = 
@@ -74,7 +78,7 @@ int main(int argc, char **argv)
   /* The size of the reconstruction object (in reconstruction space) is
    * twice the reconstruction object size, because of the length storage
    */
-  auto main_recon_space = new SIRTReconSpace(
+  auto main_recon_space = new MLEMReconSpace(
       n_blocks, 
       2*trace_metadata.num_cols()*trace_metadata.num_cols());
   main_recon_space->Initialize(trace_metadata.num_grids());
@@ -83,13 +87,12 @@ int main(int argc, char **argv)
   main_recon_replica.ResetAllItems(init_val);
 
   /* Prepare processing engine and main reduction space for other threads */
-  DISPEngineBase<SIRTReconSpace, float> *engine =
-    new DISPEngineReduction<SIRTReconSpace, float>(
+  DISPEngineBase<MLEMReconSpace, float> *engine =
+    new DISPEngineReduction<MLEMReconSpace, float>(
         comm,
         main_recon_space,
-        TraceRuntimeConfig.thread_count);
-        /// # threads (0 for auto assign the number of threads)
-
+        TraceRuntimeConfig.thread_count); 
+          /// # threads (0 for auto assign the number of threads)
   /**********************/
 
   /**************************/
@@ -101,11 +104,11 @@ int main(int argc, char **argv)
     std::cout << "Iteration: " << i << std::endl;
     engine->RunParallelReduction(*slices, req_number);  /// Reconstruction
     engine->ParInPlaceLocalSynchWrapper();              /// Local combination
-
+    
     /// Update reconstruction object
     main_recon_space->UpdateRecon(trace_metadata.recon(), main_recon_replica);
-    
-    /// Reset iteration
+
+    // Reset iteration
     engine->ResetReductionSpaces(init_val);
     slices->ResetMirroredRegionIter();
   }

@@ -2,7 +2,7 @@
 CC = clang++
 
 # Directories
-ROOTDIR = ../..
+ROOTDIR = ../../
 # DISP Framework src dir
 DISPDIR = /Users/bicer/Projects/DISP/src/core/
 # Bin directory
@@ -25,25 +25,23 @@ LIBDIRS = -L$(HDF5LIB) -L$(MPILIB)
 INCLUDES = -I$(DISPDIR) -I${COMMONDIR} -I$(HDF5INC) -I$(MPIINC)
 
 # Executable/reconstruction objects
-SIRT_OBJS = sirt.o sirt_main.o
+MLEM_OBJS = mlem.o mlem_main.o
 COMMON_OBJS = trace_h5io.o trace_utils.o
 
 # Executables
-PROGS = sirt
+PROGS = mlem
 
 .PHONY: default clean
 
 all: $(PROGS)
 
 # SIRT
-sirt: $(COMMON_OBJS) $(SIRT_OBJS)
-	$(CC) $(CFLAGS) -o $@ $(SIRT_OBJS) $(COMMON_OBJS) $(LIBDIRS) $(LIBS) 
-
-sirt.o: sirt.cc sirt.h
-	$(CC) $(CFLAGS) -c sirt.cc $(INCLUDES)
-
-sirt_main.o: sirt_main.cc
-	$(CC) $(CFLAGS) -c sirt_main.cc $(INCLUDES)
+mlem: $(COMMON_OBJS) $(MLEM_OBJS)
+	$(CC) $(CFLAGS) -o $@ $(MLEM_OBJS) $(COMMON_OBJS) $(INCLUDES) $(LIBDIRS) $(LIBS)
+mlem_main.o: mlem_main.cc
+	$(CC) $(CFLAGS) -c mlem_main.cc $(INCLUDES)
+mlem.o: mlem.cc
+	$(CC) $(CFLAGS) -c mlem.cc $(INCLUDES)
 
 trace_h5io.o: $(COMMONDIR)/trace_h5io.cc $(COMMONDIR)/trace_h5io.h
 	$(CC) $(CFLAGS) -c $(COMMONDIR)/trace_h5io.cc $(INCLUDES)

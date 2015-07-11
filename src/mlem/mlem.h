@@ -1,5 +1,5 @@
-#ifndef DISP_APPS_RECONSTRUCTION_SIRT_SIRT_H
-#define DISP_APPS_RECONSTRUCTION_SIRT_SIRT_H
+#ifndef DISP_APPS_RECONSTRUCTION_MLEM_MLEM_H
+#define DISP_APPS_RECONSTRUCTION_MLEM_MLEM_H
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,8 +13,8 @@
 #include "reduction_space_a.h"
 #include "data_region_base.h"
 
-class SIRTReconSpace : 
-  public AReductionSpaceBase<SIRTReconSpace, float>
+class MLEMReconSpace : 
+  public AReductionSpaceBase<MLEMReconSpace, float>
 {
   private:
     float *coordx = nullptr;
@@ -26,7 +26,6 @@ class SIRTReconSpace :
     float *coorx = nullptr;
     float *coory = nullptr;
     float *leng = nullptr;
-    float *leng2 = nullptr;
     int *indi = nullptr;
 
     int num_grids;
@@ -54,29 +53,27 @@ class SIRTReconSpace :
         float ray,
         int curr_slice,
         int const * const indi,
-        float *leng2,
         float *leng, 
         int len,
         int suma_beg_offset);
 
   public:
-    SIRTReconSpace(int rows, int cols) : 
+    MLEMReconSpace(int rows, int cols) : 
       AReductionSpaceBase(rows, cols) {}
 
-    virtual ~SIRTReconSpace(){
+    virtual ~MLEMReconSpace(){
       PrintProfileInfo();
       Finalize();
     }
 
-    void Reduce(MirroredRegionBareBase<float> &input);
-    // Backward Projection
     void UpdateRecon(
-        ADataRegion<float> &recon,                  // Reconstruction object
-        DataRegion2DBareBase<float> &comb_replica); // Locally combined replica
+      ADataRegion<float> &recon,                  // Reconstruction object
+      DataRegion2DBareBase<float> &comb_replica); // Locally combined replica
 
+    void Reduce(MirroredRegionBareBase<float> &input);
 
     void Initialize(int n_grids);
-    virtual void CopyTo(SIRTReconSpace &target){
+    virtual void CopyTo(MLEMReconSpace &target){
       target.Initialize(num_grids);
     }
     void Finalize();
@@ -84,4 +81,4 @@ class SIRTReconSpace :
     void PrintProfileInfo();
 };
 
-#endif    // DISP_APPS_RECONSTRUCTION_SIRT_SIRT_H
+#endif    // DISP_APPS_RECONSTRUCTION_MLEM_MLEM_H
