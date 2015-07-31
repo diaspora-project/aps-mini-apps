@@ -51,7 +51,7 @@ class SIRTReconSpace :
 
   public:
     SIRTReconSpace(int rows, int cols) : 
-      AReductionSpaceBase(rows, cols) {}
+      AReductionSpaceBase<SIRTReconSpace, float>(rows, cols) {}
 
     virtual ~SIRTReconSpace(){
       Finalize();

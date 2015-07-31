@@ -3,10 +3,11 @@
 
 #include <string>
 #include <cmath>
+#include <stdexcept>
 #include "data_region_a.h"
 #include "data_region_bare_base.h"
 
-struct {
+typedef struct {
   int num_threads;
   int num_iter;
 
