@@ -29,6 +29,7 @@ class TraceMetadata{
     int const proj_id_;
     int const slice_id_;
     int const col_id_;
+    int const num_total_slices_;
 
     int const num_projs_;
     int const num_slices_;
@@ -44,6 +45,8 @@ class TraceMetadata{
 
     size_t const count_;
     ADataRegion<float> *recon_; 
+    int const num_neighbor_recon_slices_;
+
 
   public:
 
@@ -52,16 +55,20 @@ class TraceMetadata{
         int const proj_id,
         int const slice_id,
         int const col_id,
+        int const num_total_slices,   /// Total number of slices in whole dataset
         int const num_projs,
         int const num_slices,
         int const num_cols,
         int const num_grids,
         float center,
+        /// Number of neighboring reconstruction slices
+        int const num_neighbor_recon_slices,
         float const recon_init_val)
     : theta_{theta}
     , proj_id_{proj_id}
     , slice_id_{slice_id}
     , col_id_{col_id}
+    , num_total_slices_{num_total_slices}
     , num_projs_{num_projs}
     , num_slices_{num_slices}
     , num_cols_{num_cols}
@@ -70,12 +77,20 @@ class TraceMetadata{
     , num_rays_proj_{num_slices*num_cols}
     , num_rays_slice_{num_cols}
     , count_{static_cast<size_t>(num_rays_proj_*num_projs_)}
+    /* XXX: Number of reconstruction slices are naively set to the 
+     * 2*num_neighbor_slices however this should consider top and 
+     * bottom slices where there is no neighbors. Since reconstruction 
+     * computation is aware of this, it doesn't create a problem. Still, this 
+     * needs to be fixed.
+     */
+    , num_neighbor_recon_slices_{num_neighbor_recon_slices}
     {
       if (theta_ == nullptr) throw std::invalid_argument("theta ptr is null");
 
       // Setup recon object
-      recon_ = new DataRegionBareBase<float>(num_slices_*num_cols_*num_cols_);
-      for(int i=0; i<num_slices_*num_cols_*num_cols_; ++i)
+      int num_recon_slices = num_slices+2*num_neighbor_recon_slices;
+      recon_ = new DataRegionBareBase<float>(num_recon_slices * num_grids_ * num_grids_);
+      for(int i=0; i<num_recon_slices*num_grids_*num_grids_; ++i)
         (*recon_)[i] = recon_init_val;
       
       // Set the center
@@ -98,15 +113,16 @@ class TraceMetadata{
         int const proj_id,
         int const slice_id,
         int const col_id,
+        int const num_total_slices,
         int const num_projs,
         int const num_slices,
         int const num_cols,
         int const num_grids,
         float center) 
       : TraceMetadata(
-          theta, proj_id, slice_id, col_id,
+          theta, proj_id, slice_id, col_id, num_total_slices,
           num_projs, num_slices, num_cols, num_grids,
-          center, 0.) {}
+          center, 0, 0.) {}
 
     ~TraceMetadata() {
       delete recon_;
@@ -136,6 +152,7 @@ class TraceMetadata{
     int slice_id() const { return slice_id_; };
     int proj_id() const { return proj_id_; };
     int col_id() const { return col_id_; };
+    int num_total_slices() const { return num_total_slices_; };
 
     int num_projs() const { return num_projs_; };
     int num_slices() const { return num_slices_; };
@@ -150,6 +167,7 @@ class TraceMetadata{
     float const * gridy() const { return gridy_; };
 
     ADataRegion<float>& recon() const { return *recon_; };
+    int num_neighbor_recon_slices() const { return num_neighbor_recon_slices_; };
 
     void Print()
     {

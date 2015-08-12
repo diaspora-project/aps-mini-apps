@@ -58,11 +58,13 @@ int main(int argc, char **argv)
       0,                                  /// int const proj_id,
       beg_index,                          /// int const slice_id,
       0,                                  /// int const col_id,
+      input_slice->metadata->dims[1],     /// int const num_tot_slices,
       input_slice->metadata->dims[0],     /// int const num_projs,
       n_blocks,                           /// int const num_slices,
       input_slice->metadata->dims[2],     /// int const num_cols,
       input_slice->metadata->dims[2],     /// int const num_grids,
       TraceRuntimeConfig.center,          /// float const center,
+      1,                                  /// int const num_neighbor_recon_slices,
       1.);                                /// float const recon_init_val
 
   // INFO: DataRegionBase destructor deletes input_slice.data pointer

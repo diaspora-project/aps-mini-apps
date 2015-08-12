@@ -477,8 +477,12 @@ void trace_io::WriteRecon(
     static_cast<hsize_t>(dataset_metadata.dims[2])};
   ADataRegion<float> &recon = rank_metadata.recon();
 
+  int recon_slice_data_index =
+    rank_metadata.num_neighbor_recon_slices()*
+    rank_metadata.num_grids() * rank_metadata.num_grids();
+
   WriteData(
-      &recon[0],
+      &recon[recon_slice_data_index],
       ndims, rank_dims,
       rank_metadata.slice_id(),
       ndims, app_dims,
