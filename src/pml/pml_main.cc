@@ -64,7 +64,7 @@ int main(int argc, char **argv)
       input_slice->metadata->dims[2],     /// int const num_cols,
       input_slice->metadata->dims[2],     /// int const num_grids,
       TraceRuntimeConfig.center,          /// float const center,
-      1,                                  /// int const num_neighbor_recon_slices,
+      0,                                  /// int const num_neighbor_recon_slices,
       1.);                                /// float const recon_init_val
 
   // INFO: DataRegionBase destructor deletes input_slice.data pointer

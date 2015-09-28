@@ -25,22 +25,28 @@ LIBDIRS = -L$(HDF5LIB) -L$(MPILIB)
 INCLUDES = -I$(DISPDIR) -I${COMMONDIR} -I$(HDF5INC) -I$(MPIINC)
 
 # Executable/reconstruction objects
-SIRT_OBJS = sirt.o sirt_main.o
+SIRT_OBJS = sirt.o sirt_main_model.o #sirt_main.o
 COMMON_OBJS = trace_h5io.o trace_utils.o
 
 # Executables
-PROGS = sirt
+PROGS = sirt_model #sirt
 
 .PHONY: default clean
 
 all: $(PROGS)
 
 # SIRT
+sirt_model: $(COMMON_OBJS) $(SIRT_OBJS)
+	$(CC) $(CFLAGS) -o $@ $(SIRT_OBJS) $(COMMON_OBJS) $(LIBDIRS) $(LIBS) 
+
 sirt: $(COMMON_OBJS) $(SIRT_OBJS)
 	$(CC) $(CFLAGS) -o $@ $(SIRT_OBJS) $(COMMON_OBJS) $(LIBDIRS) $(LIBS) 
 
 sirt.o: sirt.cc sirt.h
 	$(CC) $(CFLAGS) -c sirt.cc $(INCLUDES)
+
+sirt_main_model.o: sirt_main_model.cc
+	$(CC) $(CFLAGS) -c sirt_main_model.cc $(INCLUDES)
 
 sirt_main.o: sirt_main.cc
 	$(CC) $(CFLAGS) -c sirt_main.cc $(INCLUDES)

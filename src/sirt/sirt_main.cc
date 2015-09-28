@@ -7,7 +7,7 @@
 #include "sirt.h"
 
 struct {
-  std::string const kProjectionFilePath="/Users/bicer/Projects/data/original/13-ID/13id1_fixed_16s.h5";
+  std::string const kProjectionFilePath="/Users/bicer/Projects/data/original/";
   //std::string const kProjectionFilePath="/Users/bicer/Projects/tomopy/shepp-tekin.h5";
   std::string const kProjectionDatasetPath="/exchange/data";
   std::string const kThetaFilePath="/Users/bicer/Projects/data/original/13-ID/13id1_fixed_16s.h5";

@@ -17,9 +17,9 @@ struct {
   std::string const kReconOutputPath="./13id_recon.h5";
   std::string const kReconDatasetPath="/data";
 
-  int const iteration=5;
+  int const iteration=2;
   float center=0.;
-  int const thread_count=1;
+  int const thread_count=4;
   float beta_0 = 10.;
   float beta_1 = 1.;
   float delta_0 = 1.;
