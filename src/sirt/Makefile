@@ -1,10 +1,11 @@
 # Compiler
-CC = clang++
+CC = mpicxx
 
 # Directories
 ROOTDIR = ../..
 # DISP Framework src dir
-DISPDIR = /Users/bicer/Projects/DISP/src/core/
+DISPDIR = ${HOME}/projects/DISP/src/core
+
 # Bin directory
 BINDIR = ${ROOTDIR}/bin/
 
@@ -14,11 +15,11 @@ CFLAGS = -std=c++11 -DAFFINITY_OFF -g -O3 -Wall -Wextra
 # Common data structures and utilities classes
 COMMONDIR = ${ROOTDIR}/src/common
 
-HDF5LIB = /Users/bicer/Projects/hdf5-1.8.13/hdf5/lib
-HDF5INC = /Users/bicer/Projects/hdf5-1.8.13/hdf5/include 
+HDF5LIB = ${TACC_HDF5_LIB}
+HDF5INC = ${TACC_HDF5_INC}
 
-MPILIB = /usr/local/lib/
-MPIINC = /usr/local/include/
+MPILIB = ${MPICH_HOME}/lib64
+MPIINC = ${MPICH_HOME}/include64
 
 LIBS = -lm -lhdf5 -lz -lmpi 
 LIBDIRS = -L$(HDF5LIB) -L$(MPILIB)

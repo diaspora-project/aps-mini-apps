@@ -7,18 +7,20 @@
 #include "sirt.h"
 
 struct {
-  std::string const kProjectionFilePath="/Users/bicer/Projects/data/original/13-ID/13id1_fixed_16s.h5";
-  //std::string const kProjectionFilePath="/Users/bicer/Projects/tomopy/shepp-tekin.h5";
+  std::string const kProjectionFilePath =
+    "/work/03034/bicer/data/tomography/13ID/13id1_fixed_16s.h5";
   std::string const kProjectionDatasetPath="/exchange/data";
-  std::string const kThetaFilePath="/Users/bicer/Projects/data/original/13-ID/13id1_fixed_16s.h5";
-  //std::string const kThetaFilePath="/Users/bicer/Projects/tomopy/shepp-tekin.h5";
+  std::string const kThetaFilePath = 
+    "/work/03034/bicer/data/tomography/13ID/13id1_fixed_16s.h5";
   std::string const kThetaDatasetPath="/exchange/theta";
-  std::string const kReconOutputPath="./13id_recon.h5";
+
+  std::string const kReconOutputPath = 
+    "/work/03034/bicer/data/tomography/13ID/r_13id1_fixed_16s.h5";
   std::string const kReconDatasetPath="/data";
 
-  int const iteration=5;
+  int const iteration=22;
   float center=0.;
-  int const thread_count=0;
+  int const thread_count=16;
 } TraceRuntimeConfig;
 
 int main(int argc, char **argv)
@@ -113,10 +115,12 @@ int main(int argc, char **argv)
   /**************************/
 
   /* Write reconstructed data to disk */
+  std::cout << "About to write" << std::endl; 
   trace_io::WriteRecon(
       trace_metadata, *d_metadata, 
       TraceRuntimeConfig.kReconOutputPath, 
       TraceRuntimeConfig.kReconDatasetPath);
+  std::cout << "Done" << std::endl; 
 
   /* Clean-up the resources */
   delete d_metadata->dims;
