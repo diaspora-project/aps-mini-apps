@@ -96,6 +96,8 @@ int main(int argc, char **argv)
   TraceRuntimeConfig config(argc, argv, comm->rank(), comm->size());
 
   /* Read slice data and setup job information */
+  std::chrono::duration<double> read_tot(0.);
+  auto read_beg = std::chrono::system_clock::now();
   auto d_metadata = trace_io::ReadMetadata(
         config.kProjectionFilePath.c_str(), 
         config.kProjectionDatasetPath.c_str());
@@ -111,6 +113,7 @@ int main(int argc, char **argv)
         config.kThetaFilePath.c_str(), 
         config.kThetaDatasetPath.c_str());
   auto theta = trace_io::ReadTheta(t_metadata);
+  read_tot += (std::chrono::system_clock::now()-read_beg);
   /* Convert degree values to radian */
   trace_utils::DegreeToRadian(*theta);
 
@@ -165,13 +168,20 @@ int main(int argc, char **argv)
   /* Define job size per thread request */
   int64_t req_number = trace_metadata.num_cols();
 
+  std::chrono::duration<double> recon_tot(0.), inplace_tot(0.), update_tot(0.);
   for(int i=0; i<config.iteration; ++i){
     std::cout << "Iteration: " << i << std::endl;
+    auto recon_beg = std::chrono::system_clock::now();
     engine->RunParallelReduction(*slices, req_number);  /// Reconstruction
+    recon_tot += (std::chrono::system_clock::now()-recon_beg);
+    auto inplace_beg = std::chrono::system_clock::now();
     engine->ParInPlaceLocalSynchWrapper();              /// Local combination
+    inplace_tot += (std::chrono::system_clock::now()-inplace_beg);
 
     /// Update reconstruction object
+    auto update_beg = std::chrono::system_clock::now();
     main_recon_space->UpdateRecon(trace_metadata.recon(), main_recon_replica);
+    update_tot += (std::chrono::system_clock::now()-update_beg);
     
     /// Reset iteration
     engine->ResetReductionSpaces(init_val);
@@ -180,10 +190,21 @@ int main(int argc, char **argv)
   /**************************/
 
   /* Write reconstructed data to disk */
+  std::chrono::duration<double> write_tot(0.);
+  auto write_beg = std::chrono::system_clock::now();
   trace_io::WriteRecon(
       trace_metadata, *d_metadata, 
       config.kReconOutputPath, 
       config.kReconDatasetPath);
+  write_tot += (std::chrono::system_clock::now()-write_beg);
+
+  if(comm->rank()==0){
+    std::cout << "Reconstruction time=" << recon_tot.count() << std::endl;
+    std::cout << "Local combination time=" << inplace_tot.count() << std::endl;
+    std::cout << "Update time=" << update_tot.count() << std::endl;
+    std::cout << "Read time=" << read_tot.count() << std::endl;
+    std::cout << "Write time=" << write_tot.count() << std::endl;
+  }
 
   /* Clean-up the resources */
   delete d_metadata->dims;
