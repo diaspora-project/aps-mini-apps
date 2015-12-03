@@ -96,8 +96,10 @@ int main(int argc, char **argv)
   TraceRuntimeConfig config(argc, argv, comm->rank(), comm->size());
 
   /* Read slice data and setup job information */
+  #ifdef TIMERON
   std::chrono::duration<double> read_tot(0.);
   auto read_beg = std::chrono::system_clock::now();
+  #endif
   auto d_metadata = trace_io::ReadMetadata(
         config.kProjectionFilePath.c_str(), 
         config.kProjectionDatasetPath.c_str());
@@ -113,7 +115,9 @@ int main(int argc, char **argv)
         config.kThetaFilePath.c_str(), 
         config.kThetaDatasetPath.c_str());
   auto theta = trace_io::ReadTheta(t_metadata);
+  #ifdef TIMERON
   read_tot += (std::chrono::system_clock::now()-read_beg);
+  #endif
   /* Convert degree values to radian */
   trace_utils::DegreeToRadian(*theta);
 
@@ -168,20 +172,30 @@ int main(int argc, char **argv)
   /* Define job size per thread request */
   int64_t req_number = trace_metadata.num_cols();
 
+  #ifdef TIMERON
   std::chrono::duration<double> recon_tot(0.), inplace_tot(0.), update_tot(0.);
+  #endif
   for(int i=0; i<config.iteration; ++i){
     std::cout << "Iteration: " << i << std::endl;
+    #ifdef TIMERON
     auto recon_beg = std::chrono::system_clock::now();
+    #endif
     engine->RunParallelReduction(*slices, req_number);  /// Reconstruction
+    #ifdef TIMERON
     recon_tot += (std::chrono::system_clock::now()-recon_beg);
     auto inplace_beg = std::chrono::system_clock::now();
+    #endif
     engine->ParInPlaceLocalSynchWrapper();              /// Local combination
+    #ifdef TIMERON
     inplace_tot += (std::chrono::system_clock::now()-inplace_beg);
 
     /// Update reconstruction object
     auto update_beg = std::chrono::system_clock::now();
+    #endif
     main_recon_space->UpdateRecon(trace_metadata.recon(), main_recon_replica);
+    #ifdef TIMERON
     update_tot += (std::chrono::system_clock::now()-update_beg);
+    #endif
     
     /// Reset iteration
     engine->ResetReductionSpaces(init_val);
@@ -190,12 +204,15 @@ int main(int argc, char **argv)
   /**************************/
 
   /* Write reconstructed data to disk */
+  #ifdef TIMERON
   std::chrono::duration<double> write_tot(0.);
   auto write_beg = std::chrono::system_clock::now();
+  #endif
   trace_io::WriteRecon(
       trace_metadata, *d_metadata, 
       config.kReconOutputPath, 
       config.kReconDatasetPath);
+  #ifdef TIMERON
   write_tot += (std::chrono::system_clock::now()-write_beg);
 
   if(comm->rank()==0){
@@ -205,6 +222,7 @@ int main(int argc, char **argv)
     std::cout << "Read time=" << read_tot.count() << std::endl;
     std::cout << "Write time=" << write_tot.count() << std::endl;
   }
+  #endif
 
   /* Clean-up the resources */
   delete d_metadata->dims;
