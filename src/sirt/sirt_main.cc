@@ -1,7 +1,6 @@
 #include "mpi.h"
 #include "trace_h5io.h"
 #include "tclap/CmdLine.h"
-//#include "trace_utils.h"
 #include "disp_comm_mpi.h"
 #include "data_region_base.h"
 #include "disp_engine_reduction.h"
@@ -35,7 +34,7 @@ class TraceRuntimeConfig {
           "string");
         TCLAP::ValueArg<std::string> argReconOutputPath(
           "o", "reconOutputPath", "Output file path for reconstructed image (hdf5)",
-          false, "./output.hdf5", "string");
+          false, "./output.h5", "string");
         TCLAP::ValueArg<std::string> argReconDatasetPath(
           "r", "reconDatasetPath", "Reconstruction dataset path in hdf5 file",
           false, "/data", "string");
