@@ -1,37 +1,103 @@
 #include "mpi.h"
 #include "trace_h5io.h"
-//#include "trace_utils.h"
+#include "tclap/CmdLine.h"
 #include "disp_comm_mpi.h"
 #include "data_region_base.h"
 #include "disp_engine_reduction.h"
 #include "mlem.h"
 
-struct {
-  std::string const kProjectionFilePath="/Users/bicer/Projects/data/original/13-ID/13id1_fixed_1s.h5";
-  //std::string const kProjectionFilePath="/Users/bicer/Projects/tomopy/shepp-tekin.h5";
-  std::string const kProjectionDatasetPath="/exchange/data";
-  std::string const kThetaFilePath="/Users/bicer/Projects/data/original/13-ID/13id1_fixed_1s.h5";
-  //std::string const kThetaFilePath="/Users/bicer/Projects/tomopy/shepp-tekin.h5";
-  std::string const kThetaDatasetPath="/exchange/theta";
-  std::string const kReconOutputPath="./13id_i1.h5";
-  std::string const kReconDatasetPath="/data";
+class TraceRuntimeConfig {
+  public:
+    std::string kProjectionFilePath;
+    std::string kProjectionDatasetPath;
+    std::string kThetaFilePath;
+    std::string kThetaDatasetPath;
+    std::string kReconOutputPath;
+    std::string kReconDatasetPath;
+    int iteration;
+    float center;
+    int thread_count;
 
-  int const iteration=6;
-  float center=0.;
-  int const thread_count=0;
-} TraceRuntimeConfig;
+    TraceRuntimeConfig(int argc, char **argv, int rank, int size){
+      try
+      {
+        TCLAP::CmdLine cmd("MLEM Iterative Image Reconstruction", ' ', "0.01");
+        TCLAP::ValueArg<std::string> argProjectionFilePath(
+          "f", "projectionFilePath", "Projection file path", true, "", "string");
+        TCLAP::ValueArg<std::string> argProjectionDatasetPath(
+          "d", "projectionDatasetPath", "Projection dataset path in hdf5", false,
+          "/exchange/data", "string");
+        TCLAP::ValueArg<std::string> argThetaFilePath(
+          "e", "thetaFilePath", "Theta file path", true, "", "string");
+        TCLAP::ValueArg<std::string> argThetaDatasetPath(
+          "q", "thetaDatasetPath", "Theta dataset path", false, "/exchange/theta",
+          "string");
+        TCLAP::ValueArg<std::string> argReconOutputPath(
+          "o", "reconOutputPath", "Output file path for reconstructed image (hdf5)",
+          false, "./output.h5", "string");
+        TCLAP::ValueArg<std::string> argReconDatasetPath(
+          "r", "reconDatasetPath", "Reconstruction dataset path in hdf5 file",
+          false, "/data", "string");
+        TCLAP::ValueArg<int> argIteration(
+          "i", "iteration", "Number of iterations", true, 0, "int");
+        TCLAP::ValueArg<float> argCenter(
+          "c", "center", "Center value", false, 0., "float");
+        TCLAP::ValueArg<int> argThreadCount(
+          "t", "thread", "Number of threads per process", false, 1, "int");
+
+        cmd.add(argProjectionFilePath);
+        cmd.add(argProjectionDatasetPath);
+        cmd.add(argThetaFilePath);
+        cmd.add(argThetaDatasetPath);
+        cmd.add(argReconOutputPath);
+        cmd.add(argReconDatasetPath);
+        cmd.add(argIteration);
+        cmd.add(argCenter);
+        cmd.add(argThreadCount);
+
+        cmd.parse(argc, argv);
+        kProjectionFilePath = argProjectionFilePath.getValue();
+        kProjectionDatasetPath = argProjectionDatasetPath.getValue();
+        kThetaFilePath = argThetaFilePath.getValue();
+        kThetaDatasetPath = argThetaDatasetPath.getValue();
+        kReconOutputPath = argReconOutputPath.getValue();
+        kReconDatasetPath = argReconDatasetPath.getValue();
+        iteration = argIteration.getValue();
+        center = argCenter.getValue();
+        thread_count = argThreadCount.getValue();
+
+        std::cout << "MPI rank:"<< rank << "; MPI size:" << size << std::endl;
+        if(rank==0)
+        {
+          std::cout << "Projection file path=" << kProjectionFilePath << std::endl;
+          std::cout << "Projection dataset path in hdf5=" << kProjectionDatasetPath << std::endl;
+          std::cout << "Theta file path=" << kThetaFilePath << std::endl;
+          std::cout << "Theta dataset path=" << kThetaDatasetPath << std::endl;
+          std::cout << "Output file path=" << kReconOutputPath << std::endl;
+          std::cout << "Recon. dataset path=" << kReconDatasetPath << std::endl;
+          std::cout << "Number of iterations=" << iteration << std::endl;
+          std::cout << "Center value=" << center << std::endl;
+          std::cout << "Number of threads per process=" << thread_count << std::endl;
+        }
+      }
+      catch (TCLAP::ArgException &e)
+      {
+        std::cerr << "error: " << e.error() << " for arg " << e.argId() << std::endl;
+      }
+    }
+};
 
 int main(int argc, char **argv)
 {
   /* Initiate middleware's communication layer */
   DISPCommBase<float> *comm =
         new DISPCommMPI<float>(&argc, &argv);
-  std::cout << "MPI rank: "<< comm->rank() << "; MPI size: " << comm->size() << std::endl;
+  TraceRuntimeConfig config(argc, argv, comm->rank(), comm->size());
 
   /* Read slice data and setup job information */
   auto d_metadata = trace_io::ReadMetadata(
-        TraceRuntimeConfig.kProjectionFilePath.c_str(), 
-        TraceRuntimeConfig.kProjectionDatasetPath.c_str());
+        config.kProjectionFilePath.c_str(), 
+        config.kProjectionDatasetPath.c_str());
   int beg_index, n_blocks;
   trace_io::DistributeSlices(
       comm->rank(), comm->size(), 
@@ -41,8 +107,8 @@ int main(int argc, char **argv)
 
   /* Read theta data */
   auto t_metadata = trace_io::ReadMetadata(
-        TraceRuntimeConfig.kThetaFilePath.c_str(), 
-        TraceRuntimeConfig.kThetaDatasetPath.c_str());
+        config.kThetaFilePath.c_str(), 
+        config.kThetaDatasetPath.c_str());
   auto theta = trace_io::ReadTheta(t_metadata);
   /* Convert degree values to radian */
   trace_utils::DegreeToRadian(*theta);
@@ -63,8 +129,8 @@ int main(int argc, char **argv)
       n_blocks,                           /// int const num_slices,
       input_slice->metadata->dims[2],     /// int const num_cols,
       input_slice->metadata->dims[2],     /// int const num_grids,
-      TraceRuntimeConfig.center,          /// float const center,
-      1,                                  /// int const num_neighbor_recon_slices,
+      config.center,                      /// float const center,
+      0,                                  /// int const num_neighbor_recon_slices,
       1.);                                /// float const recon_init_val
 
   // INFO: DataRegionBase destructor deletes input_slice.data pointer
@@ -93,7 +159,7 @@ int main(int argc, char **argv)
     new DISPEngineReduction<MLEMReconSpace, float>(
         comm,
         main_recon_space,
-        TraceRuntimeConfig.thread_count); 
+        config.thread_count); 
           /// # threads (0 for auto assign the number of threads)
   /**********************/
 
@@ -102,13 +168,14 @@ int main(int argc, char **argv)
   /* Define job size per thread request */
   int64_t req_number = trace_metadata.num_cols();
 
-  for(int i=0; i<TraceRuntimeConfig.iteration; ++i){
+  for(int i=0; i<config.iteration; ++i){
     std::cout << "Iteration: " << i << std::endl;
     engine->RunParallelReduction(*slices, req_number);  /// Reconstruction
     engine->ParInPlaceLocalSynchWrapper();              /// Local combination
     
     /// Update reconstruction object
     main_recon_space->UpdateRecon(trace_metadata.recon(), main_recon_replica);
+
 
     // Reset iteration
     engine->ResetReductionSpaces(init_val);
@@ -119,8 +186,8 @@ int main(int argc, char **argv)
   /* Write reconstructed data to disk */
   trace_io::WriteRecon(
       trace_metadata, *d_metadata, 
-      TraceRuntimeConfig.kReconOutputPath, 
-      TraceRuntimeConfig.kReconDatasetPath);
+      config.kReconOutputPath, 
+      config.kReconDatasetPath);
 
   /* Clean-up the resources */
   delete d_metadata->dims;

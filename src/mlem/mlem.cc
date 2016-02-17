@@ -8,9 +8,10 @@ void MLEMReconSpace::UpdateRecon(
   size_t cols = comb_replica.cols()/2;
   for(size_t i=0; i<rows; ++i){
     auto replica = comb_replica[i];
-    for(size_t j=0; j<cols; ++j)
+    for(size_t j=0; j<cols; ++j){
       recon[i*cols + j] *=
         replica[j] / replica[cols+j];
+    }
   }
 }
 

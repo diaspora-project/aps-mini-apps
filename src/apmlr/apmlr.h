@@ -23,7 +23,7 @@ class APMLRDataRegion : public DataRegionBase<float, TraceMetadata>{
         float *data, 
         size_t count, 
         TraceMetadata *metadata): 
-      DataRegionBase(data, count, metadata) 
+      DataRegionBase<float, TraceMetadata>(data, count, metadata) 
     {
       size_t count_i = 
         metadata->num_slices()*metadata->num_grids()*metadata->num_grids();
@@ -105,7 +105,7 @@ class APMLRReconSpace :
 
   public:
     APMLRReconSpace(int rows, int cols) : 
-      AReductionSpaceBase(rows, cols) {}
+      AReductionSpaceBase<APMLRReconSpace, float>(rows, cols) {}
 
     virtual ~APMLRReconSpace(){
       Finalize();
