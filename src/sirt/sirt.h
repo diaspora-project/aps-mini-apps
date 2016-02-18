@@ -29,6 +29,8 @@ class SIRTReconSpace :
     float *leng2 = nullptr;
     int *indi = nullptr;
 
+    float *temp_buf = nullptr;
+
     int num_grids;
 
   protected:

@@ -50,9 +50,10 @@ void SIRTReconSpace::UpdateReconReplica(
   slice -= suma_beg_offset;
 
   upd = (ray-simdata) / a2;
+  for (int i=0; i <len-1; ++i) temp_buf[i] = leng[i]*upd;
   for (int i=0; i <len-1; ++i) {
     if (indi[i] >= suma_beg_offset) continue;
-    slice[indi[i]] += leng[i]*upd;
+    slice[indi[i]] += temp_buf[i];
   }
 }
 
@@ -71,6 +72,8 @@ void SIRTReconSpace::Initialize(int n_grids){
   leng = new float[2*num_grids];
   leng2 = new float[2*num_grids];
   indi = new int[2*num_grids];
+
+  temp_buf = new float[2*num_grids];
 }
 
 void SIRTReconSpace::Finalize(){
@@ -85,6 +88,7 @@ void SIRTReconSpace::Finalize(){
   delete [] leng;
   delete [] leng2;
   delete [] indi;
+  delete [] temp_buf;
 }
 
 void SIRTReconSpace::Reduce(MirroredRegionBareBase<float> &input)
