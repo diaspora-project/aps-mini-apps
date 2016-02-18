@@ -15,11 +15,11 @@ CFLAGS = -std=c++11 -DAFFINITY_OFF -g -O3 -Wall -Wextra
 # Common data structures and utilities classes
 COMMONDIR = ${ROOTDIR}/src/common
 
-HDF5LIB = ${TACC_HDF5_LIB}
-HDF5INC = ${TACC_HDF5_INC}
+HDF5LIB = ${HDF5_HOME}/lib
+HDF5INC = ${HDF5_HOME}/include
 
-MPILIB = ${MPICH_HOME}/lib64
-MPIINC = ${MPICH_HOME}/include64
+MPILIB = ${MPI_HOME}/lib
+MPIINC = ${MPI_HOME}/inc
 
 LIBS = -lm -lhdf5 -lz -lmpi 
 LIBDIRS = -L$(HDF5LIB) -L$(MPILIB)
