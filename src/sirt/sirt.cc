@@ -1,4 +1,6 @@
 #include "sirt.h"
+#include <numeric>
+#include <vector>
 
 /// Forward Projection
 float SIRTReconSpace::CalculateSimdata(
@@ -23,8 +25,14 @@ void SIRTReconSpace::UpdateRecon(
     auto replica = comb_replica[i];
     for(size_t j=0; j<cols; ++j)
       recon[i*cols + j] +=
-        replica[j] / replica[cols+j];
+        replica[j*2] / replica[j*2+1];
   }
+}
+
+static inline bool is_aligned( const void *pointer, 
+    size_t byte_count) 
+{ 
+  return (uintptr_t)pointer % byte_count == 0; 
 }
 
 void SIRTReconSpace::UpdateReconReplica(
@@ -34,26 +42,22 @@ void SIRTReconSpace::UpdateReconReplica(
     int const * const indi,
     float *leng2,
     float *leng, 
-    int len,
-    int suma_beg_offset)
+    int len)
 {
-  float upd, a2=0.;
+  float upd=0., a2=0.;
 
   auto &slice_t = reduction_objects()[curr_slice];
-  auto slice = &slice_t[0] + suma_beg_offset;
+  auto slice = &slice_t[0]; 
 
-  for (int i=0; i<len-1; ++i) {
-    if (indi[i] >= suma_beg_offset) continue;
+  for (int i=0; i<len-1; ++i)
     a2 += leng2[i];
-    slice[indi[i]] += leng[i];
-  }
-  slice -= suma_beg_offset;
 
   upd = (ray-simdata) / a2;
-  for (int i=0; i <len-1; ++i) temp_buf[i] = leng[i]*upd;
-  for (int i=0; i <len-1; ++i) {
-    if (indi[i] >= suma_beg_offset) continue;
-    slice[indi[i]] += temp_buf[i];
+  for (int i=0; i<len-1; ++i) {
+    //if (indi[i] >= suma_beg_offset) continue;
+    size_t index = indi[i]*2;
+    slice[index] += leng[i] * upd; 
+    slice[index+1] += leng[i];
   }
 }
 
@@ -72,8 +76,6 @@ void SIRTReconSpace::Initialize(int n_grids){
   leng = new float[2*num_grids];
   leng2 = new float[2*num_grids];
   indi = new int[2*num_grids];
-
-  temp_buf = new float[2*num_grids];
 }
 
 void SIRTReconSpace::Finalize(){
@@ -88,7 +90,6 @@ void SIRTReconSpace::Finalize(){
   delete [] leng;
   delete [] leng2;
   delete [] indi;
-  delete [] temp_buf;
 }
 
 void SIRTReconSpace::Reduce(MirroredRegionBareBase<float> &input)
@@ -170,15 +171,13 @@ void SIRTReconSpace::Reduce(MirroredRegionBareBase<float> &input)
       float simdata = CalculateSimdata(recon, len, indi, leng);
 
       /// Update recon 
-      int suma_beg_offset = num_grids*num_grids;
       UpdateReconReplica(
           simdata, 
           rays[curr_col], 
           curr_slice, 
           indi, 
           leng2, leng,
-          len, 
-          suma_beg_offset);
+          len);
       /*******************************************************/
     }
   }

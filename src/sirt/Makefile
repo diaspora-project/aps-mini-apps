@@ -11,7 +11,7 @@ DISPDIR = ${DISP_HOME}/src/core
 
 # Flags
 CFLAGS = -std=c++11 -O3 -Wall -Wextra 
-CFLAGS += -g -fPIC -DTIMERON
+CFLAGS += -g -ffast-math -Rpass-analysis=loop-vectorize -fPIC -DTIMERON
 #CFLAGS += -S -mllvm --x86-asm-syntax=intel
 
 # Common data structures and utilities classes
@@ -46,19 +46,19 @@ sirt: $(COMMON_OBJS) $(SIRT_OBJS)
 	$(CC) $(CFLAGS) -o $@ $(SIRT_OBJS) $(COMMON_OBJS) $(LIBDIRS) $(LIBS) 
 
 sirt.o: sirt.cc sirt.h
-	$(CC) $(CFLAGS) -o $@ -c sirt.cc $(INCLUDES)
+	$(CC) $(CFLAGS) -c sirt.cc $(INCLUDES)
 
 sirt_main_model.o: sirt_main_model.cc
-	$(CC) $(CFLAGS) -o $@ -c sirt_main_model.cc $(INCLUDES)
+	$(CC) $(CFLAGS) -c sirt_main_model.cc $(INCLUDES)
 
 sirt_main.o: sirt_main.cc
-	$(CC) $(CFLAGS) -o $@ -c sirt_main.cc $(INCLUDES)
+	$(CC) $(CFLAGS) -c sirt_main.cc $(INCLUDES)
 
 trace_h5io.o: $(COMMONDIR)/trace_h5io.cc $(COMMONDIR)/trace_h5io.h
-	$(CC) $(CFLAGS) -o $@ -c $(COMMONDIR)/trace_h5io.cc $(INCLUDES)
+	$(CC) $(CFLAGS) -c $(COMMONDIR)/trace_h5io.cc $(INCLUDES)
 
 trace_utils.o: $(COMMONDIR)/trace_utils.cc $(COMMONDIR)/trace_utils.h
-	$(CC) $(CFLAGS) -o $@ -c $(COMMONDIR)/trace_utils.cc $(INCLUDES)
+	$(CC) $(CFLAGS) -c $(COMMONDIR)/trace_utils.cc $(INCLUDES)
 
 install:
 	mv $(PROGS) $(BINDIR)
