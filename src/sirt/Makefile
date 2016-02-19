@@ -1,5 +1,5 @@
 # Compiler
-CC = clang++
+CC = g++
 
 # Directories
 ROOTDIR = ../..
@@ -11,7 +11,7 @@ DISPDIR = ${DISP_HOME}/src/core
 
 # Flags
 CFLAGS = -std=c++11 -O3 -Wall -Wextra 
-CFLAGS += -g -ffast-math -fPIC -DTIMERON
+CFLAGS += -g -ffast-math -fPIC -DTIMERON -DPREFETCHON #-mprfchw 
 #CFLAGS += -Rpass-analysis=loop-vectorize -S -mllvm --x86-asm-syntax=intel
 
 # Common data structures and utilities classes
