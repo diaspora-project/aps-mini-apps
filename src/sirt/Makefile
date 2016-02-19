@@ -26,7 +26,7 @@ LIBDIRS = -L$(HDF5LIB) -L$(MPILIB)
 INCLUDES = -I$(DISPDIR) -I${COMMONDIR} -I$(HDF5INC) -I$(MPIINC)
 
 # Executable/reconstruction objects
-SIRT_OBJS = sirt.o sirt_main_model.o #sirt_main.o
+SIRT_OBJS = sirt.o sirt_main.o #sirt_main_model.o #sirt_main.o
 COMMON_OBJS = trace_h5io.o trace_utils.o
 
 # Executables
