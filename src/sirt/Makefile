@@ -30,7 +30,7 @@ SIRT_OBJS = sirt.o sirt_main_model.o #sirt_main.o
 COMMON_OBJS = trace_h5io.o trace_utils.o
 
 # Executables
-PROGS = sirt_model #sirt
+PROGS = sirt #sirt_model #sirt
 
 .PHONY: default clean
 
