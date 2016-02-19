@@ -11,8 +11,8 @@ DISPDIR = ${DISP_HOME}/src/core
 
 # Flags
 CFLAGS = -std=c++11 -O3 -Wall -Wextra 
-CFLAGS += -g -ffast-math -Rpass-analysis=loop-vectorize -fPIC -DTIMERON
-#CFLAGS += -S -mllvm --x86-asm-syntax=intel
+CFLAGS += -g -ffast-math -fPIC -DTIMERON
+#CFLAGS += -Rpass-analysis=loop-vectorize -S -mllvm --x86-asm-syntax=intel
 
 # Common data structures and utilities classes
 COMMONDIR = ${ROOTDIR}/src/common

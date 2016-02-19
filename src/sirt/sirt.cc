@@ -29,12 +29,6 @@ void SIRTReconSpace::UpdateRecon(
   }
 }
 
-static inline bool is_aligned( const void *pointer, 
-    size_t byte_count) 
-{ 
-  return (uintptr_t)pointer % byte_count == 0; 
-}
-
 void SIRTReconSpace::UpdateReconReplica(
     float simdata,
     float ray,
