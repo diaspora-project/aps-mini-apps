@@ -195,7 +195,7 @@ void PMLReconSpace::CalculateFG(
   for (i=0; i<num_slices; i++) {
     float *suma = &reduction_objects()[i][0];
     for (int j=0; j<count; j++) {
-      G[i*count + j] += suma[j*2+1];
+      G[i*count+j] += suma[j*2+1];
     }
   }
 }
