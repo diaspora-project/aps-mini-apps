@@ -93,8 +93,7 @@ class PMLReconSpace :
         int curr_slice,
         int const * const indi,
         float *leng, 
-        int len,
-        int suma_beg_offset);
+        int len);
 
 
   public:

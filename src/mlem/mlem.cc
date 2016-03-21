@@ -1,5 +1,23 @@
 #include "mlem.h"
 
+/// Forward Projection
+float MLEMReconSpace::CalculateSimdata(
+    float *recon,
+    int len,
+    int *indi,
+    float *leng)
+{
+  float simdata = 0.;
+  for(int i=0; i<len-1; ++i){
+#ifdef PREFETCHON
+    size_t index = indi[i+32];
+    __builtin_prefetch(&(recon[index]),1,0);
+#endif
+    simdata += recon[indi[i]]*leng[i];
+  }
+  return simdata;
+}
+
 void MLEMReconSpace::UpdateRecon(
     ADataRegion<float> &recon,                  // Reconstruction object
     DataRegion2DBareBase<float> &comb_replica)  // Locally combined replica
@@ -10,23 +28,11 @@ void MLEMReconSpace::UpdateRecon(
     auto replica = comb_replica[i];
     for(size_t j=0; j<cols; ++j){
       recon[i*cols + j] *=
-        replica[j] / replica[cols+j];
+        replica[j*2] / replica[j*2+1];
     }
   }
 }
 
-/// Forward Projection
-float MLEMReconSpace::CalculateSimdata(
-    float *recon,
-    int len,
-    int *indi,
-    float *leng)
-{
-  float simdata = 0.;
-  for(int i=0; i<len-1; ++i)
-    simdata += recon[indi[i]]*leng[i];
-  return simdata;
-}
 
 void MLEMReconSpace::UpdateReconReplica(
     float simdata,
@@ -34,24 +40,23 @@ void MLEMReconSpace::UpdateReconReplica(
     int curr_slice,
     int const * const indi,
     float *leng, 
-    int len,
-    int suma_beg_offset)
+    int len)
 {
   float upd;
 
   auto &slice_t = reduction_objects()[curr_slice];
-  auto slice = &slice_t[0] + suma_beg_offset;
-
-  for (int i=0; i<len-1; ++i) {
-    if (indi[i] >= suma_beg_offset) continue;
-    slice[indi[i]] += leng[i];
-  }
-  slice -= suma_beg_offset;
+  auto slice = &slice_t[0];
 
   upd = (ray/simdata);
+
   for (int i=0; i <len-1; ++i) {
-    if (indi[i] >= suma_beg_offset) continue;
-    slice[indi[i]] += leng[i]*upd;
+#ifdef PREFETCHON
+    size_t index2 = indi[i+32]*2;
+    __builtin_prefetch(slice+index2,1,0);
+#endif
+    size_t index = indi[i]*2;
+    slice[index] += leng[i]*upd;
+    slice[index+1] += leng[i];
   }
 }
 
@@ -163,15 +168,13 @@ void MLEMReconSpace::Reduce(MirroredRegionBareBase<float> &input)
       float simdata = CalculateSimdata(recon, len, indi, leng);
 
       /// Update recon 
-      int suma_beg_offset = num_grids*num_grids;
       UpdateReconReplica(
           simdata, 
           rays[curr_col], 
           curr_slice, 
           indi, 
           leng,
-          len, 
-          suma_beg_offset);
+          len);
       /*******************************************************/
     }
   }

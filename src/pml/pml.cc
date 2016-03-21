@@ -16,7 +16,7 @@ void PMLReconSpace::UpdateRecon(
     for(size_t j=0; j<cols; ++j){
       size_t index = (i*cols) + j;
       recon[index] =
-        (-G[index] + sqrt(G[index]*G[index] - 8*replica[j]*F[index])) /
+        (-G[index] + sqrt(G[index]*G[index] - 8*replica[j*2]*F[index])) /
           (4*F[index]);
     }
   }
@@ -28,12 +28,13 @@ void PMLReconSpace::CalculateFG(
 {
   int num_slices = slices.metadata().num_slices();
   int num_grids = slices.metadata().num_grids();
-  int count = num_grids*num_grids;
 
   ADataRegion<float> &recon = slices.metadata().recon();
   float *F = slices.F();
   float *G = slices.G();
-  float *suma = &reduction_objects()[0][count];
+
+  int count = num_grids*num_grids;
+  float *suma = &reduction_objects()[0][0];
 
   int k, n, m, q, i;
   int ind0, indg[8];
@@ -195,7 +196,7 @@ void PMLReconSpace::CalculateFG(
 
   for (i=0; i<num_slices; i++) {
     for (int j=0; j<count; j++) {
-      G[i*count + j] += suma[j];
+      G[i*count + j] += suma[j*2];
     }
   }
 }
@@ -208,8 +209,13 @@ float PMLReconSpace::CalculateSimdata(
     float *leng)
 {
   float simdata = 0.;
-  for(int i=0; i<len-1; ++i)
+  for(int i=0; i<len-1; ++i){
+#ifdef PREFETCHON
+    size_t index = indi[i+32];
+    __builtin_prefetch(&(recon[index]),1,0);
+#endif
     simdata += recon[indi[i]]*leng[i];
+  }
   return simdata;
 }
 
@@ -221,22 +227,30 @@ void PMLReconSpace::UpdateReconReplica(
     int curr_slice,
     int const * const indi,
     float *leng, 
-    int len,
-    int suma_beg_offset)
+    int len)
 {
   auto &slice_t = reduction_objects()[curr_slice];
-  auto slice = &slice_t[0] + suma_beg_offset;
+  //auto slice = &slice_t[0] + suma_beg_offset;
+  auto slice = &slice_t[0];
 
-  for (int i=0; i<len-1; ++i) {
-    if (indi[i] >= suma_beg_offset) continue;
-    slice[indi[i]] += leng[i];
-  }
-  slice -= suma_beg_offset;
+  //for (int i=0; i<len-1; ++i) {
+  //  if (indi[i] >= suma_beg_offset) continue;
+  //  slice[indi[i]] += leng[i];
+  //}
+  //slice -= suma_beg_offset;
 
   float upd = ray/simdata;
   for (int i=0; i <len-1; ++i) {
-    if (indi[i] >= suma_beg_offset) continue;
-    slice[indi[i]] -= recon[indi[i]]*leng[i]*upd;
+    //if (indi[i] >= suma_beg_offset) continue;
+#ifdef PREFETCHON
+    size_t indi2 = indi[i+32];
+    size_t index2 = indi2*2;
+    __builtin_prefetch(recon+indi2,1,0);
+    __builtin_prefetch(slice+index2,1,0);
+#endif
+    size_t index = indi[i]*2;
+    slice[index] -= recon[indi[i]]*leng[i]*upd;
+    slice[index+1] += leng[i];
   }
 }
 
@@ -347,7 +361,7 @@ void PMLReconSpace::Reduce(MirroredRegionBareBase<float> &input)
       float simdata = CalculateSimdata(recon, len, indi, leng);
 
       /// Update recon
-      int suma_beg_offset = num_grids*num_grids;
+      //int suma_beg_offset = num_grids*num_grids;
       UpdateReconReplica(
           simdata, 
           rays[curr_col], 
@@ -355,8 +369,7 @@ void PMLReconSpace::Reduce(MirroredRegionBareBase<float> &input)
           curr_slice, 
           indi, 
           leng,
-          len, 
-          suma_beg_offset);
+          len);
       /*******************************************************/
     }
   }

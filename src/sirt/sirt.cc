@@ -1,7 +1,4 @@
 #include "sirt.h"
-#include <numeric>
-#include <vector>
-//#include <emmintrin.h>
 
 /// Forward Projection
 float SIRTReconSpace::CalculateSimdata(
@@ -54,32 +51,16 @@ void SIRTReconSpace::UpdateReconReplica(
 
   upd = (ray-simdata) / a2;
 
-  //int remain = (len-1)%2;
-
   int i=0;
   for (; i<(len-1); ++i) {
-    //if (indi[i] >= suma_beg_offset) continue;
-    //_mm_prefetch(slice+index2 ,_MM_HINT_T0);
 #ifdef PREFETCHON
     size_t index2 = indi[i+32]*2;
     __builtin_prefetch(slice+index2,1,0);
 #endif
     size_t index = indi[i]*2;
-    slice[index] += leng[i] * upd; 
+    slice[index] += leng[i]*upd; 
     slice[index+1] += leng[i];
-
-    //size_t index3 = indi[i+33]*2;
-    //__builtin_prefetch(slice+index3,1,0);
-    //size_t index_1 = indi[i+1]*2;
-    //slice[index_1] += leng[i+1] * upd; 
-    //slice[index_1+1] += leng[i+1];
   }
-  
-  //for (; i<(len-1); ++i) {
-  //  size_t index = indi[i]*2;
-  //  slice[index] += leng[i] * upd; 
-  //  slice[index+1] += leng[i];
-  //}
 }
 
 

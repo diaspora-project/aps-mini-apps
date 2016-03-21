@@ -6,8 +6,6 @@ ROOTDIR = ../..
 # Bin directory
 BINDIR = ${ROOTDIR}/bin/
 
-# DISP Framework src dir
-DISPDIR = ${DISP_HOME}/src/core
 
 # Flags
 CFLAGS = -std=c++11 -O3 -Wall -Wextra 
@@ -16,6 +14,8 @@ CFLAGS += -g -ffast-math -fPIC -DTIMERON -DPREFETCHON #-mprfchw
 
 # Common data structures and utilities classes
 COMMONDIR = ${ROOTDIR}/src/common
+# DISP Framework src dir
+DISPDIR = ${COMMONDIR}/DISP/core
 
 HDF5LIB = ${HDF5_HOME}/lib
 HDF5INC = ${HDF5_HOME}/include
