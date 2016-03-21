@@ -33,9 +33,6 @@ void PMLReconSpace::CalculateFG(
   float *F = slices.F();
   float *G = slices.G();
 
-  int count = num_grids*num_grids;
-  float *suma = &reduction_objects()[0][0];
-
   int k, n, m, q, i;
   int ind0, indg[8];
 
@@ -194,9 +191,11 @@ void PMLReconSpace::CalculateFG(
     }
   }
 
+  int count = num_grids*num_grids;
   for (i=0; i<num_slices; i++) {
+    float *suma = &reduction_objects()[i][0];
     for (int j=0; j<count; j++) {
-      G[i*count + j] += suma[j*2];
+      G[i*count + j] += suma[j*2+1];
     }
   }
 }
@@ -230,18 +229,10 @@ void PMLReconSpace::UpdateReconReplica(
     int len)
 {
   auto &slice_t = reduction_objects()[curr_slice];
-  //auto slice = &slice_t[0] + suma_beg_offset;
   auto slice = &slice_t[0];
-
-  //for (int i=0; i<len-1; ++i) {
-  //  if (indi[i] >= suma_beg_offset) continue;
-  //  slice[indi[i]] += leng[i];
-  //}
-  //slice -= suma_beg_offset;
 
   float upd = ray/simdata;
   for (int i=0; i <len-1; ++i) {
-    //if (indi[i] >= suma_beg_offset) continue;
 #ifdef PREFETCHON
     size_t indi2 = indi[i+32];
     size_t index2 = indi2*2;
@@ -361,7 +352,6 @@ void PMLReconSpace::Reduce(MirroredRegionBareBase<float> &input)
       float simdata = CalculateSimdata(recon, len, indi, leng);
 
       /// Update recon
-      //int suma_beg_offset = num_grids*num_grids;
       UpdateReconReplica(
           simdata, 
           rays[curr_col], 
