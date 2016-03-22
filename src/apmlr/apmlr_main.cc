@@ -19,7 +19,7 @@ class TraceRuntimeConfig {
     int iteration;
     float center;
     int thread_count;
-    float beta_0 = 10.;
+    float beta_0 = .1;
     float beta_1 = 1.;
     float delta_0 = 1.;
     float delta_1 = 1.;
