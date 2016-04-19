@@ -232,5 +232,6 @@ int main(int argc, char **argv)
   delete theta;
   delete engine;
   delete input_slice;
+  delete comm;
 }
 

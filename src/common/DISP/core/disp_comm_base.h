@@ -15,6 +15,8 @@ class DISPCommBase{
     /// Accessors
     int rank() const { return rank_; }
     int size() const { return size_; }
+
+    virtual ~DISPCommBase(){};
 };
 
 #endif    // DISP_SRC_DISP_COMM_BASE_H
