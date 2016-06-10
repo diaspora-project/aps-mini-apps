@@ -971,7 +971,6 @@ void APMLRReconSpace::CalculateFG(
       remaining_slices, num_grids);
 
   // Calculate G
-  //int slice_count = metadata.num_cols() * metadata.num_cols();
   int count = num_grids*num_grids;
   for (int i=0; i<num_slices; i++) {
     float *suma = &reduction_objects()[i][0];
@@ -1012,13 +1011,6 @@ void APMLRReconSpace::UpdateReconReplica(
 {
   auto &slice_t = reduction_objects()[curr_slice];
   auto slice = &slice_t[0];
-  //auto slice = &slice_t[0] + suma_beg_offset;
-
-  //for (int i=0; i<len-1; ++i) {
-  //  if (indi[i] >= suma_beg_offset) continue;
-  //  slice[indi[i]] += leng[i];
-  //}
-  //slice -= suma_beg_offset;
 
   float upd = ray/simdata;
   for (int i=0; i <len-1; ++i) {
@@ -1032,9 +1024,6 @@ void APMLRReconSpace::UpdateReconReplica(
     slice[index] -= recon[indi[i]]*leng[i]*upd;
     slice[index+1] += leng[i];
   }
-    //if (indi[i] >= suma_beg_offset) continue;
-    //slice[indi[i]] -= recon[indi[i]]*leng[i]*upd;
-  //}
 }
 
 void APMLRReconSpace::Initialize(int n_grids){
