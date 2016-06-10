@@ -3,22 +3,23 @@ CC = clang++
 
 # Directories
 ROOTDIR = ../../
-# DISP Framework src dir
-DISPDIR = /Users/bicer/Projects/DISP/src/core/
 # Bin directory
 BINDIR = ${ROOTDIR}/bin/
 
 # Flags
-CFLAGS = -std=c++11 -DAFFINITY_OFF -g -O3 -Wall -Wextra 
+CFLAGS = -std=c++11 -O3 -Wall -Wextra
+CFLAGS += -g -ffast-math -fPIC -DTIMERON -DPREFETCHON 
 
 # Common data structures and utilities classes
 COMMONDIR = ${ROOTDIR}/src/common
+# DISP Framework src dir
+DISPDIR = ${COMMONDIR}/DISP/core
 
-HDF5LIB = /Users/bicer/Projects/hdf5-1.8.13/hdf5/lib
-HDF5INC = /Users/bicer/Projects/hdf5-1.8.13/hdf5/include 
+HDF5LIB = ${HDF5_HOME}/lib
+HDF5INC = ${HDF5_HOME}/include 
 
-MPILIB = /usr/local/lib/
-MPIINC = /usr/local/include/
+MPILIB = ${MPI_HOME}/lib
+MPIINC = ${MPI_HOME}}/include
 
 LIBS = -lm -lhdf5 -lz -lmpi 
 LIBDIRS = -L$(HDF5LIB) -L$(MPILIB)

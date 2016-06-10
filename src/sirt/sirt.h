@@ -46,8 +46,7 @@ class SIRTReconSpace :
         int const * const indi,
         float *leng2,
         float *leng, 
-        int len,
-        int suma_beg_offset);
+        int len);
 
   public:
     SIRTReconSpace(int rows, int cols) : 

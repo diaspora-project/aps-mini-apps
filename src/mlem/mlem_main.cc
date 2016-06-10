@@ -176,7 +176,6 @@ int main(int argc, char **argv)
     /// Update reconstruction object
     main_recon_space->UpdateRecon(trace_metadata.recon(), main_recon_replica);
 
-
     // Reset iteration
     engine->ResetReductionSpaces(init_val);
     slices->ResetMirroredRegionIter();

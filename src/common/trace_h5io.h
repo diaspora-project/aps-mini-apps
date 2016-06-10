@@ -45,13 +45,22 @@ namespace trace_io {
       hsize_t dataset_ndims, hsize_t *dataset_dims, /* Dataset dimension values */
       int target_dim,
       char const *file_name, char const *dataset_name,
-      MPI_Comm comm, MPI_Info info);
+      MPI_Comm comm, MPI_Info info, H5FD_mpio_xfer_t mpio_xfer_flag);
 
+  /// Calls WriteRecon with mpio_xfer_flag=H5FD_MPIO_COLLECTIVE, i.e. default
+  /// transfer type is collectie io.
   void WriteRecon(
       TraceMetadata &rank_metadata, /// This rank's in memory data
       H5Metadata &dataset_metadata, /// Metadata of all dataset
       std::string const output_path,     /// Output file path
       std::string const dataset_path);   /// Dataset path in output file
+
+  void WriteRecon(
+      TraceMetadata &rank_metadata, /// This rank's in memory data
+      H5Metadata &dataset_metadata, /// Metadata of all dataset
+      std::string const output_path,     /// Output file path
+      std::string const dataset_path,     /// Dataset path in output file
+      H5FD_mpio_xfer_t mpio_xfer_flag);   /// MPI-IO transfer type 
 }
 
 #endif /// DISP_APPS_RECONSTRUCTION_COMMON_H5IO_H

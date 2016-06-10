@@ -66,9 +66,9 @@ class TraceRuntimeConfig {
         center = argCenter.getValue();
         thread_count = argThreadCount.getValue();
 
-        std::cout << "MPI rank:"<< rank << "; MPI size:" << size << std::endl;
         if(rank==0)
         {
+          std::cout << "MPI rank:"<< rank << "; MPI size:" << size << std::endl;
           std::cout << "Projection file path=" << kProjectionFilePath << std::endl;
           std::cout << "Projection dataset path in hdf5=" << kProjectionDatasetPath << std::endl;
           std::cout << "Theta file path=" << kThetaFilePath << std::endl;
@@ -232,5 +232,6 @@ int main(int argc, char **argv)
   delete theta;
   delete engine;
   delete input_slice;
+  delete comm;
 }
 
