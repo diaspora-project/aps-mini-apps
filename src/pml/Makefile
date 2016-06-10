@@ -15,11 +15,11 @@ COMMONDIR = ${ROOTDIR}/src/common
 # DISP Framework src dir
 DISPDIR = ${COMMONDIR}/DISP/core
 
-HDF5LIB = /Users/bicer/Projects/hdf5-1.8.13/hdf5/lib
-HDF5INC = /Users/bicer/Projects/hdf5-1.8.13/hdf5/include 
+HDF5LIB = ${HDF5_HOME}/lib
+HDF5INC = ${HDF5_HOME}/include 
 
-MPILIB = /usr/local/lib/
-MPIINC = /usr/local/include/
+MPILIB = ${MPI_HOME}/lib
+MPIINC = ${MPI_HOME}/include
 
 LIBS = -lm -lhdf5 -lz -lmpi 
 LIBDIRS = -L$(HDF5LIB) -L$(MPILIB)

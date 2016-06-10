@@ -8,8 +8,8 @@ BINDIR = ${ROOTDIR}/bin/
 
 
 # Flags
-CFLAGS = -std=c++11 -O3 -Wall -Wextra 
-CFLAGS += -g -ffast-math -fPIC -DTIMERON -DPREFETCHON #-mprfchw 
+CFLAGS = -std=c++11 -O2 -Wall -Wextra 
+CFLAGS += -g -ffast-math -fPIC -DTIMERON #-DPREFETCHON #-mprfchw 
 #CFLAGS += -Rpass-analysis=loop-vectorize -S -mllvm --x86-asm-syntax=intel
 
 # Common data structures and utilities classes
@@ -32,7 +32,7 @@ SIRT_OBJS = sirt.o sirt_main.o #sirt_main_model.o #sirt_main.o
 COMMON_OBJS = trace_h5io.o trace_utils.o
 
 # Executables
-PROGS = sirt #sirt_model #sirt
+PROGS = sirt #sirt_model 
 
 .PHONY: default clean
 

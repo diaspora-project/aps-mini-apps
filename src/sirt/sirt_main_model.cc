@@ -85,14 +85,14 @@ class TDataMock
       num_threads_{num_threads}
     {
       data_ = new float[num_projs_*num_slices_*num_cols_];
-      theta_ = new float[num_cols_];
+      theta_ = new float[num_projs_];
     }
 
     TDataMock(int argc, char **argv)
     {
       ParseArgs(argc,argv);
       data_ = new float[num_projs_*num_slices_*num_cols_];
-      theta_ = new float[num_cols_];
+      theta_ = new float[num_projs_];
     }
 
     ~TDataMock()
@@ -111,8 +111,8 @@ class TDataMock
     }
     void GenProjTheta(float beg, float end)
     {
-      float rate = (end-beg)/num_cols_;
-      for(int i=0; i<num_cols_; ++i)
+      float rate = (end-beg)/num_projs_;
+      for(int i=0; i<num_projs_; ++i)
         theta_[i] = (beg+i*rate)*kPI/180.;
     }
 
