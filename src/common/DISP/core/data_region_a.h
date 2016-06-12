@@ -223,7 +223,7 @@ class ADataRegion {
      * 
      * \returns Cloned data region pointer.
      */
-    ADataRegion<T>* Clone();
+    virtual ADataRegion<T>* Clone()=0;
 
     /**
      * \brief Compares the boundaries of this instance and \p region.
@@ -328,12 +328,6 @@ template <typename T>
 size_t ADataRegion<T>::size() const {
   return count_*sizeof(T);
 }
-
-template <typename T>
-ADataRegion<T>* ADataRegion<T>::Clone(){
-  ADataRegion<T> *region = new ADataRegion<T>(*this);
-  return region;
-};
 
 template <typename T>
 T& ADataRegion<T>::item (size_t index) const {

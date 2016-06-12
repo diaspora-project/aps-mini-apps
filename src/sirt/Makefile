@@ -1,5 +1,5 @@
 # Compiler
-CC = g++
+CC = mpicxx
 
 # Directories
 ROOTDIR = ../..
@@ -8,7 +8,7 @@ BINDIR = ${ROOTDIR}/bin/
 
 
 # Flags
-CFLAGS = -std=c++11 -O2 -Wall -Wextra 
+CFLAGS = -O2 -Wall -Wextra -std=c++11 
 CFLAGS += -g -ffast-math -fPIC -DTIMERON #-DPREFETCHON #-mprfchw 
 #CFLAGS += -Rpass-analysis=loop-vectorize -S -mllvm --x86-asm-syntax=intel
 
@@ -21,9 +21,9 @@ HDF5LIB = ${HDF5_HOME}/lib
 HDF5INC = ${HDF5_HOME}/include
 
 MPILIB = ${MPI_HOME}/lib
-MPIINC = ${MPI_HOME}/inc
+MPIINC = ${MPI_HOME}/include
 
-LIBS = -lm -lhdf5 -lz -lmpi 
+LIBS = -static -lm -lhdf5 -lmpi  # -lz
 LIBDIRS = -L$(HDF5LIB) -L$(MPILIB)
 INCLUDES = -I$(DISPDIR) -I${COMMONDIR} -I$(HDF5INC) -I$(MPIINC)
 

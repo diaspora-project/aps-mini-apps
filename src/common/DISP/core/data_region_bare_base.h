@@ -31,6 +31,9 @@ class DataRegionBareBase : public ADataRegion<T> {
     }
 
   public:
+    virtual ADataRegion<T>* Clone(){
+      return new DataRegionBareBase<T>(*this);
+    };
 
     // Constructors
     explicit DataRegionBareBase(const size_t count)
