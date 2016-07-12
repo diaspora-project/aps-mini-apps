@@ -95,8 +95,9 @@ int DISPEngineBase<RST, DT>::NumProcessors(){
   // Below code should works with Linux, Solaris, AIX and Mac OS X(>= 10.4)
   //num_procs = sysconf(_SC_NPROCESSORS_ONLN);
 
-  if(num_procs<1)
-    throw std::length_error("Number of available processors is <1!");
+  // If unable to compute hardware threads, set default to 1
+  if(num_procs<1) num_procs = 1;
+    // throw std::length_error("Number of available processors is <1!");
 
   return num_procs;
 }

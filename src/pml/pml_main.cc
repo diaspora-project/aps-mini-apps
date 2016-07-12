@@ -118,7 +118,7 @@ int main(int argc, char **argv)
         config.kThetaDatasetPath.c_str());
   auto theta = trace_io::ReadTheta(t_metadata);
   /* Convert degree values to radian */
-  trace_utils::DegreeToRadian(*theta);
+  // trace_utils::DegreeToRadian(*theta);
   trace_utils::Absolute(
       static_cast<float *>(input_slice->data),
       input_slice->count);

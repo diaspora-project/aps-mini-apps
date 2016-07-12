@@ -32,7 +32,7 @@ class PMLDataRegion : public DataRegionBase<float, TraceMetadata>{
         float *data, 
         size_t count, 
         TraceMetadata *metadata): 
-      DataRegionBase(data, count, metadata) 
+      DataRegionBase<float, TraceMetadata>(data, count, metadata) 
     {
       size_t count_i = 
         metadata->num_slices()*metadata->num_grids()*metadata->num_grids();
@@ -98,7 +98,7 @@ class PMLReconSpace :
 
   public:
     PMLReconSpace(int rows, int cols) : 
-      AReductionSpaceBase(rows, cols) {}
+      AReductionSpaceBase<PMLReconSpace, float>(rows, cols) {}
 
     virtual ~PMLReconSpace(){
       Finalize();
