@@ -1,14 +1,15 @@
 # Compiler
-CC = clang++
+CC = mpicxx
 
 # Directories
-ROOTDIR = ../../
+ROOTDIR = ../..
 # Bin directory
 BINDIR = ${ROOTDIR}/bin/
 
+
 # Flags
-CFLAGS = -std=c++11 -O3 -Wall -Wextra
-CFLAGS += -g -ffast-math -fPIC -DTIMERON -DPREFETCHON
+CFLAGS = -O3 -Wall -Wextra -std=c++11 
+CFLAGS += -g -fPIC -DTIMERON
 
 # Common data structures and utilities classes
 COMMONDIR = ${ROOTDIR}/src/common
@@ -16,33 +17,41 @@ COMMONDIR = ${ROOTDIR}/src/common
 DISPDIR = ${COMMONDIR}/DISP/core
 
 HDF5LIB = ${HDF5_HOME}/lib
-HDF5INC = ${HDF5_HOME}/include 
+HDF5INC = ${HDF5_HOME}/include
 
-MPILIB = ${MPI_HOME}/lib
-MPIINC = ${MPI_HOME}/include
-
-LIBS = -lm -lhdf5 -lz -lmpi 
-LIBDIRS = -L$(HDF5LIB) -L$(MPILIB)
-INCLUDES = -I$(DISPDIR) -I${COMMONDIR} -I$(HDF5INC) -I$(MPIINC)
+LIBS = -lm -lhdf5 
+LIBDIRS = -L$(HDF5LIB) 
+INCLUDES = -I$(DISPDIR) -I${COMMONDIR} -I$(HDF5INC) 
 
 # Executable/reconstruction objects
-PML_OBJS = pml.o pml_main.o
-COMMON_OBJS = trace_h5io.o trace_utils.o
+PML_OBJS = pml.o pml_main_model.o #pml_main.o
+COMMON_OBJS = trace_h5io.o trace_utils.o trace_comm.o
 
 # Executables
-PROGS = pml
+PROGS = pml_model #pml
 
 .PHONY: default clean
 
 all: $(PROGS)
 
-# SIRT
+# pml
+pml_model: $(COMMON_OBJS) $(PML_OBJS)
+	$(CC) $(CFLAGS) -o $@ $(PML_OBJS) $(COMMON_OBJS) $(LIBDIRS) $(LIBS) 
+
 pml: $(COMMON_OBJS) $(PML_OBJS)
-	$(CC) $(CFLAGS) -o $@ $(PML_OBJS) $(COMMON_OBJS) $(INCLUDES) $(LIBDIRS) $(LIBS)
+	$(CC) $(CFLAGS) -o $@ $(PML_OBJS) $(COMMON_OBJS) $(LIBDIRS) $(LIBS) 
+
+pml.o: pml.cc pml.h
+	$(CC) $(CFLAGS) -c pml.cc $(INCLUDES)
+
+pml_main_model.o: pml_main_model.cc
+	$(CC) $(CFLAGS) -c pml_main_model.cc $(INCLUDES)
+
 pml_main.o: pml_main.cc
 	$(CC) $(CFLAGS) -c pml_main.cc $(INCLUDES)
-pml.o: pml.cc
-	$(CC) $(CFLAGS) -c pml.cc $(INCLUDES)
+
+trace_comm.o: $(COMMONDIR)/trace_comm.cc $(COMMONDIR)/trace_comm.h
+	$(CC) $(CFLAGS) -c $(COMMONDIR)/trace_comm.cc $(INCLUDES)
 
 trace_h5io.o: $(COMMONDIR)/trace_h5io.cc $(COMMONDIR)/trace_h5io.h
 	$(CC) $(CFLAGS) -c $(COMMONDIR)/trace_h5io.cc $(INCLUDES)

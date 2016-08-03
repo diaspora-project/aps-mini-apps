@@ -1,12 +1,10 @@
 #include <chrono>
 #include "mpi.h"
 #include "trace_h5io.h"
-//#include "trace_utils.h"
 #include "disp_comm_mpi.h"
 #include "data_region_base.h"
 #include "disp_engine_reduction.h"
-#include "sirt.h"
-
+#include "pml.h"
 
 class TDataMock
 {
@@ -122,11 +120,10 @@ class TDataMock
 };
 
 
-
 int main(int argc, char **argv)
 {
   auto tot_beg_time = std::chrono::high_resolution_clock::now();
-  
+
   /* Initiate middleware's communication layer */
   DISPCommBase<float> *comm =
         new DISPCommMPI<float>(&argc, &argv);
@@ -151,11 +148,13 @@ int main(int argc, char **argv)
       mock_data.num_slices(),                           /// int const num_slices,
       mock_data.num_cols(),     /// int const num_cols,
       mock_data.num_cols(),     /// int const num_grids,
-      0.);         /// float const center
+      0.,           /// float const center
+      0,            /// int const num_neighbor recon_slices
+      1.);         /// recon init
 
   // INFO: DataRegionBase destructor deletes input_slice.data pointer
-  ADataRegion<float> *slices = 
-    new DataRegionBase<float, TraceMetadata>(
+  auto slices = 
+    new PMLDataRegion(
         static_cast<float *>(mock_data.projs().data()),
         trace_metadata.count(),
         &trace_metadata);
@@ -166,7 +165,7 @@ int main(int argc, char **argv)
   /* The size of the reconstruction object (in reconstruction space) is
    * twice the reconstruction object size, because of the length storage
    */
-  auto main_recon_space = new SIRTReconSpace(
+  auto main_recon_space = new PMLReconSpace(
       mock_data.num_slices(), 
       2*trace_metadata.num_cols()*trace_metadata.num_cols());
   main_recon_space->Initialize(trace_metadata.num_grids());
@@ -175,13 +174,12 @@ int main(int argc, char **argv)
   main_recon_replica.ResetAllItems(init_val);
 
   /* Prepare processing engine and main reduction space for other threads */
-  DISPEngineBase<SIRTReconSpace, float> *engine =
-    new DISPEngineReduction<SIRTReconSpace, float>(
+  DISPEngineBase<PMLReconSpace, float> *engine =
+    new DISPEngineReduction<PMLReconSpace, float>(
         comm,
         main_recon_space,
-        mock_data.num_threads());
-        /// # threads (0 for auto assign the number of threads)
-
+        mock_data.num_threads()); 
+          /// # threads (0 for auto assign the number of threads)
   /**********************/
 
   /**************************/
@@ -191,20 +189,23 @@ int main(int argc, char **argv)
 
   auto rec_beg_time = std::chrono::high_resolution_clock::now();
   for(int i=0; i<mock_data.num_iter(); ++i){
-    //std::cout << "Iteration: " << i << std::endl;
+    std::cout << "Iteration: " << i << std::endl;
     engine->RunParallelReduction(*slices, req_number);  /// Reconstruction
     engine->ParInPlaceLocalSynchWrapper();              /// Local combination
+    /// main_recon_space has the combined values
+    
+    slices->SetFG(0.);
+    main_recon_space->CalculateFG(*slices, 10.);
 
     /// Update reconstruction object
-    main_recon_space->UpdateRecon(trace_metadata.recon(), main_recon_replica);
-    
-    /// Reset iteration
+    main_recon_space->UpdateRecon(*slices, main_recon_replica);
+
+    // Reset iteration
     engine->ResetReductionSpaces(init_val);
     slices->ResetMirroredRegionIter();
   }
   std::chrono::duration<double> rec_time = 
     std::chrono::high_resolution_clock::now()-rec_beg_time; 
-
   /**************************/
 
   std::chrono::duration<double> tot_time = 

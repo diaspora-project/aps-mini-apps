@@ -8,9 +8,8 @@ BINDIR = ${ROOTDIR}/bin/
 
 
 # Flags
-CFLAGS = -O2 -Wall -Wextra -std=c++11 
-CFLAGS += -g -ffast-math -fPIC -DTIMERON #-DPREFETCHON #-mprfchw 
-#CFLAGS += -Rpass-analysis=loop-vectorize -S -mllvm --x86-asm-syntax=intel
+CFLAGS = -O3 -Wall -Wextra -std=c++11 
+CFLAGS += -g -fPIC -DTIMERON #-DPREFETCHON
 
 # Common data structures and utilities classes
 COMMONDIR = ${ROOTDIR}/src/common
@@ -20,19 +19,16 @@ DISPDIR = ${COMMONDIR}/DISP/core
 HDF5LIB = ${HDF5_HOME}/lib
 HDF5INC = ${HDF5_HOME}/include
 
-MPILIB = ${MPI_HOME}/lib
-MPIINC = ${MPI_HOME}/include
-
-LIBS = -static -lm -lhdf5 -lmpi  # -lz
-LIBDIRS = -L$(HDF5LIB) -L$(MPILIB)
-INCLUDES = -I$(DISPDIR) -I${COMMONDIR} -I$(HDF5INC) -I$(MPIINC)
+LIBS = -lm -lhdf5
+LIBDIRS = -L$(HDF5LIB) 
+INCLUDES = -I$(DISPDIR) -I${COMMONDIR} -I$(HDF5INC)
 
 # Executable/reconstruction objects
-SIRT_OBJS = sirt.o sirt_main.o #sirt_main_model.o #sirt_main.o
+SIRT_OBJS = sirt.o sirt_main_model.o #sirt_main.o
 COMMON_OBJS = trace_h5io.o trace_utils.o
 
 # Executables
-PROGS = sirt #sirt_model 
+PROGS = sirt_model 
 
 .PHONY: default clean
 
