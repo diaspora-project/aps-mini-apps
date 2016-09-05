@@ -9,7 +9,7 @@ BINDIR = ${ROOTDIR}/bin/
 
 # Flags
 CFLAGS = -O3 -Wall -Wextra -std=c++11 
-CFLAGS += -g -fPIC -DTIMERON
+CFLAGS += -no-prec-div -ansi-alias -no-inline-factor -no-inline-max-size -g -fPIC -DTIMERON #-qopt-report=4 -qopt-report-phase ipo #no-inline-factor
 
 # Common data structures and utilities classes
 COMMONDIR = ${ROOTDIR}/src/common
