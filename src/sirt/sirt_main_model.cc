@@ -1,4 +1,5 @@
 #include <chrono>
+#include <random>
 #include "mpi.h"
 #include "trace_h5io.h"
 //#include "trace_utils.h"
@@ -99,9 +100,13 @@ class TDataMock
     ~TDataMock() { }
 
 
-    void GenParData(float val)
+    void GenParData(float mean, float stddev)
     {
-      for (auto &elem : *vdata_) elem=val;
+      //std::random_device rd;
+      //std::mt19937 mt(rd());
+      //std::uniform_real_distribution<float> dist(mean, stddev);
+      std::srand(std::time(0));
+      for (auto &elem : *vdata_) elem = 1.*std::rand()/RAND_MAX;
     }
     void GenProjTheta(float beg, float end)
     {
@@ -133,7 +138,7 @@ int main(int argc, char **argv)
 
   auto dg_beg_time = std::chrono::high_resolution_clock::now();
   TDataMock mock_data(argc, argv);
-  mock_data.GenParData(0.);
+  mock_data.GenParData(0.5, 0.1);
   mock_data.GenProjTheta(0., 180.);
   std::chrono::duration<double> dg_time = 
     std::chrono::high_resolution_clock::now()-dg_beg_time; 

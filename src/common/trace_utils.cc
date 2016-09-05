@@ -23,7 +23,7 @@ void trace_utils::DegreeToRadian(trace_io::H5Data &theta)
   theta.data = buf;
 }
 
-// Backward projection
+// Backprojection
 void trace_utils::UpdateRecon(
     ADataRegion<float> &recon,                  // Reconstruction object
     DataRegion2DBareBase<float> &comb_replica)  // Locally combined replica
