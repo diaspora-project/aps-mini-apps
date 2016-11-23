@@ -5,6 +5,7 @@
 #include "data_region_base.h"
 #include "disp_engine_reduction.h"
 #include "sirt.h"
+#include "mock_streaming.h"
 
 class TraceRuntimeConfig {
   public:
@@ -136,7 +137,7 @@ int main(int argc, char **argv)
       config.center);         /// float const center
 
   // INFO: DataRegionBase destructor deletes input_slice.data pointer
-  ADataRegion<float> *slices = 
+  auto *slices = 
     new DataRegionBase<float, TraceMetadata>(
         static_cast<float *>(input_slice->data),
         trace_metadata.count(),
@@ -172,35 +173,48 @@ int main(int argc, char **argv)
   int64_t req_number = trace_metadata.num_cols();
 
   #ifdef TIMERON
-  std::chrono::duration<double> recon_tot(0.), inplace_tot(0.), update_tot(0.);
+  std::chrono::duration<double> recon_tot(0.), inplace_tot(0.), update_tot(0.), 
+    datagen_tot(0.);
   #endif
-  for(int i=0; i<config.iteration; ++i){
-    std::cout << "Iteration: " << i << std::endl;
-    #ifdef TIMERON
-    auto recon_beg = std::chrono::system_clock::now();
-    #endif
-    engine->RunParallelReduction(*slices, req_number);  /// Reconstruction
-    #ifdef TIMERON
-    recon_tot += (std::chrono::system_clock::now()-recon_beg);
-    auto inplace_beg = std::chrono::system_clock::now();
-    #endif
-    engine->ParInPlaceLocalSynchWrapper();              /// Local combination
-    #ifdef TIMERON
-    inplace_tot += (std::chrono::system_clock::now()-inplace_beg);
+  MockStreamingData projection_stream(*slices, 64, 10);
+  DataRegionBase<float, TraceMetadata> *curr_slices = nullptr;
+  while(true){
+      #ifdef TIMERON
+      auto datagen_beg = std::chrono::system_clock::now();
+      #endif
+      curr_slices = projection_stream.ReadWindow();
+      #ifdef TIMERON
+      datagen_tot += (std::chrono::system_clock::now()-datagen_beg);
+      #endif
+      if(curr_slices == nullptr) break;
 
-    /// Update reconstruction object
-    auto update_beg = std::chrono::system_clock::now();
-    #endif
-    main_recon_space->UpdateRecon(trace_metadata.recon(), main_recon_replica);
-    #ifdef TIMERON
-    update_tot += (std::chrono::system_clock::now()-update_beg);
-    #endif
-    
-    /// Reset iteration
-    engine->ResetReductionSpaces(init_val);
-    slices->ResetMirroredRegionIter();
+      #ifdef TIMERON
+      auto recon_beg = std::chrono::system_clock::now();
+      #endif
+      engine->RunParallelReduction(*curr_slices, req_number);  /// Reconstruction
+      #ifdef TIMERON
+      recon_tot += (std::chrono::system_clock::now()-recon_beg);
+      auto inplace_beg = std::chrono::system_clock::now();
+      #endif
+      engine->ParInPlaceLocalSynchWrapper();              /// Local combination
+      #ifdef TIMERON
+      inplace_tot += (std::chrono::system_clock::now()-inplace_beg);
+
+      /// Update reconstruction object
+      auto update_beg = std::chrono::system_clock::now();
+      #endif
+      main_recon_space->UpdateRecon(trace_metadata.recon(), main_recon_replica);
+      #ifdef TIMERON
+      update_tot += (std::chrono::system_clock::now()-update_beg);
+      #endif
+
+      std::cout << "Proj id=" << projection_stream.curr_proj_index() <<
+        "; iteration=" << projection_stream.curr_iteration() << std::endl;
+      
+      /// Reset iteration
+      engine->ResetReductionSpaces(init_val);
   }
-  /**************************/
+    /**************************/
 
   /* Write reconstructed data to disk */
   #ifdef TIMERON
@@ -220,6 +234,7 @@ int main(int argc, char **argv)
     std::cout << "Update time=" << update_tot.count() << std::endl;
     std::cout << "Read time=" << read_tot.count() << std::endl;
     std::cout << "Write time=" << write_tot.count() << std::endl;
+    std::cout << "Data gen total time=" << datagen_tot.count() << std::endl;
   }
   #endif
 

@@ -1,5 +1,5 @@
 # Compiler
-CC = mpicxx
+CC = mpiicpc
 
 # Directories
 ROOTDIR = ../..
@@ -9,7 +9,8 @@ BINDIR = ${ROOTDIR}/bin/
 
 # Flags
 CFLAGS = -O3 -Wall -Wextra -std=c++11 
-CFLAGS += -no-inline-factor -no-inline-max-size -g -fPIC -DTIMERON
+CFLAGS += -g -fPIC -DTIMERON
+#CFLAGS += -no-inline-factor -no-inline-max-size 
 #CFLAGS += -no-prec-div -ansi-alias 
 
 # Common data structures and utilities classes

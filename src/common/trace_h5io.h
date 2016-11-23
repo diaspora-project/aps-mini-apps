@@ -2,6 +2,7 @@
 #define DISP_APPS_RECONSTRUCTION_COMMON_H5IO_H 
 
 #include "hdf5.h"
+#include "mpi.h"
 #include "trace_data.h"
 
 namespace trace_io {

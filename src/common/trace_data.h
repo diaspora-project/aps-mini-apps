@@ -167,6 +167,10 @@ class TraceMetadata{
     float const * gridy() const { return gridy_; };
 
     ADataRegion<float>& recon() const { return *recon_; };
+    void recon(ADataRegion<float>& rcn) { 
+      //if ((recon_ != &rcn)) { delete recon_; }
+      recon_ = &rcn; 
+    };
     int num_neighbor_recon_slices() const { return num_neighbor_recon_slices_; };
 
     void Print()

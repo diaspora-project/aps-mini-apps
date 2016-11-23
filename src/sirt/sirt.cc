@@ -24,12 +24,22 @@ void SIRTReconSpace::UpdateRecon(
 {
   size_t rows = comb_replica.rows();
   size_t cols = comb_replica.cols()/2;
+  size_t nans = 0;
   for(size_t i=0; i<rows; ++i){
     auto replica = comb_replica[i];
-    for(size_t j=0; j<cols; ++j)
-      recon[i*cols + j] +=
-        replica[j*2] / replica[j*2+1];
+    for(size_t j=0; j<cols; ++j){
+      float upd = replica[j*2] / replica[j*2+1];
+      if(std::isnan(upd)) {
+        nans++;
+        //std::cout << "NaN value: replica[" << j*2 << "]=" << replica[j*2] <<
+        //  " / replica[" << j*2+1 << "]=" << replica[j*2+1]  << 
+        //  " = " << replica[j*2]/replica[j*2+1] << std::endl;
+        continue;
+      }
+      recon[i*cols + j] += upd;
+    }
   }
+  std::cout << "NaNs=" << nans << std::endl;
 }
 
 void SIRTReconSpace::UpdateReconReplica(
@@ -113,11 +123,13 @@ void SIRTReconSpace::Reduce(MirroredRegionBareBase<float> &input)
     metadata.RayProjection(rays.index()+rays.count()-1) - curr_proj;
 
   /* Reconstruction start */
+  //for (int i=0; i<100; ++i){
   for (int proj = curr_proj; proj<=(curr_proj+count_projs); ++proj) {
     float theta_q = theta[proj];
     int quadrant = trace_utils::CalculateQuadrant(theta_q);
     float sinq = sinf(theta_q);
     float cosq = cosf(theta_q);
+    //std::cout << "Current proj=" << curr_proj  << "; Theta=" << theta_q << std::endl;
 
     int curr_slice = metadata.RaySlice(rays.index());
     int curr_slice_offset = curr_slice*num_grids*num_grids;
