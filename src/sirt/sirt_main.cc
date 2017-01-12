@@ -1,3 +1,4 @@
+#include <iomanip>
 #include "mpi.h"
 #include "trace_h5io.h"
 #include "tclap/CmdLine.h"
@@ -119,7 +120,7 @@ int main(int argc, char **argv)
   read_tot += (std::chrono::system_clock::now()-read_beg);
   #endif
   /* Convert degree values to radian */
-  trace_utils::DegreeToRadian(*theta);
+  //trace_utils::DegreeToRadian(*theta);
 
   /* Setup metadata data structure */
   // INFO: TraceMetadata destructor frees theta->data!
@@ -175,14 +176,16 @@ int main(int argc, char **argv)
   #ifdef TIMERON
   std::chrono::duration<double> recon_tot(0.), inplace_tot(0.), update_tot(0.), 
     datagen_tot(0.);
+  std::chrono::duration<double> write_tot(0.);
   #endif
-  MockStreamingData projection_stream(*slices, 64, 10);
+  MockStreamingData projection_stream(*slices, 50, 40); /// # iterations is uselestt if ReadSlidingWindow is called
   DataRegionBase<float, TraceMetadata> *curr_slices = nullptr;
   while(true){
       #ifdef TIMERON
       auto datagen_beg = std::chrono::system_clock::now();
       #endif
-      curr_slices = projection_stream.ReadWindow();
+      curr_slices = projection_stream.ReadSlidingWindow();
+      //curr_slices = projection_stream.ReadSlidingOrderedSubsetting();
       #ifdef TIMERON
       datagen_tot += (std::chrono::system_clock::now()-datagen_beg);
       #endif
@@ -192,6 +195,7 @@ int main(int argc, char **argv)
       auto recon_beg = std::chrono::system_clock::now();
       #endif
       engine->RunParallelReduction(*curr_slices, req_number);  /// Reconstruction
+
       #ifdef TIMERON
       recon_tot += (std::chrono::system_clock::now()-recon_beg);
       auto inplace_beg = std::chrono::system_clock::now();
@@ -206,6 +210,21 @@ int main(int argc, char **argv)
       main_recon_space->UpdateRecon(trace_metadata.recon(), main_recon_replica);
       #ifdef TIMERON
       update_tot += (std::chrono::system_clock::now()-update_beg);
+      auto write_beg = std::chrono::system_clock::now();
+      #endif
+      //if(!(projection_stream.curr_iteration() % 10)){
+      if(!(projection_stream.curr_proj_index() % 16)){
+        std::stringstream iteration_stream;
+        iteration_stream << std::setfill('0') << std::setw(6) <<projection_stream.curr_proj_index();
+                                                                //projection_stream.curr_iteration();
+        std::string outputpath = iteration_stream.str() + "-recon.h5";
+        trace_io::WriteRecon(
+            trace_metadata, *d_metadata, 
+            outputpath, 
+            config.kReconDatasetPath);
+      }
+      #ifdef TIMERON
+      write_tot += (std::chrono::system_clock::now()-write_beg);
       #endif
 
       std::cout << "Proj id=" << projection_stream.curr_proj_index() <<
@@ -218,7 +237,7 @@ int main(int argc, char **argv)
 
   /* Write reconstructed data to disk */
   #ifdef TIMERON
-  std::chrono::duration<double> write_tot(0.);
+  //std::chrono::duration<double> write_tot(0.);
   auto write_beg = std::chrono::system_clock::now();
   #endif
   trace_io::WriteRecon(
@@ -226,7 +245,7 @@ int main(int argc, char **argv)
       config.kReconOutputPath, 
       config.kReconDatasetPath);
   #ifdef TIMERON
-  write_tot += (std::chrono::system_clock::now()-write_beg);
+  //write_tot += (std::chrono::system_clock::now()-write_beg);
 
   if(comm->rank()==0){
     std::cout << "Reconstruction time=" << recon_tot.count() << std::endl;

@@ -1,3 +1,4 @@
+#include <iomanip>
 #include "mpi.h"
 #include "trace_h5io.h"
 #include "tclap/CmdLine.h"
@@ -5,6 +6,7 @@
 #include "data_region_base.h"
 #include "disp_engine_reduction.h"
 #include "pml.h"
+#include "mock_streaming.h"
 
 class TraceRuntimeConfig {
   public:
@@ -101,6 +103,11 @@ int main(int argc, char **argv)
         new DISPCommMPI<float>(&argc, &argv);
   TraceRuntimeConfig config(argc, argv, comm->rank(), comm->size());
 
+  #ifdef TIMERON
+  std::chrono::duration<double> read_tot(0.);
+  auto read_beg = std::chrono::system_clock::now();
+  #endif
+
   /* Read slice data and setup job information */
   auto d_metadata = trace_io::ReadMetadata(
         config.kProjectionFilePath.c_str(), 
@@ -117,6 +124,9 @@ int main(int argc, char **argv)
         config.kThetaFilePath.c_str(), 
         config.kThetaDatasetPath.c_str());
   auto theta = trace_io::ReadTheta(t_metadata);
+  #ifdef TIMERON
+  read_tot += (std::chrono::system_clock::now()-read_beg);
+  #endif
   /* Convert degree values to radian */
   // trace_utils::DegreeToRadian(*theta);
   trace_utils::Absolute(
@@ -146,7 +156,8 @@ int main(int argc, char **argv)
         static_cast<float *>(input_slice->data),
         trace_metadata.count(),
         &trace_metadata);
-
+  DataRegionBase<float, TraceMetadata>* cast_slices = 
+    static_cast<DataRegionBase<float, TraceMetadata>*>(slices);
   /***********************/
   /* Initiate middleware */
   /* Prepare main reduction space and its objects */
@@ -175,29 +186,95 @@ int main(int argc, char **argv)
   /* Define job size per thread request */
   int64_t req_number = trace_metadata.num_cols();
 
-  for(int i=0; i<config.iteration; ++i){
-    std::cout << "Iteration: " << i << std::endl;
-    engine->RunParallelReduction(*slices, req_number);  /// Reconstruction
-    engine->ParInPlaceLocalSynchWrapper();              /// Local combination
-    /// main_recon_space has the combined values
-    
-    slices->SetFG(0.);
-    main_recon_space->CalculateFG(*slices, config.beta);
+  #ifdef TIMERON
+  std::chrono::duration<double> recon_tot(0.), inplace_tot(0.), update_tot(0.), 
+    datagen_tot(0.);
+  std::chrono::duration<double> write_tot(0.);
+  #endif
+  MockStreamingData projection_stream(*cast_slices, 180, config.iteration); /// # iterations is uselestt if ReadSlidingWindow is called
+  DataRegionBase<float, TraceMetadata> *curr_slices = nullptr;
 
-    /// Update reconstruction object
-    main_recon_space->UpdateRecon(*slices, main_recon_replica);
+  //for(int i=0; i<config.iteration; ++i){
+  while(true){
+      #ifdef TIMERON
+      auto datagen_beg = std::chrono::system_clock::now();
+      #endif
+      //curr_slices = projection_stream.ReadSlidingWindow();
+      curr_slices = projection_stream.ReadOrderedSubsetting();
+      #ifdef TIMERON
+      datagen_tot += (std::chrono::system_clock::now()-datagen_beg);
+      #endif
+      if(curr_slices == nullptr) break;
 
-    // Reset iteration
-    engine->ResetReductionSpaces(init_val);
-    slices->ResetMirroredRegionIter();
+      #ifdef TIMERON
+      auto recon_beg = std::chrono::system_clock::now();
+      #endif
+      engine->RunParallelReduction(*curr_slices, req_number);  /// Reconstruction
+      #ifdef TIMERON
+      recon_tot += (std::chrono::system_clock::now()-recon_beg);
+      auto inplace_beg = std::chrono::system_clock::now();
+      #endif
+      engine->ParInPlaceLocalSynchWrapper();              /// Local combination
+      #ifdef TIMERON
+      inplace_tot += (std::chrono::system_clock::now()-inplace_beg);
+
+      /// Update reconstruction object
+      auto update_beg = std::chrono::system_clock::now();
+      #endif
+      slices->SetFG(0.);
+      main_recon_space->CalculateFG(*slices, config.beta);
+
+      main_recon_space->UpdateRecon(
+        trace_metadata.recon(), 
+        slices->F(), slices->G(), 
+        main_recon_replica);
+      #ifdef TIMERON
+      update_tot += (std::chrono::system_clock::now()-update_beg);
+      auto write_beg = std::chrono::system_clock::now();
+      #endif
+
+      if(!(projection_stream.curr_iteration() % 20)){
+      //if(!(projection_stream.curr_proj_index() % 16)){
+        std::stringstream iteration_stream;
+        iteration_stream << std::setfill('0') << std::setw(6) <<//projection_stream.curr_proj_index();
+                                                                projection_stream.curr_iteration();
+        std::string outputpath = iteration_stream.str() + "-recon.h5";
+        trace_io::WriteRecon(
+            trace_metadata, *d_metadata, 
+            outputpath, 
+            config.kReconDatasetPath);
+      }
+      #ifdef TIMERON
+      write_tot += (std::chrono::system_clock::now()-write_beg);
+      #endif
+
+      std::cout << "Proj id=" << projection_stream.curr_proj_index() <<
+        "; iteration=" << projection_stream.curr_iteration() << std::endl;
+      
+
+      /// Reset iteration
+      engine->ResetReductionSpaces(init_val);
   }
   /**************************/
-
-  /* Write reconstructed data to disk */
+  #ifdef TIMERON
+  //std::chrono::duration<double> write_tot(0.);
+  auto write_beg = std::chrono::system_clock::now();
+  #endif
   trace_io::WriteRecon(
       trace_metadata, *d_metadata, 
       config.kReconOutputPath, 
       config.kReconDatasetPath);
+  #ifdef TIMERON
+  //write_tot += (std::chrono::system_clock::now()-write_beg);
+  if(comm->rank()==0){
+    std::cout << "Reconstruction time=" << recon_tot.count() << std::endl;
+    std::cout << "Local combination time=" << inplace_tot.count() << std::endl;
+    std::cout << "Update time=" << update_tot.count() << std::endl;
+    std::cout << "Read time=" << read_tot.count() << std::endl;
+    std::cout << "Write time=" << write_tot.count() << std::endl;
+    std::cout << "Data gen total time=" << datagen_tot.count() << std::endl;
+  }
+  #endif
 
   /* Clean-up the resources */
   delete d_metadata->dims;

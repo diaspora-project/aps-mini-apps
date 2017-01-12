@@ -9,8 +9,11 @@ BINDIR = ${ROOTDIR}/bin/
 
 # Flags
 CFLAGS = -O3 -Wall -Wextra -std=c++11 
-CFLAGS += -g -fPIC -DTIMERON
-#CFLAGS += -no-inline-factor -no-inline-max-size 
+CFLAGS += -g -fPIC -DTIMERON 
+#CFLAGS += -fast #didn't work, compilation error
+#CFLAGS += -falign-functions=16 -falign-loops=16 # didn't help
+#CFLAGS += -no-prec-div # didn't help
+#CFLAGS += -no-inline-factor -no-inline-max-size  # didn't help
 #CFLAGS += -no-prec-div -ansi-alias 
 
 # Common data structures and utilities classes

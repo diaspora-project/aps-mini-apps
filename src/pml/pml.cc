@@ -1,25 +1,36 @@
 #include "pml.h"
 
 void PMLReconSpace::UpdateRecon(
-    PMLDataRegion &slices,                      // Input slices, metadata, recon
+    //PMLDataRegion &slices,                      // Input slices, metadata, recon
+    ADataRegion<float> &recon,                  // Reconstruction object
+    float *F, float *G,
     DataRegion2DBareBase<float> &comb_replica)  // Locally combined replica
 {
-  auto &recon = slices.metadata().recon();
+  //auto &recon = slices.metadata().recon();
   size_t rows = comb_replica.rows();
   size_t cols = comb_replica.cols()/2;
 
-  float *F = slices.F();
-  float *G = slices.G();
+  //float *F = slices.F();
+  //float *G = slices.G();
 
+  size_t nans=0;
   for(size_t i=0; i<rows; ++i){
     auto replica = comb_replica[i];
     for(size_t j=0; j<cols; ++j){
       size_t index = (i*cols) + j;
-      recon[index] =
-        (-G[index] + sqrt(G[index]*G[index] - 8*replica[j*2]*F[index])) /
+      float upd =  (-G[index] + sqrt(G[index]*G[index] - 8*replica[j*2]*F[index])) /
           (4*F[index]);
+      if(std::isnan(upd)) {
+        nans++; 
+        //std::cout << "NaN value: replica[" << j*2 << "]=" << replica[j*2] <<
+        //  " / replica[" << j*2+1 << "]=" << replica[j*2+1]  << 
+        //  " = " << replica[j*2]/replica[j*2+1] << std::endl;
+        continue;
+      } 
+      else recon[index] = upd;
     }
   }
+  std::cout << "NaNs=" << nans << std::endl;
 }
 
 void PMLReconSpace::CalculateFG(

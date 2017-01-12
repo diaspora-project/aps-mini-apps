@@ -105,7 +105,9 @@ class PMLReconSpace :
     }
 
     void UpdateRecon(
-        PMLDataRegion &slices, // Reconstruction object
+        //PMLDataRegion &slices, // Reconstruction object
+        ADataRegion<float> &recon,                  // Reconstruction object
+        float *F, float *G,
         DataRegion2DBareBase<float> &comb_replica); // Locally combined replica
 
     void CalculateFG(

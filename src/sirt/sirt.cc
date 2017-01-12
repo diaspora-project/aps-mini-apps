@@ -30,7 +30,7 @@ void SIRTReconSpace::UpdateRecon(
     for(size_t j=0; j<cols; ++j){
       float upd = replica[j*2] / replica[j*2+1];
       if(std::isnan(upd)) {
-        nans++;
+        nans++; 
         //std::cout << "NaN value: replica[" << j*2 << "]=" << replica[j*2] <<
         //  " / replica[" << j*2+1 << "]=" << replica[j*2+1]  << 
         //  " = " << replica[j*2]/replica[j*2+1] << std::endl;
