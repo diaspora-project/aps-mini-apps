@@ -48,7 +48,7 @@ class MLEMReconSpace :
 
   public:
     MLEMReconSpace(int rows, int cols) : 
-      AReductionSpaceBase(rows, cols) {}
+      AReductionSpaceBase<MLEMReconSpace, float>(rows, cols) {}
 
     virtual ~MLEMReconSpace(){
       Finalize();
