@@ -9,6 +9,9 @@ namespace trace_utils {
 
   void DegreeToRadian(trace_io::H5Data &theta);
   void Absolute(float *data, size_t count);
+  void RemoveNegatives(float *data, size_t count);
+  void RemoveNaNs(float *data, size_t count);
+  void RemoveAbnormals(float *data, size_t count);
 
   // Backward projection
   void UpdateRecon(

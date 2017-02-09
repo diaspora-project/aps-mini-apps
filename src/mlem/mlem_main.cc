@@ -121,10 +121,15 @@ int main(int argc, char **argv)
   read_tot += (std::chrono::system_clock::now()-read_beg);
   #endif
   /* Convert degree values to radian */
-  //trace_utils::DegreeToRadian(*theta);
-  trace_utils::Absolute(
+  trace_utils::DegreeToRadian(*theta);
+  size_t ray_count = 
+    input_slice->metadata->dims[0]*input_slice->count*input_slice->metadata->dims[2]; 
+  trace_utils::RemoveNegatives(
       static_cast<float *>(input_slice->data),
-      input_slice->count);
+      ray_count);
+  trace_utils::RemoveAbnormals(
+      static_cast<float *>(input_slice->data),
+      ray_count);
 
   /* Setup metadata data structure */
   // INFO: TraceMetadata destructor frees theta->data!
@@ -183,7 +188,7 @@ int main(int argc, char **argv)
     datagen_tot(0.);
   std::chrono::duration<double> write_tot(0.);
   #endif
-  MockStreamingData projection_stream(*slices, 128, 80); /// # iterations is uselestt if ReadSlidingWindow is called
+  MockStreamingData projection_stream(*slices, 180, 80); /// # iterations is uselestt if ReadSlidingWindow is called
   DataRegionBase<float, TraceMetadata> *curr_slices = nullptr;
 
   while(true){

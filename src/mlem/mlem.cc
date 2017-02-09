@@ -24,13 +24,19 @@ void MLEMReconSpace::UpdateRecon(
 {
   size_t rows = comb_replica.rows();
   size_t cols = comb_replica.cols()/2;
+  size_t nans = 0;
   for(size_t i=0; i<rows; ++i){
     auto replica = comb_replica[i];
     for(size_t j=0; j<cols; ++j){
+      float upd = replica[j*2] / replica[j*2+1];
+      if(!std::isnormal(upd)){
+        nans++; continue;
+      }
       recon[i*cols + j] *=
         replica[j*2] / replica[j*2+1];
     }
   }
+  std::cout << "NaNs=" << nans << std::endl;
 }
 
 
@@ -64,6 +70,7 @@ void MLEMReconSpace::UpdateReconReplica(
 void MLEMReconSpace::Initialize(int n_grids){
   num_grids = n_grids; 
 
+  try{
   coordx = new float[num_grids+1]; 
   coordy = new float[num_grids+1];
   ax = new float[num_grids+1];
@@ -74,6 +81,9 @@ void MLEMReconSpace::Initialize(int n_grids){
   coory = new float[2*num_grids];
   leng = new float[2*num_grids];
   indi = new int[2*num_grids];
+  } catch (std::bad_alloc& ba) {
+    std::cerr << "bad_alloc caught: " << ba.what() << '\n';
+  }
 }
 
 void MLEMReconSpace::Finalize(){
@@ -107,6 +117,7 @@ void MLEMReconSpace::Reduce(MirroredRegionBareBase<float> &input)
   int count_projs = 
     metadata.RayProjection(rays.index()+rays.count()-1) - curr_proj;
 
+
   /* Reconstruction start */
   for (int proj = curr_proj; proj<=(curr_proj+count_projs); ++proj) {
     float theta_q = theta[proj];
@@ -117,6 +128,9 @@ void MLEMReconSpace::Reduce(MirroredRegionBareBase<float> &input)
     int curr_slice = metadata.RaySlice(rays.index());
     int curr_slice_offset = curr_slice*num_grids*num_grids;
     float *recon = (&(metadata.recon()[0])+curr_slice_offset);
+    //std::cout << "recon=" << recon << std::endl;
+
+    //std::cout << "curr_proj=" << proj << "/" << count_projs  << "; offset=" << &(rays[0]) << "-" << &(rays[0])+(num_cols-1) << "; theta_q=" << theta_q << std::endl;
 
     for (int curr_col=0; curr_col<num_cols; ++curr_col) {
       /// Calculate coordinates

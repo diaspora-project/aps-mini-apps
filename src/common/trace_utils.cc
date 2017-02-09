@@ -7,6 +7,42 @@ void trace_utils::Absolute(float *data, size_t count)
     data[i] = std::fabs(data[i]);
 }
 
+void trace_utils::RemoveNegatives(float *data, size_t count)
+{
+  size_t zeros = 0;
+  for(size_t i=0; i<count; ++i){
+    if(data[i]<0) {
+      data[i]=0;
+      ++zeros;
+    }
+  }
+  std::cout << "Negatives set to 0=" << zeros << " out of " << count  << std::endl;
+}
+
+void trace_utils::RemoveNaNs(float *data, size_t count)
+{
+  size_t nans = 0;
+  for(size_t i=0; i<count; ++i){
+    if(std::isnan(data[i])) {
+      data[i]=0;
+      ++nans;
+    }
+  }
+  std::cout << "NaNs set to 0=" << nans << std::endl;
+}
+
+void trace_utils::RemoveAbnormals(float *data, size_t count)
+{
+  size_t abns = 0;
+  for(size_t i=0; i<count; ++i){
+    if(!std::isnormal(data[i])) {
+      data[i]=0;
+      ++abns;
+    }
+  }
+  std::cout << "Abnormal numbers set to 0=" << abns << " out of " << count << std::endl;
+}
+
 void trace_utils::DegreeToRadian(trace_io::H5Data &theta)
 {
   int num_elem = theta.metadata->dims[0];

@@ -8,9 +8,9 @@ ROOTDIR = ../../
 BINDIR = ${ROOTDIR}/bin/
 
 # Flags
-CFLAGS = -O3 -Wall -Wextra -std=c++11 
+CFLAGS = -O2 -Wall -Wextra -std=c++11 
 CFLAGS += -g -fPIC -DTIMERON 
-CFLAGS += -no-inline-factor -no-inline-max-size  # didn't help
+#CFLAGS += -no-inline-factor -no-inline-max-size  # didn't help
 
 # Common data structures and utilities classes
 COMMONDIR = ${ROOTDIR}/src/common
@@ -26,10 +26,11 @@ INCLUDES = -I$(DISPDIR) -I${COMMONDIR} -I$(HDF5INC)
 
 # Executable/reconstruction objects
 MLEM_OBJS = mlem.o mlem_main.o
+MLEM_ORDERED_OBJS = mlem.o mlem_ordered_main.o
 COMMON_OBJS = trace_h5io.o trace_utils.o
 
 # Executables
-PROGS = mlem
+PROGS = mlem mlem_ordered
 
 .PHONY: default clean
 
@@ -38,8 +39,16 @@ all: $(PROGS)
 # SIRT
 mlem: $(COMMON_OBJS) $(MLEM_OBJS)
 	$(CC) $(CFLAGS) -o $@ $(MLEM_OBJS) $(COMMON_OBJS) $(INCLUDES) $(LIBDIRS) $(LIBS)
+
+mlem_ordered: $(COMMON_OBJS) $(MLEM_ORDERED_OBJS)
+	$(CC) $(CFLAGS) -o $@ $(MLEM_ORDERED_OBJS) $(COMMON_OBJS) $(INCLUDES) $(LIBDIRS) $(LIBS)
+
 mlem_main.o: mlem_main.cc
 	$(CC) $(CFLAGS) -c mlem_main.cc $(INCLUDES)
+
+mlem_ordered_main.o: mlem_ordered_main.cc
+	$(CC) $(CFLAGS) -c mlem_ordered_main.cc $(INCLUDES)
+
 mlem.o: mlem.cc
 	$(CC) $(CFLAGS) -c mlem.cc $(INCLUDES)
 

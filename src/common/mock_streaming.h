@@ -251,4 +251,5 @@ class MockStreamingData
 
     int curr_proj_index() const { return curr_proj_index_; }
     int curr_iteration() const { return curr_iteration_; }
+    void Reset() {curr_proj_index_=0; curr_iteration_=0; }
 };
