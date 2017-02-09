@@ -16,9 +16,17 @@ class TraceRuntimeConfig {
     std::string kThetaDatasetPath;
     std::string kReconOutputPath;
     std::string kReconDatasetPath;
+    std::string kReconOutputDir;
     int iteration;
     float center;
     int thread_count;
+    int subsets = 1;
+
+    int subset_iteration = 1;
+    int block_remove_subsets = 1;
+    int block_remove_iteration = 1;
+    int write_freq = 0;
+    int write_block_freq = 0;
 
     TraceRuntimeConfig(int argc, char **argv, int rank, int size){
       try
@@ -37,25 +45,47 @@ class TraceRuntimeConfig {
         TCLAP::ValueArg<std::string> argReconOutputPath(
           "o", "reconOutputPath", "Output file path for reconstructed image (hdf5)",
           false, "./output.h5", "string");
+        TCLAP::ValueArg<std::string> argReconOutputDir(
+          "", "recon-output-dir", "Output directory for the streaming outputs",
+          false, ".", "string");
         TCLAP::ValueArg<std::string> argReconDatasetPath(
           "r", "reconDatasetPath", "Reconstruction dataset path in hdf5 file",
           false, "/data", "string");
         TCLAP::ValueArg<int> argIteration(
           "i", "iteration", "Number of iterations", true, 0, "int");
+        TCLAP::ValueArg<int> argSubsetIteration(
+          "", "subset-iteration", "Number of iterations for on subset", false, 1, "int");
+        TCLAP::ValueArg<int> argBlockRemoveIteration(
+          "", "block-remove-iteration", "Number of iterations for removing subset blocks on 3D image", false, 0, "int");
         TCLAP::ValueArg<float> argCenter(
           "c", "center", "Center value", false, 0., "float");
         TCLAP::ValueArg<int> argThreadCount(
           "t", "thread", "Number of threads per process", false, 1, "int");
+        TCLAP::ValueArg<float> argSubsets(
+          "", "subsets", "Ordered subsets", false, 1, "int");
+        TCLAP::ValueArg<float> argBlockRemoveSubsets(
+          "", "block-remove-subsets", "Number of subsets for removing block lines", false, 1, "int");
+        TCLAP::ValueArg<float> argWriteFreq(
+          "", "write-frequency", "Write frequency", false, 0, "int");
+        TCLAP::ValueArg<float> argWriteBlockFreq(
+          "", "write-block-frequency", "Write frequency during subset block cleaning", false, 0, "int");
 
         cmd.add(argProjectionFilePath);
         cmd.add(argProjectionDatasetPath);
         cmd.add(argThetaFilePath);
         cmd.add(argThetaDatasetPath);
         cmd.add(argReconOutputPath);
+        cmd.add(argReconOutputDir);
         cmd.add(argReconDatasetPath);
         cmd.add(argIteration);
         cmd.add(argCenter);
         cmd.add(argThreadCount);
+        cmd.add(argSubsets);
+        cmd.add(argBlockRemoveSubsets);
+        cmd.add(argBlockRemoveIteration);
+        cmd.add(argWriteFreq);
+        cmd.add(argWriteBlockFreq);
+        cmd.add(argSubsetIteration);
 
         cmd.parse(argc, argv);
         kProjectionFilePath = argProjectionFilePath.getValue();
@@ -63,10 +93,17 @@ class TraceRuntimeConfig {
         kThetaFilePath = argThetaFilePath.getValue();
         kThetaDatasetPath = argThetaDatasetPath.getValue();
         kReconOutputPath = argReconOutputPath.getValue();
+        kReconOutputDir = argReconOutputDir.getValue();
         kReconDatasetPath = argReconDatasetPath.getValue();
         iteration = argIteration.getValue();
         center = argCenter.getValue();
         thread_count = argThreadCount.getValue();
+        subsets = argSubsets.getValue();
+        block_remove_subsets = argBlockRemoveSubsets.getValue();
+        block_remove_iteration = argBlockRemoveIteration.getValue();
+        write_freq= argWriteFreq.getValue();
+        write_block_freq= argWriteBlockFreq.getValue();
+        subset_iteration = argSubsetIteration.getValue();
 
         std::cout << "MPI rank:"<< rank << "; MPI size:" << size << std::endl;
         if(rank==0)
@@ -76,10 +113,17 @@ class TraceRuntimeConfig {
           std::cout << "Theta file path=" << kThetaFilePath << std::endl;
           std::cout << "Theta dataset path=" << kThetaDatasetPath << std::endl;
           std::cout << "Output file path=" << kReconOutputPath << std::endl;
+          std::cout << "Output dir path=" << kReconOutputDir << std::endl;
           std::cout << "Recon. dataset path=" << kReconDatasetPath << std::endl;
           std::cout << "Number of iterations=" << iteration << std::endl;
           std::cout << "Center value=" << center << std::endl;
           std::cout << "Number of threads per process=" << thread_count << std::endl;
+          std::cout << "Subsets=" << subsets  << std::endl;
+          std::cout << "Number of subset iterations=" << subset_iteration << std::endl;
+          std::cout << "Block remove subsets=" << block_remove_subsets  << std::endl;
+          std::cout << "Number of block remove iterations=" << block_remove_iteration << std::endl;
+          std::cout << "Write frequency=" << write_freq << std::endl;
+          std::cout << "Write block frequency=" << write_block_freq << std::endl;
         }
       }
       catch (TCLAP::ArgException &e)
@@ -121,10 +165,15 @@ int main(int argc, char **argv)
   read_tot += (std::chrono::system_clock::now()-read_beg);
   #endif
   /* Convert degree values to radian */
-  //trace_utils::DegreeToRadian(*theta);
-  trace_utils::Absolute(
+  trace_utils::DegreeToRadian(*theta);
+  size_t ray_count = 
+    input_slice->metadata->dims[0]*input_slice->count*input_slice->metadata->dims[2]; 
+  trace_utils::RemoveNegatives(
       static_cast<float *>(input_slice->data),
-      input_slice->count);
+      ray_count);
+  trace_utils::RemoveAbnormals(
+      static_cast<float *>(input_slice->data),
+      ray_count);
 
   /* Setup metadata data structure */
   // INFO: TraceMetadata destructor frees theta->data!
@@ -183,47 +232,57 @@ int main(int argc, char **argv)
     datagen_tot(0.);
   std::chrono::duration<double> write_tot(0.);
   #endif
-  MockStreamingData projection_stream(*slices, 128, 80); /// # iterations is uselestt if ReadSlidingWindow is called
+  MockStreamingData projection_stream(*slices, config.subsets, config.subset_iteration); 
   DataRegionBase<float, TraceMetadata> *curr_slices = nullptr;
 
-  while(true){
-      #ifdef TIMERON
-      auto datagen_beg = std::chrono::system_clock::now();
-      #endif
-      //curr_slices = projection_stream.ReadSlidingWindow();
-      curr_slices = projection_stream.ReadSlidingOrderedSubsetting();
-      #ifdef TIMERON
-      datagen_tot += (std::chrono::system_clock::now()-datagen_beg);
-      #endif
-      if(curr_slices == nullptr) break;
+  for(int i=0; i<config.iteration; ++i){
+    std::cout << "Iteration=" << i << std::endl;
+    while(true){
+        #ifdef TIMERON
+        auto datagen_beg = std::chrono::system_clock::now();
+        #endif
+        curr_slices = projection_stream.ReadOrderedSubsetting();
+        #ifdef TIMERON
+        datagen_tot += (std::chrono::system_clock::now()-datagen_beg);
+        #endif
+        if(curr_slices == nullptr) break;
 
-      #ifdef TIMERON
-      auto recon_beg = std::chrono::system_clock::now();
-      #endif
-      engine->RunParallelReduction(*curr_slices, req_number);  /// Reconstruction
+        #ifdef TIMERON
+        auto recon_beg = std::chrono::system_clock::now();
+        #endif
+        engine->RunParallelReduction(*curr_slices, req_number);  /// Reconstruction
 
-      #ifdef TIMERON
-      recon_tot += (std::chrono::system_clock::now()-recon_beg);
-      auto inplace_beg = std::chrono::system_clock::now();
-      #endif
-      engine->ParInPlaceLocalSynchWrapper();              /// Local combination
-      #ifdef TIMERON
-      inplace_tot += (std::chrono::system_clock::now()-inplace_beg);
+        #ifdef TIMERON
+        recon_tot += (std::chrono::system_clock::now()-recon_beg);
+        auto inplace_beg = std::chrono::system_clock::now();
+        #endif
+        engine->ParInPlaceLocalSynchWrapper();              /// Local combination
+        #ifdef TIMERON
+        inplace_tot += (std::chrono::system_clock::now()-inplace_beg);
 
-      /// Update reconstruction object
-      auto update_beg = std::chrono::system_clock::now();
-      #endif
-      main_recon_space->UpdateRecon(trace_metadata.recon(), main_recon_replica);
+        /// Update reconstruction object
+        auto update_beg = std::chrono::system_clock::now();
+        #endif
+        main_recon_space->UpdateRecon(trace_metadata.recon(), main_recon_replica);
+        #ifdef TIMERON
+        update_tot += (std::chrono::system_clock::now()-update_beg);
+        #endif
+
+        std::cout << "Current proj id=" << projection_stream.curr_proj_index() << std::endl;
+
+        /// Reset iteration
+        engine->ResetReductionSpaces(init_val);
+    }
       #ifdef TIMERON
-      update_tot += (std::chrono::system_clock::now()-update_beg);
       auto write_beg = std::chrono::system_clock::now();
       #endif
-      //if(!(projection_stream.curr_iteration() % 20)){
-      if(!(projection_stream.curr_proj_index() % 16)){
+      if(!(i%config.write_freq)){
+      //if(!(projection_stream.curr_proj_index() % 16)){
         std::stringstream iteration_stream;
-        iteration_stream << std::setfill('0') << std::setw(6) <<projection_stream.curr_proj_index();
+        iteration_stream << std::setfill('0') << std::setw(6) <<//projection_stream.curr_proj_index();
                                                                 //projection_stream.curr_iteration();
-        std::string outputpath = iteration_stream.str() + "-recon.h5";
+                                                                i;
+        std::string outputpath = config.kReconOutputDir + "/" + iteration_stream.str() + "-recon.h5";
         trace_io::WriteRecon(
             trace_metadata, *d_metadata, 
             outputpath, 
@@ -232,26 +291,7 @@ int main(int argc, char **argv)
       #ifdef TIMERON
       write_tot += (std::chrono::system_clock::now()-write_beg);
       #endif
-
-      std::cout << "Proj id=" << projection_stream.curr_proj_index() <<
-        "; iteration=" << projection_stream.curr_iteration() << std::endl;
-      
-
-      /// Reset iteration
-      engine->ResetReductionSpaces(init_val);
-
-    /*
-    std::cout << "Iteration: " << i << std::endl;
-    engine->RunParallelReduction(*slices, req_number);  /// Reconstruction
-    engine->ParInPlaceLocalSynchWrapper();              /// Local combination
-    
-    /// Update reconstruction object
-    main_recon_space->UpdateRecon(trace_metadata.recon(), main_recon_replica);
-
-    // Reset iteration
-    engine->ResetReductionSpaces(init_val);
-    slices->ResetMirroredRegionIter();
-    */
+      projection_stream.Reset();
   }
   /**************************/
 
@@ -260,11 +300,82 @@ int main(int argc, char **argv)
   //std::chrono::duration<double> write_tot(0.);
   auto write_beg = std::chrono::system_clock::now();
   #endif
+  std::string outputpath_subset =  config.kReconOutputDir + "/" +"output-subset-recon.h5";
   trace_io::WriteRecon(
       trace_metadata, *d_metadata, 
-      config.kReconOutputPath, 
+      outputpath_subset, 
       config.kReconDatasetPath);
   #ifdef TIMERON
+  write_tot += (std::chrono::system_clock::now()-write_beg);
+  #endif
+
+  MockStreamingData block_remove_stream(*slices, config.block_remove_subsets, config.subset_iteration); 
+  for(int i=0; i<config.block_remove_iteration; ++i){
+    std::cout << "Iteration=" << i << std::endl;
+    while(true){
+        #ifdef TIMERON
+        auto datagen_beg = std::chrono::system_clock::now();
+        #endif
+        curr_slices = block_remove_stream.ReadOrderedSubsetting();
+        #ifdef TIMERON
+        datagen_tot += (std::chrono::system_clock::now()-datagen_beg);
+        #endif
+        if(curr_slices == nullptr) break;
+
+        #ifdef TIMERON
+        auto recon_beg = std::chrono::system_clock::now();
+        #endif
+        engine->RunParallelReduction(*curr_slices, req_number);  /// Reconstruction
+
+        #ifdef TIMERON
+        recon_tot += (std::chrono::system_clock::now()-recon_beg);
+        auto inplace_beg = std::chrono::system_clock::now();
+        #endif
+        engine->ParInPlaceLocalSynchWrapper();              /// Local combination
+        #ifdef TIMERON
+        inplace_tot += (std::chrono::system_clock::now()-inplace_beg);
+
+        /// Update reconstruction object
+        auto update_beg = std::chrono::system_clock::now();
+        #endif
+        main_recon_space->UpdateRecon(trace_metadata.recon(), main_recon_replica);
+        #ifdef TIMERON
+        update_tot += (std::chrono::system_clock::now()-update_beg);
+        #endif
+
+        std::cout << "Current proj id=" << block_remove_stream.curr_proj_index() << std::endl;
+
+        /// Reset iteration
+        engine->ResetReductionSpaces(init_val);
+    }
+    #ifdef TIMERON
+    auto write_beg = std::chrono::system_clock::now();
+    #endif
+    if(!(i%config.write_block_freq)){
+      std::stringstream iteration_stream;
+      iteration_stream << std::setfill('0') << std::setw(6) <<//projection_stream.curr_proj_index();
+                                                              //projection_stream.curr_iteration();
+                                                              i;
+      std::string outputpath =  config.kReconOutputDir + "/" +iteration_stream.str() + "-br-recon.h5";
+      trace_io::WriteRecon(
+          trace_metadata, *d_metadata, 
+          outputpath, 
+          config.kReconDatasetPath);
+    }
+    #ifdef TIMERON
+    write_tot += (std::chrono::system_clock::now()-write_beg);
+    #endif
+    projection_stream.Reset();
+    #ifdef TIMERON
+  }
+
+  std::string outputpath_cleaned =  config.kReconOutputDir + "/" +"output-cleaned-recon.h5";
+  trace_io::WriteRecon(
+      slices->metadata(), *d_metadata, 
+      outputpath_cleaned, 
+      config.kReconDatasetPath);
+
+  /**************************/
   //write_tot += (std::chrono::system_clock::now()-write_beg);
   if(comm->rank()==0){
     std::cout << "Reconstruction time=" << recon_tot.count() << std::endl;
