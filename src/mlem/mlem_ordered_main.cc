@@ -6,7 +6,7 @@
 #include "data_region_base.h"
 #include "disp_engine_reduction.h"
 #include "mlem.h"
-#include "mock_streaming.h"
+#include "trace_stream.h"
 
 class TraceRuntimeConfig {
   public:
@@ -232,7 +232,7 @@ int main(int argc, char **argv)
     datagen_tot(0.);
   std::chrono::duration<double> write_tot(0.);
   #endif
-  MockStreamingData projection_stream(*slices, config.subsets, config.subset_iteration); 
+  TraceStream projection_stream(*slices, config.subsets, config.subset_iteration); 
   DataRegionBase<float, TraceMetadata> *curr_slices = nullptr;
 
   for(int i=0; i<config.iteration; ++i){
@@ -309,7 +309,7 @@ int main(int argc, char **argv)
   write_tot += (std::chrono::system_clock::now()-write_beg);
   #endif
 
-  MockStreamingData block_remove_stream(*slices, config.block_remove_subsets, config.subset_iteration); 
+  TraceStream block_remove_stream(*slices, config.block_remove_subsets, config.subset_iteration); 
   for(int i=0; i<config.block_remove_iteration; ++i){
     std::cout << "Iteration=" << i << std::endl;
     while(true){

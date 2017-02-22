@@ -29,7 +29,7 @@ class MockStreamingData
       orig_data_ {orig_data},
       window_len_ {window_len},
       iteration_on_window_ {iteration_on_each_window},
-      ray_per_proj {orig_data.metadata().num_slices()*orig_data.metadata().num_cols()},
+      ray_per_proj {static_cast<size_t>(orig_data.metadata().num_slices()*orig_data.metadata().num_cols())},
       curr_projs {new float[window_len_ * ray_per_proj]},
       curr_theta {new float[window_len_]}
     {}

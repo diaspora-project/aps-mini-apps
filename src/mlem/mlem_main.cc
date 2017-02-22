@@ -6,7 +6,7 @@
 #include "data_region_base.h"
 #include "disp_engine_reduction.h"
 #include "mlem.h"
-#include "mock_streaming.h"
+#include "trace_stream.h"
 
 class TraceRuntimeConfig {
   public:
@@ -183,7 +183,7 @@ int main(int argc, char **argv)
     datagen_tot(0.);
   std::chrono::duration<double> write_tot(0.);
   #endif
-  MockStreamingData projection_stream(*slices, 128, 80); /// # iterations is uselestt if ReadSlidingWindow is called
+  TraceStream projection_stream(*slices, 128, 80); /// # iterations is uselestt if ReadSlidingWindow is called
   DataRegionBase<float, TraceMetadata> *curr_slices = nullptr;
 
   while(true){
