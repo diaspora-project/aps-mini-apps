@@ -9,10 +9,6 @@ float MLEMReconSpace::CalculateSimdata(
 {
   float simdata = 0.;
   for(int i=0; i<len-1; ++i){
-#ifdef PREFETCHON
-    size_t index = indi[i+32];
-    __builtin_prefetch(&(recon[index]),1,0);
-#endif
     simdata += recon[indi[i]]*leng[i];
   }
   return simdata;
@@ -56,10 +52,6 @@ void MLEMReconSpace::UpdateReconReplica(
   upd = (ray/simdata);
 
   for (int i=0; i <len-1; ++i) {
-#ifdef PREFETCHON
-    size_t index2 = indi[i+32]*2;
-    __builtin_prefetch(slice+index2,1,0);
-#endif
     size_t index = indi[i]*2;
     slice[index] += leng[i]*upd;
     slice[index+1] += leng[i];
@@ -70,7 +62,7 @@ void MLEMReconSpace::UpdateReconReplica(
 void MLEMReconSpace::Initialize(int n_grids){
   num_grids = n_grids; 
 
-  try{
+  try {
   coordx = new float[num_grids+1]; 
   coordy = new float[num_grids+1];
   ax = new float[num_grids+1];

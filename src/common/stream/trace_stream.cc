@@ -28,13 +28,17 @@ DataRegionBase<float, TraceMetadata>* TraceStream::ReadSlidingWindow(
     EraseBegTraceMsg();
   /// New message arrived, there is space in window
   else if(msg!=nullptr && vtheta.size()<window_len_){
-    AddTomoMsg(*(traceMQ().read_data(msg)));   
+    tomo_msg_data_t *dmsg = traceMQ().read_data(msg);
+    traceMQ().print_data(dmsg, metadata().n_sinograms*metadata().n_rays_per_proj_row);
+    AddTomoMsg(*dmsg);   
     traceMQ().free_msg(msg);
   }
   /// New message arrived, there is no space in window
   else if(msg!=nullptr && vtheta.size()==window_len_){
     EraseBegTraceMsg();  /// Remove first projection
-    AddTomoMsg(*(traceMQ().read_data(msg)));    /// Add projection to the end
+    tomo_msg_data_t *dmsg = traceMQ().read_data(msg);
+    traceMQ().print_data(dmsg, metadata().n_sinograms*metadata().n_rays_per_proj_row);
+    AddTomoMsg(*dmsg);    /// Add projection to the end
     traceMQ().free_msg(msg);
   }
   else std::cerr << "Unknown state in ReadWindow!" << std::endl;
@@ -64,10 +68,10 @@ void TraceStream::AddTomoMsg(tomo_msg_data_t &dmsg){
 }
 
 void TraceStream::EraseBegTraceMsg(){
-    vtheta.erase(vtheta.begin());
-    size_t n_rays_per_proj = metadata().n_sinograms * metadata().n_rays_per_proj_row;
-    vproj.erase(vproj.begin(),vproj.begin()+n_rays_per_proj); 
-    vmeta.erase(vmeta.begin());
+  vtheta.erase(vtheta.begin());
+  size_t n_rays_per_proj = metadata().n_sinograms * metadata().n_rays_per_proj_row;
+  vproj.erase(vproj.begin(),vproj.begin()+n_rays_per_proj); 
+  vmeta.erase(vmeta.begin());
 }
 
 DataRegionBase<float, TraceMetadata>* TraceStream::SetupTraceDataRegion(
@@ -87,6 +91,8 @@ DataRegionBase<float, TraceMetadata>* TraceStream::SetupTraceDataRegion(
     vmeta.back().center);             // use the last incoming center for recon.);
 
   mdata->recon(recon_image);
+
+  mdata->Print();
 
   // Will be deleted at the end of main loop
   float *data=new float[mdata->count()];

@@ -133,11 +133,6 @@ class TraceMQ
     tomo_msg_data_info_rep_t* read_data_info_rep(tomo_msg_t *msg);
     tomo_msg_data_info_req_t* read_data_info_req(tomo_msg_t *msg);
 
-    /**
-    Helper functions for printing data and info messages.
-    */
-    void print_data_info_rep_msg(tomo_msg_data_info_rep_t *msg);
-    void print_data(tomo_msg_data_t *msg, size_t data_count);
 
     /**
     Sender and received functions for tracemq
@@ -174,6 +169,11 @@ class TraceMQ
 
     /** Clean tracemq messages.  */
     void free_msg(tomo_msg_t *msg);
+    /**
+    Helper functions for printing data and info messages.
+    */
+    void print_data_info_rep_msg(tomo_msg_data_info_rep_t *msg);
+    void print_data(tomo_msg_data_t *msg, size_t data_count);
 
     TMQ_State state() const { return state_; } 
     void state(TMQ_State state) { state_ = state; } 
