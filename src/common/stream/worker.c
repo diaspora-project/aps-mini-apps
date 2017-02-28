@@ -26,62 +26,77 @@ int main (int argc, char *argv[])
   }
 
   // Setup MPI
-  int my_rank, world_size;
+  int comm_rank, comm_size;
   MPI_Init(&argc, &argv);
-  MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-  MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+  MPI_Comm_rank(MPI_COMM_WORLD, &comm_rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &comm_size);
 
   int dest_port = atoi(argv[2]);
   char addr[64];
-  snprintf(addr, 64, "tcp://%s:%d", argv[1], dest_port+my_rank);
-  printf("[%d] Destination address=%s\n", my_rank, addr);
+  snprintf(addr, 64, "tcp://%s:%d", argv[1], dest_port+comm_rank);
+  printf("[%d] Destination address=%s\n", comm_rank, addr);
 
   // Connect to server 
   void *context = zmq_ctx_new();
   void *server = zmq_socket(context, ZMQ_REQ);
   zmq_connect(server, addr);
 
-  // Tell how many processes there is to server
-  char rank_str[16];
-  if(my_rank==0){
-    snprintf(rank_str, 16, "%d", world_size);
-    s_send(server, rank_str);
-    char *str = s_recv(server);
-    printf("Server received # of processes, replied: %s", str);
-    free(str);
+  /// Handshake with server
+  uint64_t seq = 0;
+  tomo_msg_t *msg = tracemq_prepare_data_info_req_msg(seq, comm_rank, comm_size);
+  tracemq_send_msg(server, msg);
+  tracemq_free_msg(msg);
+  ++seq;
+
+  /// Receive data info msg
+  msg = tracemq_recv_msg(server); assert(seq==msg->seq_n);
+  tomo_msg_data_info_rep_t *info = tracemq_read_data_info_rep(msg);
+  tracemq_print_data_info_rep_msg(info);
+  //uint32_t tn_sinogram=info->tn_sinograms;
+  uint32_t n_sinogram=info->n_sinograms;
+  //uint32_t beg_sinogram=info->beg_sinogram;
+  uint32_t n_rays_per_proj_row=info->n_rays_per_proj_row;
+  // ... setup trace data structures ...
+  tracemq_free_msg(msg);
+  ++seq;
+
+  /// Ready to receive msgs
+  msg = tracemq_prepare_data_req_msg(seq);
+  tracemq_send_msg(server, msg);
+  tracemq_free_msg(msg);
+  ++seq;
+
+  tomo_msg_t *dmsg;
+  while((dmsg=tracemq_recv_msg(server))->type & TRACEMQ_MSG_DATA_REP){
+    assert(seq==dmsg->seq_n);
+    ++seq;
+
+    /// Right after receiving message, tell server that you received it
+    msg = tracemq_prepare_data_req_msg(seq);
+    tracemq_send_msg(server, msg);
+    tracemq_free_msg(msg);
+    ++seq;
+
+    tomo_msg_data_t *data_msg = tracemq_read_data(dmsg);
+    // ... do something with the data ...
+    tracemq_print_data(data_msg, n_sinogram*n_rays_per_proj_row);
+    tracemq_free_msg(dmsg);
   }
 
-  // Introduce yourself
-  snprintf(rank_str, 16, "%d", my_rank);
-  s_send(server, rank_str);
+  assert(dmsg->type==TRACEMQ_MSG_FIN_REP); /// Last message must be fin
+  printf("seq_n=%zu; seq=%llu\n", dmsg->seq_n, seq);
+  assert(dmsg->seq_n==seq);
+  tracemq_free_msg(dmsg);
+  ++seq;
 
-  // Check if server has any projection
-  tomo_msg_t *msg;
-  while((msg=trace_receive_msg(server))->type){
-    // Say you received it
-    char ack_msg[256];
-    snprintf(ack_msg, 256, "[%d]: I received the projection=%d; beginning sinogram=%d; # sinograms=%d", 
-      my_rank, msg->projection_id, msg->beg_sinogram, msg->n_sinogram);
-    s_send(server, ack_msg);
-    printf("%s\n", ack_msg);
-
-    // Do something with the data
-    for(int i=0; i<msg->n_sinogram; ++i){
-      for(int j=0; j<msg->n_rays_per_proj_col; ++j){
-        printf("%hi ", msg->data[i*msg->n_rays_per_proj_col+j]);
-      }
-      printf("\n");
-    }
-
-    // Clean-up message
-    free(msg);
-  }
-
-  // Tell you received fin message
-  char ack_msg[256];
-  snprintf(ack_msg, 256, "[%d]: I received fin message: %08x", my_rank, msg->type);
-  s_send(server, ack_msg);
-  free(msg);
+  // send fin received msg
+  msg = malloc(sizeof(tomo_msg_t));
+  msg->type=TRACEMQ_MSG_FIN_REP;
+  msg->seq_n=seq;
+  msg->size=sizeof(tomo_msg_t);
+  tracemq_send_msg(server, msg);
+  tracemq_free_msg(msg);
+  ++seq;
 
   // Cleanup
   zmq_close(server);

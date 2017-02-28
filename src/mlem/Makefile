@@ -7,7 +7,7 @@ ROOTDIR = ../../
 BINDIR = ${ROOTDIR}/bin/
 
 # Flags
-CFLAGS = -std=c++11 -O3 -Wall -Wextra
+CFLAGS = -std=c++11 -O0 -Wall -Wextra
 CFLAGS += -g -ffast-math -fPIC -DTIMERON -DPREFETCHON 
 
 # Common data structures and utilities classes
@@ -22,25 +22,27 @@ HDF5INC = ${HDF5_HOME}/include
 MPILIB = ${MPI_HOME}/lib
 MPIINC = ${MPI_HOME}}/include
 
-LIBS = -lm -lhdf5 -lz -lmpi 
+LIBS = -lm -lhdf5 -lz -lmpi  -lzmq
 LIBDIRS = -L$(HDF5LIB) -L$(MPILIB)
 INCLUDES = -I$(STREAMDIR) -I$(DISPDIR) -I${COMMONDIR} -I$(HDF5INC) -I$(MPIINC)
 
 # Executable/reconstruction objects
-MLEM_OBJS = mlem.o mlem_main.o
-COMMON_OBJS = trace_h5io.o trace_utils.o trace_stream.o
+MLEM_OBJS = mlem.o mlem_stream_main.o
+COMMON_OBJS = trace_h5io.o trace_utils.o trace_stream.o trace_mq.o
 
 # Executables
-PROGS = mlem
+PROGS = mlem_stream
 
 .PHONY: default clean
 
 all: $(PROGS)
 
-mlem: $(COMMON_OBJS) $(MLEM_OBJS)
+mlem_stream: $(COMMON_OBJS) $(MLEM_OBJS)
 	$(CC) $(CFLAGS) -o $@ $(MLEM_OBJS) $(COMMON_OBJS) $(INCLUDES) $(LIBDIRS) $(LIBS)
-mlem_main.o: mlem_main.cc
-	$(CC) $(CFLAGS) -c mlem_main.cc $(INCLUDES)
+
+mlem_stream_main.o: mlem_stream_main.cc
+	$(CC) $(CFLAGS) -c mlem_stream_main.cc $(INCLUDES)
+
 mlem.o: mlem.cc
 	$(CC) $(CFLAGS) -c mlem.cc $(INCLUDES)
 
@@ -52,6 +54,9 @@ trace_utils.o: $(COMMONDIR)/trace_utils.cc $(COMMONDIR)/trace_utils.h
 
 trace_stream.o: $(STREAMDIR)/trace_stream.cc $(STREAMDIR)/trace_stream.h
 	$(CC) $(CFLAGS) -c $(STREAMDIR)/trace_stream.cc $(INCLUDES)
+
+trace_mq.o: $(STREAMDIR)/trace_mq.cc $(STREAMDIR)/trace_mq.h
+	$(CC) $(CFLAGS) -c $(STREAMDIR)/trace_mq.cc $(INCLUDES)
 
 install:
 	mv $(PROGS) $(BINDIR)

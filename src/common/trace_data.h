@@ -86,12 +86,6 @@ class TraceMetadata{
     , num_neighbor_recon_slices_{num_neighbor_recon_slices}
     {
       if (theta_ == nullptr) throw std::invalid_argument("theta ptr is null");
-
-      // Setup recon object
-      int num_recon_slices = num_slices+2*num_neighbor_recon_slices;
-      recon_ = new DataRegionBareBase<float>(num_recon_slices * num_grids_ * num_grids_);
-      for(int i=0; i<num_recon_slices*num_grids_*num_grids_; ++i)
-        (*recon_)[i] = recon_init_val;
       
       // Set the center
       center_ = (center_<=0.) ? static_cast<float>(num_cols_)/2.+1. : center_;
@@ -125,8 +119,6 @@ class TraceMetadata{
           center, 0, 0.) {}
 
     ~TraceMetadata() {
-      delete recon_;
-      delete [] theta_;
       delete [] gridx_;
       delete [] gridy_;
     }
