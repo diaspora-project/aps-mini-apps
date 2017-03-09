@@ -248,5 +248,8 @@ void trace_utils::CalculateDistanceLengths(
     i2 = static_cast<int>(x2);
     indy = i2 - (i2>x2);
     indi[i] = indx+(indy*num_grids);
+    if(indi[i]<0){
+      std::cout << "wrong indi[i]=" << indi[i] << std::endl;
+    }
   }
 }

@@ -145,10 +145,12 @@ int main(int argc, char **argv)
   /// Number of requested ray-sum values by each thread poll
   int64_t req_number = num_cols; 
   /// Required data structure for dumping image to h5 file
-  trace_io::H5Metadata h5md = { 
-    .ndims = 3, 
-    .dims = (hsize_t*)malloc(sizeof(hsize_t)*3) };
-  h5md.dims[0] = tmetadata.tn_sinograms; h5md.dims[1]=num_cols; h5md.dims[2] = num_cols;
+  trace_io::H5Metadata h5md; 
+  h5md.ndims=3; 
+  h5md.dims=(hsize_t*)malloc(sizeof(hsize_t)*3);
+  h5md.dims[1] = tmetadata.tn_sinograms; 
+  h5md.dims[0]=0; /// Number of projections is unknown
+  h5md.dims[2] = tmetadata.n_rays_per_proj_row; 
   for(int iter=0; ; ++iter){
       #ifdef TIMERON
       auto datagen_beg = std::chrono::system_clock::now();

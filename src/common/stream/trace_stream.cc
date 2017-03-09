@@ -54,7 +54,7 @@ DataRegionBase<float, TraceMetadata>* TraceStream::ReadSlidingWindow(
 
 void TraceStream::AddTomoMsg(tomo_msg_data_t &dmsg){
   // Convert to radian
-  dmsg.theta = dmsg.theta*3.14159265358979f/180.0;
+  //dmsg.theta = dmsg.theta*3.14159265358979f/180.0;
   std::cout << "Theta=" << dmsg.theta << std::endl;
   tomo_msg_data_t rdmsg = {
     .projection_id=dmsg.projection_id,
@@ -86,8 +86,7 @@ DataRegionBase<float, TraceMetadata>* TraceStream::SetupTraceDataRegion(
     vtheta.size(),                    // int const num_projs,
     metadata().n_sinograms,            // metadata().num_slices(),
     metadata().n_rays_per_proj_row,    // metadata().num_cols(),
-    metadata().n_rays_per_proj_row * 
-      metadata().n_rays_per_proj_row, // metadata().num_grids(),
+    metadata().n_rays_per_proj_row, // * metadata().n_rays_per_proj_row, // metadata().num_grids(),
     vmeta.back().center);             // use the last incoming center for recon.);
 
   mdata->recon(recon_image);

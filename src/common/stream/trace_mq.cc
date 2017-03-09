@@ -1,4 +1,5 @@
 #include "trace_mq.h"
+#include <cstring>
 #include <cassert>
 
 TraceMQ::TraceMQ(
@@ -11,7 +12,7 @@ TraceMQ::TraceMQ(
     seq_ {0}
 {
   std::string addr("tcp://" + dest_ip_ + ":" + 
-    std::to_string(dest_port_+comm_rank_));
+    std::to_string(static_cast<long long>(dest_port_+comm_rank_)));
   std::cout << "[" << comm_rank_ << "] Destination address=" << addr << std::endl;
 
   context = zmq_ctx_new();
