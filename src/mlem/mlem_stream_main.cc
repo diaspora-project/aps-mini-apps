@@ -38,7 +38,7 @@ class TraceRuntimeConfig {
         TCLAP::ValueArg<int> argThreadCount(
           "t", "thread", "Number of threads per process", false, 1, "int");
         TCLAP::ValueArg<float> argWriteFreq(
-          "", "write-frequency", "Write frequency", false, 1, "int");
+          "", "write-frequency", "Write frequency", false, 10000, "int");
         TCLAP::ValueArg<float> argWindowLen(
           "", "window-length", "Number of projections that will be stored in the window",
           false, 32, "int");
@@ -149,13 +149,14 @@ int main(int argc, char **argv)
   h5md.ndims=3; 
   h5md.dims=(hsize_t*)malloc(sizeof(hsize_t)*3);
   h5md.dims[1] = tmetadata.tn_sinograms; 
-  h5md.dims[0]=0; /// Number of projections is unknown
+  h5md.dims[0] = 0;   /// Number of projections is unknown
   h5md.dims[2] = tmetadata.n_rays_per_proj_row; 
   for(int iter=0; ; ++iter){
       #ifdef TIMERON
       auto datagen_beg = std::chrono::system_clock::now();
       #endif
       curr_slices = tstream.ReadSlidingWindow(recon_image);
+      if(config.center!=0) curr_slices->metadata().center(config.center);
       #ifdef TIMERON
       datagen_tot += (std::chrono::system_clock::now()-datagen_beg);
       #endif
@@ -206,26 +207,16 @@ int main(int argc, char **argv)
       delete curr_slices;
   }
 
-  // curr_slice points to nullptr
-  /* Write final reconstructed data to disk */
-  //#ifdef TIMERON
-  //auto write_beg = std::chrono::system_clock::now();
-  //#endif
-  //std::string outputpath =  config.kReconOutputDir + "/" +"final-recon.h5";
-  //trace_io::WriteRecon( curr_slices->metadata(), h5md, 
-  //    outputpath, config.kReconDatasetPath);
-  //#ifdef TIMERON
-  //write_tot += (std::chrono::system_clock::now()-write_beg);
-  //#endif
-
   /**************************/
-  //write_tot += (std::chrono::system_clock::now()-write_beg);
   if(comm->rank()==0){
     std::cout << "Reconstruction time=" << recon_tot.count() << std::endl;
     std::cout << "Local combination time=" << inplace_tot.count() << std::endl;
     std::cout << "Update time=" << update_tot.count() << std::endl;
     std::cout << "Write time=" << write_tot.count() << std::endl;
     std::cout << "Data gen total time=" << datagen_tot.count() << std::endl;
+    std::cout << "Total comp=" << recon_tot.count() + inplace_tot.count() + update_tot.count() << std::endl;
+    std::cout << "Sustained proj/sec=" << tstream.counter() / 
+                                          (recon_tot.count()+inplace_tot.count()+update_tot.count()) << std::endl;
   }
 
   /* Clean-up the resources */

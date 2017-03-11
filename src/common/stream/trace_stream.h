@@ -11,6 +11,7 @@ class TraceStream
 {
   private:
     uint32_t window_len_;
+    uint32_t counter_;
     TraceMQ traceMQ_;
 
     std::vector<float> vproj;
@@ -45,6 +46,7 @@ class TraceStream
       DataRegionBareBase<float> &recon_image);
 
     tomo_msg_metadata_t metadata() { return traceMQ().metadata(); }
+    uint32_t counter() const { return counter_; }
 };
 
 #endif // TRACE_COMMONS_STREAM_TRACE_STREAM_H

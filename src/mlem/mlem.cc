@@ -32,7 +32,7 @@ void MLEMReconSpace::UpdateRecon(
         replica[j*2] / replica[j*2+1];
     }
   }
-  std::cout << "NaNs=" << nans << std::endl;
+  //std::cout << "NaNs=" << nans << std::endl;
 }
 
 

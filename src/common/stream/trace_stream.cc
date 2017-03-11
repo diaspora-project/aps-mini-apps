@@ -7,6 +7,7 @@ TraceStream::TraceStream(
     int comm_rank,
     int comm_size) :
   window_len_ {window_len},
+  counter_ {0},
   traceMQ_ {dest_ip, dest_port, comm_rank, comm_size}
 {
   traceMQ().Initialize();
@@ -29,17 +30,19 @@ DataRegionBase<float, TraceMetadata>* TraceStream::ReadSlidingWindow(
   /// New message arrived, there is space in window
   else if(msg!=nullptr && vtheta.size()<window_len_){
     tomo_msg_data_t *dmsg = traceMQ().read_data(msg);
-    traceMQ().print_data(dmsg, metadata().n_sinograms*metadata().n_rays_per_proj_row);
+    //traceMQ().print_data(dmsg, metadata().n_sinograms*metadata().n_rays_per_proj_row);
     AddTomoMsg(*dmsg);   
     traceMQ().free_msg(msg);
+    ++counter_;
   }
   /// New message arrived, there is no space in window
   else if(msg!=nullptr && vtheta.size()==window_len_){
     EraseBegTraceMsg();  /// Remove first projection
     tomo_msg_data_t *dmsg = traceMQ().read_data(msg);
-    traceMQ().print_data(dmsg, metadata().n_sinograms*metadata().n_rays_per_proj_row);
+    //traceMQ().print_data(dmsg, metadata().n_sinograms*metadata().n_rays_per_proj_row);
     AddTomoMsg(*dmsg);    /// Add projection to the end
     traceMQ().free_msg(msg);
+    ++counter_;
   }
   else std::cerr << "Unknown state in ReadWindow!" << std::endl;
 
@@ -55,7 +58,7 @@ DataRegionBase<float, TraceMetadata>* TraceStream::ReadSlidingWindow(
 void TraceStream::AddTomoMsg(tomo_msg_data_t &dmsg){
   // Convert to radian
   //dmsg.theta = dmsg.theta*3.14159265358979f/180.0;
-  std::cout << "Theta=" << dmsg.theta << std::endl;
+  //std::cout << "Theta=" << dmsg.theta << std::endl;
   tomo_msg_data_t rdmsg = {
     .projection_id=dmsg.projection_id,
     .theta=dmsg.theta,
@@ -91,7 +94,7 @@ DataRegionBase<float, TraceMetadata>* TraceStream::SetupTraceDataRegion(
 
   mdata->recon(recon_image);
 
-  mdata->Print();
+  //mdata->Print();
 
   // Will be deleted at the end of main loop
   float *data=new float[mdata->count()];

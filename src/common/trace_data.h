@@ -151,6 +151,11 @@ class TraceMetadata{
     int num_cols() const { return num_cols_; };
     int num_grids() const { return num_grids_; };
     float center() const { return center_; };
+    void center(float c) { 
+      center_ = c; 
+      mov_ = static_cast<float>(num_cols_)/2. - center_;
+      if(mov_ - std::ceil(mov_) < 1e-6) mov_ += 1e-6;
+    };
 
     size_t count() const { return count_; };
 

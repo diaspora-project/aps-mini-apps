@@ -165,7 +165,7 @@ tomo_msg_t* TraceMQ::prepare_data_info_req_msg(uint64_t seq_n,
                                                uint32_t comm_size)
 {
   uint64_t tot_msg_size = sizeof(tomo_msg_t)+sizeof(tomo_msg_data_info_req_t);
-  printf("total message size=%llu\n", tot_msg_size);
+  //printf("total message size=%llu\n", tot_msg_size);
   tomo_msg_t *msg = (tomo_msg_t *) malloc(tot_msg_size);
   setup_msg_header(msg, seq_n, TRACEMQ_MSG_DATAINFO_REQ, tot_msg_size);
 
