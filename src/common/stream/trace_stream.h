@@ -38,12 +38,16 @@ class TraceStream
 
     /* Create a data region from sliding window
      * @param recon_image Initial values of reconstructed image
+     * @param step        Sliding step. Waits at least step projection 
+     *                    before returning window back to the reconstruction
+     *                    engine
      *
      * Return:  nullptr if there is no message and sliding window is empty
      *          DataRegionBase if there is data in sliding window
      */
     DataRegionBase<float, TraceMetadata>* ReadSlidingWindow(
-      DataRegionBareBase<float> &recon_image);
+      DataRegionBareBase<float> &recon_image, 
+      int step);
 
     tomo_msg_metadata_t metadata() { return traceMQ().metadata(); }
     uint32_t counter() const { return counter_; }

@@ -15,6 +15,7 @@ class TraceRuntimeConfig {
     std::string kReconOutputDir;
     int thread_count;
     int window_len;
+    int window_step;
     int write_freq = 0;
     int center;
     std::string dest_host;
@@ -42,6 +43,9 @@ class TraceRuntimeConfig {
         TCLAP::ValueArg<float> argWindowLen(
           "", "window-length", "Number of projections that will be stored in the window",
           false, 32, "int");
+        TCLAP::ValueArg<float> argWindowStep(
+          "", "window-step", "Number of projections that will be received in each request",
+          false, 1, "int");
         TCLAP::ValueArg<std::string> argDestHost(
           "", "dest-host", "Destination host/ip address", false, "164.54.143.3", 
             "string");
@@ -55,6 +59,7 @@ class TraceRuntimeConfig {
         cmd.add(argThreadCount);
         cmd.add(argWriteFreq);
         cmd.add(argWindowLen);
+        cmd.add(argWindowStep);
         cmd.add(argDestHost);
         cmd.add(argDestPort);
 
@@ -66,6 +71,7 @@ class TraceRuntimeConfig {
         thread_count = argThreadCount.getValue();
         write_freq= argWriteFreq.getValue();
         window_len= argWindowLen.getValue();
+        window_step= argWindowStep.getValue();
         dest_host= argDestHost.getValue();
         dest_port= argDestPort.getValue();
 
@@ -79,6 +85,7 @@ class TraceRuntimeConfig {
           std::cout << "Number of threads per process=" << thread_count << std::endl;
           std::cout << "Write frequency=" << write_freq << std::endl;
           std::cout << "Window length=" << window_len << std::endl;
+          std::cout << "Window step=" << window_step << std::endl;
           std::cout << "Destination host address=" << dest_host << std::endl;
           std::cout << "Destination port=" << dest_port << std::endl;
         }
@@ -155,7 +162,7 @@ int main(int argc, char **argv)
       #ifdef TIMERON
       auto datagen_beg = std::chrono::system_clock::now();
       #endif
-      curr_slices = tstream.ReadSlidingWindow(recon_image);
+      curr_slices = tstream.ReadSlidingWindow(recon_image, config.window_step);
       if(config.center!=0) curr_slices->metadata().center(config.center);
       #ifdef TIMERON
       datagen_tot += (std::chrono::system_clock::now()-datagen_beg);

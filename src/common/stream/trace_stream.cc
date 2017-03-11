@@ -14,39 +14,63 @@ TraceStream::TraceStream(
 }
 
 DataRegionBase<float, TraceMetadata>* TraceStream::ReadSlidingWindow(
-  DataRegionBareBase<float> &recon_image) 
+  DataRegionBareBase<float> &recon_image, 
+  int step) 
 {
-  /// Receive new message
-  tomo_msg_t *msg = traceMQ().ReceiveMsg();
+  // Receive new message
+  std::vector<tomo_msg_t*> received_msgs; 
+  for(int i=0; i<step; ++i){
+    tomo_msg_t *msg = traceMQ().ReceiveMsg();
+    if(msg == nullptr) break;
+    received_msgs.push_back(msg);
+  }
+  std::cout << "Received # msgs=" << received_msgs.size() << std::endl;
 
   // TODO: After receiving message corrections might need to be applied
 
   /// End of the processing
-  if(msg==nullptr && vtheta.size()<=1) 
+  if(received_msgs.size()==0 && vtheta.size()==0){
+    std::cout << "End of window/proj" << std::endl;
     return nullptr; 
+  }
   /// End of messages, but there is data to be processed in window
-  else if(msg==nullptr && vtheta.size()>1) 
-    EraseBegTraceMsg();
-  /// New message arrived, there is space in window
-  else if(msg!=nullptr && vtheta.size()<window_len_){
-    tomo_msg_data_t *dmsg = traceMQ().read_data(msg);
-    //traceMQ().print_data(dmsg, metadata().n_sinograms*metadata().n_rays_per_proj_row);
-    AddTomoMsg(*dmsg);   
-    traceMQ().free_msg(msg);
-    ++counter_;
+  else if(received_msgs.size()==0 && vtheta.size()>0){ 
+    std::cout << "End of proj, still some in the window: " << vtheta.size() << std::endl;
+    for(int i=0; i<step; ++i){  // Delete step size element
+      if(vtheta.size()>0) EraseBegTraceMsg();
+      else break;
+    }
+  }
+  /// New message(s) arrived, there is space in window
+  else if(received_msgs.size()>0 && vtheta.size()<window_len_){
+    std::cout << "New message(s) arrived, there is space in window: " << vtheta.size() << std::endl;
+    for(auto msg : received_msgs){
+      tomo_msg_data_t *dmsg = traceMQ().read_data(msg);
+      //traceMQ().print_data(dmsg, metadata().n_sinograms*metadata().n_rays_per_proj_row);
+      AddTomoMsg(*dmsg);   
+      traceMQ().free_msg(msg);
+      ++counter_;
+    }
   }
   /// New message arrived, there is no space in window
-  else if(msg!=nullptr && vtheta.size()==window_len_){
-    EraseBegTraceMsg();  /// Remove first projection
-    tomo_msg_data_t *dmsg = traceMQ().read_data(msg);
-    //traceMQ().print_data(dmsg, metadata().n_sinograms*metadata().n_rays_per_proj_row);
-    AddTomoMsg(*dmsg);    /// Add projection to the end
-    traceMQ().free_msg(msg);
-    ++counter_;
+  else if(received_msgs.size()>0 && vtheta.size()>=window_len_){
+    std::cout << "New message arrived, there is no space in window:"<< vtheta.size() << std::endl;
+    for(int i=0; i<step; ++i) {
+      if(vtheta.size()>0) EraseBegTraceMsg();
+      else break;
+    }
+    for(auto msg : received_msgs){
+      tomo_msg_data_t *dmsg = traceMQ().read_data(msg);
+      //traceMQ().print_data(dmsg, metadata().n_sinograms*metadata().n_rays_per_proj_row);
+      AddTomoMsg(*dmsg);   
+      traceMQ().free_msg(msg);
+      ++counter_;
+    }
   }
   else std::cerr << "Unknown state in ReadWindow!" << std::endl;
 
-  /// Clean-up received message
+  /// Clean-up vector
+  received_msgs.clear();
 
   /// Generate new data and metadata
   DataRegionBase<float, TraceMetadata>* data_region = 
