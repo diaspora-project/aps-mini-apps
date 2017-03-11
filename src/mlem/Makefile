@@ -1,5 +1,5 @@
 # Compiler
-CC = clang++
+CC = mpicxx
 
 # Directories
 ROOTDIR = ../../
@@ -7,8 +7,9 @@ ROOTDIR = ../../
 BINDIR = ${ROOTDIR}/bin/
 
 # Flags
-CFLAGS = -std=c++11 -O0 -Wall -Wextra
-CFLAGS += -g -ffast-math -fPIC -DTIMERON -DPREFETCHON 
+CFLAGS = -O3 -Wall -Wextra -std=c++11 
+CFLAGS += -fPIC -DTIMERON 
+#CFLAGS += -no-inline-factor -no-inline-max-size  # didn't help
 
 # Common data structures and utilities classes
 COMMONDIR = ${ROOTDIR}/src/common
@@ -19,12 +20,11 @@ STREAMDIR = ${COMMONDIR}/stream
 HDF5LIB = ${HDF5_HOME}/lib
 HDF5INC = ${HDF5_HOME}/include 
 
-MPILIB = ${MPI_HOME}/lib
-MPIINC = ${MPI_HOME}}/include
+ZMQLIB = "/home/bicer/local/lib"
 
-LIBS = -lm -lhdf5 -lz -lmpi  -lzmq
-LIBDIRS = -L$(HDF5LIB) -L$(MPILIB)
-INCLUDES = -I$(STREAMDIR) -I$(DISPDIR) -I${COMMONDIR} -I$(HDF5INC) -I$(MPIINC)
+LIBS = -lm -lhdf5 -lzmq
+LIBDIRS = -L$(HDF5LIB)  -L${ZMQLIB}
+INCLUDES = -I$(STREAMDIR) -I$(DISPDIR) -I${COMMONDIR} -I$(HDF5INC)
 
 # Executable/reconstruction objects
 MLEM_OBJS = mlem.o mlem_stream_main.o
