@@ -16,6 +16,7 @@ class TraceRuntimeConfig {
     int thread_count;
     int window_len;
     int window_step;
+    int window_iter;
     int write_freq = 0;
     int center;
     std::string dest_host;
@@ -46,6 +47,9 @@ class TraceRuntimeConfig {
         TCLAP::ValueArg<float> argWindowStep(
           "", "window-step", "Number of projections that will be received in each request",
           false, 1, "int");
+        TCLAP::ValueArg<float> argWindowIter(
+          "", "window-iter", "Number of iterations on received window",
+          false, 1, "int");
         TCLAP::ValueArg<std::string> argDestHost(
           "", "dest-host", "Destination host/ip address", false, "164.54.143.3", 
             "string");
@@ -60,6 +64,7 @@ class TraceRuntimeConfig {
         cmd.add(argWriteFreq);
         cmd.add(argWindowLen);
         cmd.add(argWindowStep);
+        cmd.add(argWindowIter);
         cmd.add(argDestHost);
         cmd.add(argDestPort);
 
@@ -72,6 +77,7 @@ class TraceRuntimeConfig {
         write_freq= argWriteFreq.getValue();
         window_len= argWindowLen.getValue();
         window_step= argWindowStep.getValue();
+        window_iter= argWindowIter.getValue();
         dest_host= argDestHost.getValue();
         dest_port= argDestPort.getValue();
 
@@ -86,6 +92,7 @@ class TraceRuntimeConfig {
           std::cout << "Write frequency=" << write_freq << std::endl;
           std::cout << "Window length=" << window_len << std::endl;
           std::cout << "Window step=" << window_step << std::endl;
+          std::cout << "Window iter=" << window_iter << std::endl;
           std::cout << "Destination host address=" << dest_host << std::endl;
           std::cout << "Destination port=" << dest_port << std::endl;
         }
@@ -136,7 +143,6 @@ int main(int argc, char **argv)
   /**************************/
   /* Perform reconstruction */
   /* Define job size per thread request */
-
   #ifdef TIMERON
   std::chrono::duration<double> recon_tot(0.), inplace_tot(0.), update_tot(0.), 
     datagen_tot(0.);
@@ -158,7 +164,7 @@ int main(int argc, char **argv)
   h5md.dims[1] = tmetadata.tn_sinograms; 
   h5md.dims[0] = 0;   /// Number of projections is unknown
   h5md.dims[2] = tmetadata.n_rays_per_proj_row; 
-  for(int iter=0; ; ++iter){
+  for(int passes=0; ; ++passes){
       #ifdef TIMERON
       auto datagen_beg = std::chrono::system_clock::now();
       #endif
@@ -170,34 +176,39 @@ int main(int argc, char **argv)
 
       if(curr_slices == nullptr) break; /// If nullptr, there is no more projection 
 
-      #ifdef TIMERON
-      auto recon_beg = std::chrono::system_clock::now();
-      #endif
-      engine->RunParallelReduction(*curr_slices, req_number);  /// Reconstruction
+      /// Iterate on window
+      for(int i=0; i<config.window_iter; ++i){
+        #ifdef TIMERON
+        auto recon_beg = std::chrono::system_clock::now();
+        #endif
+        engine->RunParallelReduction(*curr_slices, req_number);  /// Reconstruction
 
-      #ifdef TIMERON
-      recon_tot += (std::chrono::system_clock::now()-recon_beg);
-      auto inplace_beg = std::chrono::system_clock::now();
-      #endif
-      engine->ParInPlaceLocalSynchWrapper();              /// Local combination
-      #ifdef TIMERON
-      inplace_tot += (std::chrono::system_clock::now()-inplace_beg);
+        #ifdef TIMERON
+        recon_tot += (std::chrono::system_clock::now()-recon_beg);
+        auto inplace_beg = std::chrono::system_clock::now();
+        #endif
+        engine->ParInPlaceLocalSynchWrapper();              /// Local combination
+        #ifdef TIMERON
+        inplace_tot += (std::chrono::system_clock::now()-inplace_beg);
 
-      /// Update reconstruction object
-      auto update_beg = std::chrono::system_clock::now();
-      #endif
-      main_recon_space->UpdateRecon(recon_image, main_recon_replica);
-      #ifdef TIMERON
-      update_tot += (std::chrono::system_clock::now()-update_beg);
-      #endif
+        /// Update reconstruction object
+        auto update_beg = std::chrono::system_clock::now();
+        #endif
+        main_recon_space->UpdateRecon(recon_image, main_recon_replica);
+        #ifdef TIMERON
+        update_tot += (std::chrono::system_clock::now()-update_beg);
+        #endif
+        engine->ResetReductionSpaces(init_val);
+        curr_slices->ResetMirroredRegionIter();
+      }
 
       /* Write reconstructed data to disk */
       #ifdef TIMERON
       auto write_beg = std::chrono::system_clock::now();
       #endif
-      if(!(iter%config.write_freq)){
+      if(!(passes%config.write_freq)){
         std::stringstream iteration_stream;
-        iteration_stream << std::setfill('0') << std::setw(6) << iter;
+        iteration_stream << std::setfill('0') << std::setw(6) << passes;
         std::string outputpath = config.kReconOutputDir + "/" + 
           iteration_stream.str() + "-recon.h5";
         trace_io::WriteRecon(
@@ -208,8 +219,6 @@ int main(int argc, char **argv)
       write_tot += (std::chrono::system_clock::now()-write_beg);
       #endif
 
-      /// Reset iteration
-      engine->ResetReductionSpaces(init_val);
       //delete curr_slices->metadata(); //XXX Memory leak!!
       delete curr_slices;
   }

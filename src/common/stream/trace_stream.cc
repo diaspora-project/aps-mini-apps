@@ -24,26 +24,26 @@ DataRegionBase<float, TraceMetadata>* TraceStream::ReadSlidingWindow(
     if(msg == nullptr) break;
     received_msgs.push_back(msg);
   }
-  std::cout << "Received # msgs=" << received_msgs.size() << std::endl;
 
   // TODO: After receiving message corrections might need to be applied
 
   /// End of the processing
   if(received_msgs.size()==0 && vtheta.size()==0){
-    std::cout << "End of window/proj" << std::endl;
+    std::cout << "End of the processing: " << vtheta.size() << std::endl;
     return nullptr; 
   }
   /// End of messages, but there is data to be processed in window
   else if(received_msgs.size()==0 && vtheta.size()>0){ 
-    std::cout << "End of proj, still some in the window: " << vtheta.size() << std::endl;
     for(int i=0; i<step; ++i){  // Delete step size element
       if(vtheta.size()>0) EraseBegTraceMsg();
       else break;
     }
+    //std::cout << "End of messages, but there might be data in window:" << vtheta.size() << std::endl;
+    if(vtheta.size()==0) return nullptr;
   }
   /// New message(s) arrived, there is space in window
   else if(received_msgs.size()>0 && vtheta.size()<window_len_){
-    std::cout << "New message(s) arrived, there is space in window: " << vtheta.size() << std::endl;
+    //std::cout << "New message(s) arrived, there is space in window: " << window_len_ - vtheta.size() << std::endl;
     for(auto msg : received_msgs){
       tomo_msg_data_t *dmsg = traceMQ().read_data(msg);
       //traceMQ().print_data(dmsg, metadata().n_sinograms*metadata().n_rays_per_proj_row);
@@ -51,10 +51,11 @@ DataRegionBase<float, TraceMetadata>* TraceStream::ReadSlidingWindow(
       traceMQ().free_msg(msg);
       ++counter_;
     }
+    //std::cout << "After adding # items in window: " << vtheta.size() << std::endl;
   }
   /// New message arrived, there is no space in window
   else if(received_msgs.size()>0 && vtheta.size()>=window_len_){
-    std::cout << "New message arrived, there is no space in window:"<< vtheta.size() << std::endl;
+    //std::cout << "New message arrived, there is no space in window: " << vtheta.size() << std::endl;
     for(int i=0; i<step; ++i) {
       if(vtheta.size()>0) EraseBegTraceMsg();
       else break;
@@ -66,6 +67,7 @@ DataRegionBase<float, TraceMetadata>* TraceStream::ReadSlidingWindow(
       traceMQ().free_msg(msg);
       ++counter_;
     }
+    //std::cout << "After remove/add, new window size: " << vtheta.size() << std::endl;
   }
   else std::cerr << "Unknown state in ReadWindow!" << std::endl;
 
