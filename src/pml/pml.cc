@@ -30,7 +30,7 @@ void PMLReconSpace::UpdateRecon(
       else recon[index] = upd;
     }
   }
-  std::cout << "NaNs=" << nans << std::endl;
+  //std::cout << "NaNs=" << nans << std::endl;
 }
 
 void PMLReconSpace::CalculateFG(
