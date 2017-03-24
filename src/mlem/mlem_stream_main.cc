@@ -169,7 +169,7 @@ int main(int argc, char **argv)
       auto datagen_beg = std::chrono::system_clock::now();
       #endif
       curr_slices = tstream.ReadSlidingWindow(recon_image, config.window_step);
-      if(config.center!=0) curr_slices->metadata().center(config.center);
+      if(config.center!=0 && curr_slices!=nullptr) curr_slices->metadata().center(config.center);
       #ifdef TIMERON
       datagen_tot += (std::chrono::system_clock::now()-datagen_beg);
       #endif

@@ -29,7 +29,7 @@ DataRegionBase<float, TraceMetadata>* TraceStream::ReadSlidingWindow(
 
   /// End of the processing
   if(received_msgs.size()==0 && vtheta.size()==0){
-    std::cout << "End of the processing: " << vtheta.size() << std::endl;
+    //std::cout << "End of the processing: " << vtheta.size() << std::endl;
     return nullptr; 
   }
   /// End of messages, but there is data to be processed in window
