@@ -55,8 +55,8 @@ trace_io::H5Metadata* trace_io::ReadMetadata(
 
   /* Get the dimensions */
   hsize_t *dims, *m_dims;
-  dims = (hsize_t*) calloc(ndims, sizeof(*dims));
-  m_dims = (hsize_t*) calloc(ndims, sizeof(*m_dims));
+  dims = new hsize_t[ndims];
+  m_dims = new hsize_t[ndims];
   int ret = H5Sget_simple_extent_dims(dataspace_id, dims, m_dims);
   if(ret <= 0)
     throw std::runtime_error("Unable to get dimensions from hdf5 dataset");
@@ -71,7 +71,7 @@ trace_io::H5Metadata* trace_io::ReadMetadata(
   H5Dclose(dataset_id);
   H5Sclose(dataspace_id);
   H5Fclose(file_id);
-  free(m_dims);
+  delete [] m_dims;
 
   return h5_metadata;
 }
@@ -452,6 +452,8 @@ void trace_io::WriteData(
   H5Pclose(plist_id);
   H5Fclose(file_id);
 
+  free(m_count);
+  free(d_count);
   free(dataset_ddims);
   free(d_offset);
 }

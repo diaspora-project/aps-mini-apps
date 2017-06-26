@@ -160,7 +160,7 @@ int main(int argc, char **argv)
   /// Required data structure for dumping image to h5 file
   trace_io::H5Metadata h5md; 
   h5md.ndims=3; 
-  h5md.dims=(hsize_t*)malloc(sizeof(hsize_t)*3);
+  h5md.dims= new hsize_t[3];
   h5md.dims[1] = tmetadata.tn_sinograms; 
   h5md.dims[0] = 0;   /// Number of projections is unknown
   h5md.dims[2] = tmetadata.n_rays_per_proj_row; 
@@ -236,7 +236,7 @@ int main(int argc, char **argv)
   }
 
   /* Clean-up the resources */
-  free(h5md.dims);
+  delete [] h5md.dims;
   //delete main_recon_space;
   //delete curr_slices;
   delete comm;

@@ -139,9 +139,9 @@ int main(int argc, char **argv)
       n_blocks,                           /// int const num_slices,
       input_slice->metadata->dims[2],     /// int const num_cols,
       input_slice->metadata->dims[2],     /// int const num_grids,
-      config.center,                      /// float const center,
-      0,                                  /// int const num_neighbor_recon_slices,
-      1.);                                /// float const recon_init_val
+      config.center)                      /// float const center,
+      //0,                                  /// int const num_neighbor_recon_slices,
+      //1.);                                /// float const recon_init_val
 
   // INFO: DataRegionBase destructor deletes input_slice.data pointer
   DataRegionBase<float, TraceMetadata> *slices = 
