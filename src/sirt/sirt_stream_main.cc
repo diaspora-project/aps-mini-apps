@@ -5,7 +5,7 @@
 #include "disp_comm_mpi.h"
 #include "data_region_base.h"
 #include "disp_engine_reduction.h"
-#include "mlem.h"
+#include "sirt.h"
 #include "trace_stream.h"
 
 class TraceRuntimeConfig {
@@ -25,7 +25,7 @@ class TraceRuntimeConfig {
     TraceRuntimeConfig(int argc, char **argv, int rank, int size){
       try
       {
-        TCLAP::CmdLine cmd("MLEM Iterative Image Reconstruction", ' ', "0.01");
+        TCLAP::CmdLine cmd("SIRT Iterative Image Reconstruction", ' ', "0.01");
         TCLAP::ValueArg<std::string> argReconOutputPath(
           "o", "reconOutputPath", "Output file path for reconstructed image (hdf5)",
           false, "./output.h5", "string");
@@ -124,7 +124,7 @@ int main(int argc, char **argv)
   /* The size of the reconstruction object (in reconstruction space) is
    * twice the reconstruction object size, because of the length storage
    */
-  auto main_recon_space = new MLEMReconSpace(
+  auto main_recon_space = new SIRTReconSpace(
       n_blocks, 2*num_cols*num_cols);
   main_recon_space->Initialize(num_cols*num_cols);
   auto &main_recon_replica = main_recon_space->reduction_objects();
@@ -132,12 +132,13 @@ int main(int argc, char **argv)
   main_recon_replica.ResetAllItems(init_val);
 
   /* Prepare processing engine and main reduction space for other threads */
-  DISPEngineBase<MLEMReconSpace, float> *engine =
-    new DISPEngineReduction<MLEMReconSpace, float>(
+  DISPEngineBase<SIRTReconSpace, float> *engine =
+    new DISPEngineReduction<SIRTReconSpace, float>(
         comm,
         main_recon_space,
-        config.thread_count); 
-          /// # threads (0 for auto assign the number of threads)
+        config.thread_count);
+        /// # threads (0 for auto assign the number of threads)
+
   /**********************/
 
   /**************************/
@@ -147,13 +148,13 @@ int main(int argc, char **argv)
   std::chrono::duration<double> recon_tot(0.), inplace_tot(0.), update_tot(0.), 
     datagen_tot(0.);
   std::chrono::duration<double> write_tot(0.);
-  #endif
 
   DataRegionBase<float, TraceMetadata> *curr_slices = nullptr;
   /// Reconstructed image
   DataRegionBareBase<float> recon_image(n_blocks*num_cols*num_cols);  
   for(size_t i=0; i<recon_image.count(); ++i) 
-    recon_image[i]=1.; /// Initial values of the reconstructe image
+    recon_image[i]=0.; /// Initial values of the reconstructe image
+  #endif
 
   /// Number of requested ray-sum values by each thread poll
   int64_t req_number = num_cols; 
@@ -176,6 +177,15 @@ int main(int argc, char **argv)
       #endif
 
       if(curr_slices == nullptr) break; /// If nullptr, there is no more projection 
+
+      /// Check window effect
+      /// and iteration
+      /*
+      if((passes/config.write_freq)>793){
+        tstream.WindowLength(5);
+        config.window_iter=5;
+      }
+      */
 
       /// Iterate on window
       for(int i=0; i<config.window_iter; ++i){
@@ -243,5 +253,4 @@ int main(int argc, char **argv)
   delete comm;
   delete engine;
 }
-
 

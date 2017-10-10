@@ -125,6 +125,7 @@ void MLEMReconSpace::Reduce(MirroredRegionBareBase<float> &input)
     //std::cout << "curr_proj=" << proj << "/" << count_projs  << "; offset=" << &(rays[0]) << "-" << &(rays[0])+(num_cols-1) << "; theta_q=" << theta_q << std::endl;
 
     for (int curr_col=0; curr_col<num_cols; ++curr_col) {
+      if(rays[curr_col]<0) continue;
       /// Calculate coordinates
       float xi = -1e6;
       float yi = (1-num_cols)/2. + curr_col+mov;

@@ -51,6 +51,8 @@ class TraceStream
 
     tomo_msg_metadata_t metadata() { return traceMQ().metadata(); }
     uint32_t counter() const { return counter_; }
+
+    void WindowLength(int wlen);
 };
 
 #endif // TRACE_COMMONS_STREAM_TRACE_STREAM_H

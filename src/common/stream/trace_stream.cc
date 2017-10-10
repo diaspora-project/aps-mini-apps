@@ -17,6 +17,10 @@ DataRegionBase<float, TraceMetadata>* TraceStream::ReadSlidingWindow(
   DataRegionBareBase<float> &recon_image, 
   int step) 
 {
+  // Dynamically meet sizes
+  while(vtheta.size()>window_len_)
+    EraseBegTraceMsg();
+
   // Receive new message
   std::vector<tomo_msg_t*> received_msgs; 
   for(int i=0; i<step; ++i){
@@ -133,5 +137,9 @@ DataRegionBase<float, TraceMetadata>* TraceStream::SetupTraceDataRegion(
   curr_data->ResetMirroredRegionIter();
 
   return curr_data;
+}
+
+void TraceStream::WindowLength(int wlen){
+  window_len_ = wlen;
 }
 
