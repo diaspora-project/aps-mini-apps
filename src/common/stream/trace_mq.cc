@@ -55,6 +55,9 @@ tomo_msg_t* TraceMQ::ReceiveMsg() {
     ++seq_;
 
     state(TMQ_State::DATA);
+    size_t count=10;
+    print_data(read_data(dmsg), count);
+
     return dmsg;
   } 
   else if (dmsg->type == TRACEMQ_MSG_FIN_REP){ /// Message is for finalization

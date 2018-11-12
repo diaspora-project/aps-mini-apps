@@ -8,8 +8,7 @@ BINDIR = ${ROOTDIR}/bin/
 
 # Flags
 CFLAGS = -O3 -Wall -Wextra -std=c++11 
-CFLAGS += -no-inline-factor -no-inline-max-size -g -fPIC -DTIMERON
-#CFLAGS += -no-prec-div -ansi-alias 
+CFLAGS += -fPIC -DTIMERON
 
 # Common data structures and utilities classes
 COMMONDIR = ${ROOTDIR}/src/common
@@ -17,19 +16,19 @@ COMMONDIR = ${ROOTDIR}/src/common
 DISPDIR = ${COMMONDIR}/DISP/core
 STREAMDIR = ${COMMONDIR}/stream
 
-HDF5LIB = ${HDF5_HOME}/lib
-HDF5INC = ${HDF5_HOME}/include
+#HDF5LIB = ${HDF5_HOME}/lib
+#HDF5INC = ${HDF5_HOME}/include
 
-ZMQLIB = "/home/bicer/local/lib"
+#ZMQLIB = "/home/bicer/local/lib"
 
-LIBS = -lm -lhdf5 -lzmq
-LIBDIRS = -L$(HDF5LIB)  -L${ZMQLIB}
-INCLUDES = -I$(STREAMDIR) -I$(DISPDIR) -I${COMMONDIR} -I$(HDF5INC)
+LIBS = -lzmq #-lhdf5 -lm 
+LIBDIRS = #-L$(HDF5LIB)  -L${ZMQLIB}
+INCLUDES = -I$(STREAMDIR) -I$(DISPDIR) -I${COMMONDIR} #-I$(HDF5INC)
 
 # Executable/reconstruction objects
 SIRT_MODEL_OBJS = sirt_main_model.o
 SIRT_OBJS = sirt.o sirt_stream_main.o
-COMMON_OBJS = trace_h5io.o trace_utils.o trace_stream.o trace_mq.o
+COMMON_OBJS = trace_utils.o trace_stream.o trace_mq.o #trace_h5io.o
 
 # Executables
 MODEL = sirt_model
