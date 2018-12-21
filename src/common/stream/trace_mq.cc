@@ -1,13 +1,16 @@
 #include "trace_mq.h"
+#include <sstream>
 #include <cstring>
 #include <cassert>
 
 TraceMQ::TraceMQ(
-  std::string dest_ip, int dest_port, int comm_rank, int comm_size) : 
+  std::string dest_ip, int dest_port, int comm_rank, int comm_size, std::string pub_info) : 
     dest_ip_ {dest_ip}, 
     dest_port_ {dest_port}, 
     comm_rank_ {comm_rank}, 
     comm_size_ {comm_size},
+    pub_info_ {pub_info}, /// Publisher information
+    fbuilder_ {1024},
     state_ {TMQ_State::DATA},  /// Initial state is expecting DATA
     seq_ {0}
 {
@@ -18,6 +21,9 @@ TraceMQ::TraceMQ(
   context = zmq_ctx_new();
   server = zmq_socket(context, ZMQ_REQ); 
   zmq_connect(server, addr.c_str()); 
+
+  server_pub = zmq_socket(context, ZMQ_PUB);
+  zmq_connect(server_pub, pub_info_.c_str()); 
 }
 
 void TraceMQ::Initialize() {
@@ -39,6 +45,41 @@ void TraceMQ::Initialize() {
   send_msg(server, msg);
   free_msg(msg);
   ++seq_;
+}
+
+void TraceMQ::PublishMsg(float *msg, std::vector<int> dims)
+{
+  size_t msg_size = 1;
+  for(int i : dims) msg_size *= i;
+  msg_size *= sizeof(float);
+
+  std::ostringstream out;
+  out << "Image is ready to be published at " << pub_info_ << 
+         ", size of the message=" << msg_size;
+  std::cout << out.str() << std::endl;
+  /// Serialized data
+  MONA::TraceDS::Dim3 ddims {dims[0], dims[1], dims[2]};
+  uint8_t *bmsg = reinterpret_cast<uint8_t*>(msg);
+  std::vector<uint8_t> data {bmsg, bmsg+msg_size};
+  auto img_offset = MONA::TraceDS::CreateTImageDirect(fbuilder_, 
+                      0, //int32_t seq = 0,
+                      &ddims, //const Dim3 *dims = 0,
+                      0.0f, //float rotation = 0.0f,
+                      0.0f, //float center = 0.0f,
+                      0, //int32_t uniqueId = 0,
+                      MONA::TraceDS::IType_End, //IType itype = IType_End,
+                      &data); //const std::vector<uint8_t> *tdata = nullptr)
+  fbuilder_.Finish(img_offset);
+  int size = fbuilder_.GetSize(); // Size of the generated image
+  uint8_t *buf = fbuilder_.GetBufferPointer(); // Buffer pointer to serialized data
+  fbuilder_.Clear();
+
+  /// Publish
+  int rc = zmq_send(server_pub, buf, size, 0); assert(rc==size);
+  //zmq_msg_t zmsg;
+  //int rc = zmq_msg_init_size(&zmsg, size); assert(rc==0);
+  //memcpy(reinterpret_cast<void*>(zmq_msg_data(&zmsg)), reinterpret_cast<void*>(buf), size);
+  //rc = zmq_msg_send(&zmsg, server_pub, 0); assert(rc==size);
 }
 
 tomo_msg_t* TraceMQ::ReceiveMsg() {
@@ -218,5 +259,5 @@ tomo_msg_t* TraceMQ::recv_msg(void *server){
 
 void TraceMQ::free_msg(tomo_msg_t *msg) {
   free(msg);
-  msg=NULL;
+  msg=nullptr;
 }

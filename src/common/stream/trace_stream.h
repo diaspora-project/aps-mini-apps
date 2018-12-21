@@ -34,6 +34,12 @@ class TraceStream
                 int dest_port,
                 uint32_t window_len, 
                 int comm_rank,
+                int comm_size, 
+                std::string pub_info);
+    TraceStream(std::string dest_ip,
+                int dest_port,
+                uint32_t window_len, 
+                int comm_rank,
                 int comm_size);
 
     /* Create a data region from sliding window
@@ -53,6 +59,11 @@ class TraceStream
     uint32_t counter() const { return counter_; }
 
     void WindowLength(int wlen);
+
+    /* Publish reconstructed slices.
+     * @param slice Slice and its metadata information.
+     */
+    void PublishImage(DataRegionBase<float, TraceMetadata> &slice);
 };
 
 #endif // TRACE_COMMONS_STREAM_TRACE_STREAM_H

@@ -110,8 +110,10 @@ int main(int argc, char **argv)
   DISPCommBase<float> *comm =
         new DISPCommMPI<float>(&argc, &argv);
   TraceRuntimeConfig config(argc, argv, comm->rank(), comm->size());
-  TraceStream tstream(config.dest_host, config.dest_port, config.window_len, 
-    comm->rank(), comm->size());
+  TraceStream tstream(config.dest_host, config.dest_port, 
+                      config.window_len, 
+                      comm->rank(), comm->size(),
+                      "tcp://*:52000");
 
   /* Get metadata structure */
   tomo_msg_metadata_t tmetadata = (tomo_msg_metadata_t)tstream.metadata();
@@ -214,9 +216,13 @@ int main(int argc, char **argv)
       }
 
       /* Emit reconstructed data */
-      //#ifdef TIMERON
-      //auto write_beg = std::chrono::system_clock::now();
-      //#endif
+      #ifdef TIMERON
+      auto write_beg = std::chrono::system_clock::now();
+      #endif
+      /* Publish the reconstructed image (slices) outside */
+      if(!(passes%config.write_freq)){
+        tstream.PublishImage(*curr_slices);
+      }
       //if(!(passes%config.write_freq)){
       //  std::stringstream iteration_stream;
       //  iteration_stream << std::setfill('0') << std::setw(6) << passes;
@@ -226,9 +232,9 @@ int main(int argc, char **argv)
       //      curr_slices->metadata(), h5md, 
       //      outputpath, config.kReconDatasetPath);
       //}
-      //#ifdef TIMERON
-      //write_tot += (std::chrono::system_clock::now()-write_beg);
-      //#endif
+      #ifdef TIMERON
+      write_tot += (std::chrono::system_clock::now()-write_beg);
+      #endif
 
       //delete curr_slices->metadata(); //TODO Check for memory leak
       delete curr_slices;

@@ -1,17 +1,24 @@
 #include "trace_stream.h"
 
 TraceStream::TraceStream(
-    std::string dest_ip,
-    int dest_port,
+    std::string dest_ip, int dest_port,
     uint32_t window_len, 
-    int comm_rank,
-    int comm_size) :
+    int comm_rank, int comm_size, 
+    std::string pub_info) :
   window_len_ {window_len},
   counter_ {0},
-  traceMQ_ {dest_ip, dest_port, comm_rank, comm_size}
+  traceMQ_ {dest_ip, dest_port, comm_rank, comm_size, pub_info}
 {
   traceMQ().Initialize();
 }
+
+TraceStream::TraceStream(
+    std::string dest_ip, int dest_port,
+    uint32_t window_len, 
+    int comm_rank, int comm_size) :
+  TraceStream(dest_ip, dest_port, window_len, comm_rank, comm_size, "")
+{ }
+
 
 DataRegionBase<float, TraceMetadata>* TraceStream::ReadSlidingWindow(
   DataRegionBareBase<float> &recon_image, 
@@ -23,7 +30,7 @@ DataRegionBase<float, TraceMetadata>* TraceStream::ReadSlidingWindow(
 
   // Receive new message
   std::vector<tomo_msg_t*> received_msgs; 
-  for(int i=0; i<step; ++i){
+  for(int i=0; i<step; ++i) {
     tomo_msg_t *msg = traceMQ().ReceiveMsg();
     if(msg == nullptr) break;
     received_msgs.push_back(msg);
@@ -141,5 +148,12 @@ DataRegionBase<float, TraceMetadata>* TraceStream::SetupTraceDataRegion(
 
 void TraceStream::WindowLength(int wlen){
   window_len_ = wlen;
+}
+
+void TraceStream::PublishImage(DataRegionBase<float, TraceMetadata> &slice){
+  auto &mdata = slice.metadata();
+  auto &image = mdata.recon();
+  traceMQ().PublishMsg( &image[0], 
+                          {mdata.num_slices(), mdata.num_cols(), mdata.num_cols()});
 }
 

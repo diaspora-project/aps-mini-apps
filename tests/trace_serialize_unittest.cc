@@ -69,6 +69,7 @@ TEST(TraceSerializationTest, Serialize)
   fbuilder.Finish(offsetImage);
   //int size = fbuilder.GetSize();
   uint8_t *buf = fbuilder.GetBufferPointer();
+  fbuilder.Clear(); // Reset all stat in flatbuffer for reuse
  
   auto &timage = *(MONA::TraceDS::GetTImage(buf));
 

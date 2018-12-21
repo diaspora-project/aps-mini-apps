@@ -3,6 +3,8 @@
 
 #include <string>
 #include <iostream>
+#include <vector>
+#include "trace_prot_generated.h"
 #include "zmq.h"
 
 #define TRACEMQ_MSG_FIN_REP       0x00000000
@@ -57,9 +59,14 @@ class TraceMQ
     int dest_port_;
     int comm_rank_;
     int comm_size_;
+    std::string pub_info_;
+
 
     void *context;
     void *server;
+    void *server_pub;
+
+    flatbuffers::FlatBufferBuilder fbuilder_;
 
     /* State of the TraceMQ
      *
@@ -143,29 +150,44 @@ class TraceMQ
 
   public:
     /**
-    Connects to the destination host with given port. Also sets the comm_rank 
-    and comm_size information in the class. 
-    */
+     * Sets up the Trace message queue.
+     *
+     * @param dest_ip IP address of the distributor process.
+     * @param dest_port Port address of the distributor process.
+     * @param comm_rank This process' rank on the cluster. This information
+     *                  is used for load balancing also.
+     * @param comm_size The total numper of mpi processes. Similar to above
+     *                  this is used for load balancing.
+     * @param pub_info Publisher address for the reconstructed slices.
+     *
+     */
     TraceMQ(std::string dest_ip,
             int dest_port,
             int comm_rank,
             int comm_size);
+    TraceMQ(std::string dest_ip,
+            int dest_port,
+            int comm_rank,
+            int comm_size,
+            std::string pub_info);
     ~TraceMQ();
 
     /**
-    Initializes the connection with the data acquisition machine or its 
-    forwarder.
-
-    Performs initial handshake with the destination host and ip address.
-    First, it exchanges its comm_rank and comm_size parameters with the
-    destination. Then, it receives the projection information and sets its
-    local metadata structure, tomo_msg_metadata_t.
-    */
+     * Initializes the connection with the data acquisition machine or its 
+     * forwarder.
+     *
+     * Performs initial handshake with the destination host and ip address.
+     * First, it exchanges its comm_rank and comm_size parameters with the
+     * destination. Then, it receives the projection information and sets its
+     * local metadata structure, tomo_msg_metadata_t.
+     */
     void Initialize();
 
     /// Waits for tomo_msg_t and returns it
     tomo_msg_t* ReceiveMsg();
     tomo_msg_data_t* read_data(tomo_msg_t *msg);
+
+    void PublishMsg(float *msg, std::vector<int> dims);
 
     /** Clean tracemq messages.  */
     void free_msg(tomo_msg_t *msg);
