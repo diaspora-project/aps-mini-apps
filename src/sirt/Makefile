@@ -21,9 +21,9 @@ STREAMDIR = ${COMMONDIR}/stream
 
 #ZMQLIB = "/home/bicer/local/lib"
 
-LIBS = -lzmq #-lhdf5 -lm 
-LIBDIRS = #-L$(HDF5LIB)  -L${ZMQLIB}
-INCLUDES = -I$(STREAMDIR) -I$(DISPDIR) -I${COMMONDIR} #-I$(HDF5INC)
+LIBS = -lzmq -lsodium #-lhdf5 -lm 
+LIBDIRS = -L/home/beams/TBICER/miniconda3/envs/recon//lib #-L$(HDF5LIB)  -L${ZMQLIB}
+INCLUDES = -I$(STREAMDIR) -I$(DISPDIR) -I${COMMONDIR} -I/home/beams/TBICER/miniconda3/envs/recon/include #-I$(HDF5INC)
 
 # Executable/reconstruction objects
 SIRT_MODEL_OBJS = sirt_main_model.o

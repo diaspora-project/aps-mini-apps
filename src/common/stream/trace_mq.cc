@@ -19,11 +19,11 @@ TraceMQ::TraceMQ(
   std::cout << "[" << comm_rank_ << "] Destination address=" << addr << std::endl;
 
   context = zmq_ctx_new();
-  server = zmq_socket(context, ZMQ_REQ); 
-  zmq_connect(server, addr.c_str()); 
+  server = zmq_socket(context, ZMQ_REQ);
+  int rc = zmq_connect(server, addr.c_str()); assert(rc==0); 
 
   server_pub = zmq_socket(context, ZMQ_PUB);
-  zmq_connect(server_pub, pub_info_.c_str()); 
+  rc = zmq_bind(server_pub, pub_info_.c_str()); assert(rc==0);
 }
 
 void TraceMQ::Initialize() {

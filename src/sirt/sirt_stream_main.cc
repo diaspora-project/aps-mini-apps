@@ -21,6 +21,8 @@ class TraceRuntimeConfig {
     int center;
     std::string dest_host;
     int dest_port;
+    std::string pub_addr;
+    int pub_freq = 0;
 
     TraceRuntimeConfig(int argc, char **argv, int rank, int size){
       try
@@ -35,12 +37,18 @@ class TraceRuntimeConfig {
         TCLAP::ValueArg<std::string> argReconDatasetPath(
           "r", "reconDatasetPath", "Reconstruction dataset path in hdf5 file",
           false, "/data", "string");
+        TCLAP::ValueArg<std::string> argPubAddr(
+          "", "pub-addr", "Bind address for the publisher. Default tcp://*:52000", false, 
+          "tcp://*:52000", "string");
+        TCLAP::ValueArg<float> argPubFreq(
+          "", "pub-freq", "Publish frequency", false, 10000, "int");
+
         TCLAP::ValueArg<float> argCenter(
           "c", "center", "Center value", false, 0., "float");
         TCLAP::ValueArg<int> argThreadCount(
           "t", "thread", "Number of threads per process", false, 1, "int");
         TCLAP::ValueArg<float> argWriteFreq(
-          "", "write-frequency", "Write frequency", false, 10000, "int");
+          "", "write-freq", "Write frequency", false, 10000, "int");
         TCLAP::ValueArg<float> argWindowLen(
           "", "window-length", "Number of projections that will be stored in the window",
           false, 32, "int");
@@ -50,6 +58,7 @@ class TraceRuntimeConfig {
         TCLAP::ValueArg<float> argWindowIter(
           "", "window-iter", "Number of iterations on received window",
           false, 1, "int");
+
         TCLAP::ValueArg<std::string> argDestHost(
           "", "dest-host", "Destination host/ip address", false, "164.54.143.3", 
             "string");
@@ -59,12 +68,17 @@ class TraceRuntimeConfig {
         cmd.add(argReconOutputPath);
         cmd.add(argReconOutputDir);
         cmd.add(argReconDatasetPath);
+
+        cmd.add(argPubFreq);
+        cmd.add(argPubAddr);
+
         cmd.add(argCenter);
         cmd.add(argThreadCount);
         cmd.add(argWriteFreq);
         cmd.add(argWindowLen);
         cmd.add(argWindowStep);
         cmd.add(argWindowIter);
+
         cmd.add(argDestHost);
         cmd.add(argDestPort);
 
@@ -80,6 +94,8 @@ class TraceRuntimeConfig {
         window_iter= argWindowIter.getValue();
         dest_host= argDestHost.getValue();
         dest_port= argDestPort.getValue();
+        pub_addr= argPubAddr.getValue();
+        pub_freq= argPubFreq.getValue();
 
         std::cout << "MPI rank:"<< rank << "; MPI size:" << size << std::endl;
         if(rank==0)
@@ -95,6 +111,8 @@ class TraceRuntimeConfig {
           std::cout << "Window iter=" << window_iter << std::endl;
           std::cout << "Destination host address=" << dest_host << std::endl;
           std::cout << "Destination port=" << dest_port << std::endl;
+          std::cout << "Publisher address=" << pub_addr << std::endl;
+          std::cout << "Publish frequency=" << pub_freq << std::endl;
         }
       }
       catch (TCLAP::ArgException &e)
@@ -113,7 +131,7 @@ int main(int argc, char **argv)
   TraceStream tstream(config.dest_host, config.dest_port, 
                       config.window_len, 
                       comm->rank(), comm->size(),
-                      "tcp://*:52000");
+                      config.pub_addr);
 
   /* Get metadata structure */
   tomo_msg_metadata_t tmetadata = (tomo_msg_metadata_t)tstream.metadata();
@@ -220,7 +238,7 @@ int main(int argc, char **argv)
       auto write_beg = std::chrono::system_clock::now();
       #endif
       /* Publish the reconstructed image (slices) outside */
-      if(!(passes%config.write_freq)){
+      if(!(passes%config.pub_freq)){
         tstream.PublishImage(*curr_slices);
       }
       //if(!(passes%config.write_freq)){
