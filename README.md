@@ -21,6 +21,7 @@ cp ../../../python/streamer-dist/ModDistStreamPubDemo.py .
 cp -r ../../../python/common ../ 
 ```
 This will let you execute the ModDistStreamPubDemo.py script, which is the main streamer-dist process. You can check a sample usage of this script in the file ``` [Trace]$ cat tests/dist.cmd.log ```.
+
 3. streamer-daq: This process generates the data and streams it to the streamer-dist process. In order to setup the python script, follow the below steps (again from project root directory):
 ``` 
 mkdir build/python/streamer-daq
