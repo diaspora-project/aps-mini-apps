@@ -1,6 +1,6 @@
 # Trace
 
-This code lets users to perform reconstruction on streaming tomography data. It provides a sliding window data structure to store (partial) data and a reconstruction algorithm to reconstruct the data in the window. The reconstruction algorithm is based on the [SIRT](https://en.wikipedia.org/wiki/SIRT) algorithm. This code is CPU based and is optimized for distributed memory parallelization (via MPI). 
+This code lets users to perform reconstruction on streaming tomography data. It provides a sliding window data structure to store (partial) data and a reconstruction algorithm to reconstruct the data in the window. The reconstruction algorithm is based on the SIRT algorithm. This code is CPU based and is optimized for distributed memory parallelization (via MPI). 
 
 Instructions for installation:
 There are several dependencies, including zmq, swig, python libraries/headers, MPI, flatbuffers, parallel hdf5, cmake, and a C++ compiler. 
