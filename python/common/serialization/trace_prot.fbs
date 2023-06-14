@@ -1,0 +1,28 @@
+namespace MONA.TraceDS;
+
+enum IType:byte { End, Projection, White, Dark, WhiteReset, DarkReset }
+
+struct Dim2 {
+  y:int;
+  x:int;
+}
+
+struct Dim3 {
+  z:int;
+  y:int;
+  x:int;
+}
+
+table TImage{
+  seq:int;
+  //dims:Dim2;
+  dims:Dim3;
+  rotation:float;
+  center:float;
+  uniqueId:int;
+  itype:IType;
+  tdata:[ubyte];
+}
+
+root_type TImage;
+

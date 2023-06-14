@@ -1,5 +1,5 @@
 # Compiler
-CC = mpicxx
+CC = mpicxx#/local/bin/mpicxx
 
 # Directories
 ROOTDIR = ../..
@@ -8,7 +8,7 @@ BINDIR = ${ROOTDIR}/bin/
 
 # Flags
 CFLAGS = -O3 -Wall -Wextra -std=c++11 
-CFLAGS += -fPIC -DTIMERON
+CFLAGS += -fPIC -DTIMERON #-fno-builtin
 
 # Common data structures and utilities classes
 COMMONDIR = ${ROOTDIR}/src/common
@@ -21,9 +21,9 @@ STREAMDIR = ${COMMONDIR}/stream
 
 #ZMQLIB = "/home/bicer/local/lib"
 
-LIBS = -lzmq -lsodium #-lhdf5 -lm 
-LIBDIRS = -L/home/beams/TBICER/miniconda3/envs/recon//lib #-L$(HDF5LIB)  -L${ZMQLIB}
-INCLUDES = -I$(STREAMDIR) -I$(DISPDIR) -I${COMMONDIR} -I/home/beams/TBICER/miniconda3/envs/recon/include #-I$(HDF5INC)
+LIBS = -lzmq -lpthread #-lhdf5 -lm 
+LIBDIRS = -L/home/beams/TBICER/miniconda3/envs/workflow/lib #-L$(HDF5LIB)  -L${ZMQLIB}
+INCLUDES = -I$(STREAMDIR) -I$(DISPDIR) -I${COMMONDIR} -I/home/beams/TBICER/miniconda3/envs/workflow/include #-I$(HDF5INC)
 
 # Executable/reconstruction objects
 SIRT_MODEL_OBJS = sirt_main_model.o
@@ -48,7 +48,6 @@ sirt_stream_main.o: sirt_stream_main.cc
 
 sirt_model: $(COMMON_OBJS) $(SIRT_MODEL_OBJS)
 	$(CC) $(CFLAGS) -o $@ $(SIRT_MODEL_OBJS) $(COMMON_OBJS) $(LIBDIRS) $(LIBS) 
-
 sirt: $(COMMON_OBJS) $(SIRT_OBJS)
 	$(CC) $(CFLAGS) -o $@ $(SIRT_OBJS) $(COMMON_OBJS) $(LIBDIRS) $(LIBS) 
 

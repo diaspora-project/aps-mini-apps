@@ -1,9 +1,9 @@
 #include <iomanip>
 #include "mpi.h"
-//#include "trace_h5io.h"
+#include "trace_h5io.h"
+#include "data_region_base.h"
 #include "tclap/CmdLine.h"
 #include "disp_comm_mpi.h"
-#include "data_region_base.h"
 #include "disp_engine_reduction.h"
 #include "sirt.h"
 #include "trace_stream.h"
@@ -168,23 +168,24 @@ int main(int argc, char **argv)
   std::chrono::duration<double> recon_tot(0.), inplace_tot(0.), update_tot(0.), 
     datagen_tot(0.);
   std::chrono::duration<double> write_tot(0.);
+  #endif
 
+  //DataRegionBase<float, TraceMetadata> *curr_slices = nullptr;
   DataRegionBase<float, TraceMetadata> *curr_slices = nullptr;
   /// Reconstructed image
   DataRegionBareBase<float> recon_image(n_blocks*num_cols*num_cols);  
   for(size_t i=0; i<recon_image.count(); ++i) 
     recon_image[i]=0.; /// Initial values of the reconstructe image
-  #endif
 
   /// Number of requested ray-sum values by each thread poll
   int64_t req_number = num_cols; 
   /// Required data structure for dumping image to h5 file
-  //trace_io::H5Metadata h5md; 
-  //h5md.ndims=3; 
-  //h5md.dims= new hsize_t[3];
-  //h5md.dims[1] = tmetadata.tn_sinograms; 
-  //h5md.dims[0] = 0;   /// Number of projections is unknown
-  //h5md.dims[2] = tmetadata.n_rays_per_proj_row; 
+  trace_io::H5Metadata h5md; 
+  h5md.ndims=3; 
+  h5md.dims= new hsize_t[3];
+  h5md.dims[1] = tmetadata.tn_sinograms; 
+  h5md.dims[0] = 0;   /// Number of projections is unknown
+  h5md.dims[2] = tmetadata.n_rays_per_proj_row; 
   for(int passes=0; ; ++passes){
       #ifdef TIMERON
       auto datagen_beg = std::chrono::system_clock::now();
@@ -241,15 +242,15 @@ int main(int argc, char **argv)
       if(!(passes%config.pub_freq)){
         tstream.PublishImage(*curr_slices);
       }
-      //if(!(passes%config.write_freq)){
-      //  std::stringstream iteration_stream;
-      //  iteration_stream << std::setfill('0') << std::setw(6) << passes;
-      //  std::string outputpath = config.kReconOutputDir + "/" + 
-      //    iteration_stream.str() + "-recon.h5";
-      //  trace_io::WriteRecon(
-      //      curr_slices->metadata(), h5md, 
-      //      outputpath, config.kReconDatasetPath);
-      //}
+      if(!(passes%config.write_freq)){
+        std::stringstream iteration_stream;
+        iteration_stream << std::setfill('0') << std::setw(6) << passes;
+        std::string outputpath = config.kReconOutputDir + "/" + 
+          iteration_stream.str() + "-recon.h5";
+        trace_io::WriteRecon(
+            curr_slices->metadata(), h5md, 
+            outputpath, config.kReconDatasetPath);
+      }
       #ifdef TIMERON
       write_tot += (std::chrono::system_clock::now()-write_beg);
       #endif
@@ -259,6 +260,7 @@ int main(int argc, char **argv)
   }
 
   /**************************/
+  #ifdef TIMERON
   if(comm->rank()==0){
     std::cout << "Reconstruction time=" << recon_tot.count() << std::endl;
     std::cout << "Local combination time=" << inplace_tot.count() << std::endl;
@@ -269,10 +271,11 @@ int main(int argc, char **argv)
     std::cout << "Sustained proj/sec=" << tstream.counter() / 
                                           (recon_tot.count()+inplace_tot.count()+update_tot.count()) << std::endl;
   }
+  #endif
 
   /* Clean-up the resources */
-  //delete [] h5md.dims;
-  //delete main_recon_space;
+  delete [] h5md.dims;
+  delete main_recon_space;
   //delete curr_slices;
   delete comm;
   delete engine;
