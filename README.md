@@ -7,10 +7,12 @@ There are several dependencies, including zmq, swig, python libraries/headers, M
 
 There are three main processes:
 1. sirt_stream: This process performs the reconstruction. In order to generate this executable, run the following commands in project root directory:
-``` mkdir build ```
-``` cd build ```
-``` cmake .. ```
-``` make ```
+``` 
+mkdir build
+cd build
+cmake ..
+make 
+```
 2. streamer-dist: This process partitions and streams the data to the sirt_stream process. In order to setup the python script, follow the below steps (again from project root directory):
 ``` mkdir build/python/streamer-dist ```
 ``` cd build/python/streamer-dist ```
