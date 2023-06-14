@@ -14,21 +14,27 @@ cmake ..
 make 
 ```
 2. streamer-dist: This process partitions and streams the data to the sirt_stream process. In order to setup the python script, follow the below steps (again from project root directory):
-``` mkdir build/python/streamer-dist ```
-``` cd build/python/streamer-dist ```
-``` cp ../../../python/streamer-dist/ModDistStreamPubDemo.py . ```
-``` cp -r ../../../python/common ../ ```
+``` 
+mkdir build/python/streamer-dist
+cd build/python/streamer-dist
+cp ../../../python/streamer-dist/ModDistStreamPubDemo.py .
+cp -r ../../../python/common ../ 
+```
 This will let you execute the ModDistStreamPubDemo.py script, which is the main streamer-dist process. You can check a sample usage of this script in the file ``` [Trace]$ cat tests/dist.cmd.log ```.
 3. streamer-daq: This process generates the data and streams it to the streamer-dist process. In order to setup the python script, follow the below steps (again from project root directory):
-``` mkdir build/python/streamer-daq ```
-``` cd build/python/streamer-daq ```
-``` cp ../../../python/streamer-daq/DAQStream.py ./ ```
+``` 
+mkdir build/python/streamer-daq
+cd build/python/streamer-daq
+cp ../../../python/streamer-daq/DAQStream.py ./ 
+```
 This will let you execute the DAQStream.py script, which is the main streamer-daq process. You can check a sample usage of this script in the file ``` [Trace]$ cat tests/daq.cmd.log ```.
 
 In short DAQStream generates the data and streams it to the streamer-dist process, which partitions the data and streams it to the sirt_stream process, which performs the reconstruction. There can be many sirt_stream processes running in parallel, each of which will perform reconstruction on a different slice of the 3D volume. The reconstructed images are written to hdf5 files.
 
 There is also a python script that shows how to check the image quality of the reconstructed images. In order to setup the python script, follow the below steps (again from project root directory):
-``` mkdir build/python/quality ```
-``` cd build/python/quality ```
-``` cp ../../../python/quality/iqcheck.py ./ ```
+``` 
+mkdir build/python/quality
+cd build/python/quality
+cp ../../../python/quality/iqcheck.py ./ 
+```
 The script has hardcoded paths to the reconstructed images, so you will need to change those paths to point to the correct locations. This script also has a dependency to sewar package.
