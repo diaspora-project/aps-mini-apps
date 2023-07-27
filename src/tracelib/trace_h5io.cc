@@ -160,7 +160,8 @@ trace_io::H5Data* trace_io::ReadSlices(
   hsize_t *h_block = (hsize_t*) calloc(ndims, sizeof(hsize_t));
 
 
-  unsigned long *dims = metadata.dims;
+  //unsigned long *dims = metadata.dims;
+  hsize_t *dims = metadata.dims;
   /* h_offset = {0, slice_id, 0} */
   /* h_offset[1] = w_neighbor_offset; */
   h_offset[1] = beg_slice;
