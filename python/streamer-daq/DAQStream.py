@@ -132,7 +132,7 @@ def serialize_dataset(idata, flat, dark, itheta, seq=0):
     seq+=1
     data.append(serialized_data)
   print("Serialization time={:.2f}".format(time_ser))
-  return np.array(data)
+  return np.array(data, dtype=object)
 
 def ordered_subset(max_ind, nelem):
   nsubsets = np.ceil(max_ind/nelem).astype(int)
