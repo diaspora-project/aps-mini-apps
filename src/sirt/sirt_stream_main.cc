@@ -255,6 +255,7 @@ int main(int argc, char **argv)
       write_tot += (std::chrono::system_clock::now()-write_beg);
       #endif
 
+
       //delete curr_slices->metadata(); //TODO Check for memory leak
       delete curr_slices;
   }

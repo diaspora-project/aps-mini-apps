@@ -1,4 +1,4 @@
-FROM continuumio/miniconda3
+FROM continuumio/miniconda3 as base
 
 RUN apt-get update && apt-get install -y \
     build-essential \
@@ -7,7 +7,6 @@ RUN apt-get update && apt-get install -y \
     git \
     libmpich-dev \
     libhdf5-mpich-dev
-
 RUN conda install -y \
     numpy \
     scipy \
@@ -15,15 +14,7 @@ RUN conda install -y \
     pyzmq \
     pip \
     cmake
-
 RUN pip install --upgrade pip
-RUN pip install h5py
-
-RUN conda install -y -c conda-forge \
-    tomopy \
-    dxchange
-
-RUN conda uninstall hdf5
 
 RUN git clone https://github.com/google/flatbuffers.git
 WORKDIR /flatbuffers
@@ -39,27 +30,35 @@ RUN git checkout stream_test
 
 RUN mkdir build
 RUN mkdir build/python
+RUN mkdir build/python/quality
+
+# Setup quality checker
+RUN pip install sewar
+RUN cp ./python/quality/iqcheck.py ./build/python/quality
 
 # Setup flatbuffers data structures
 WORKDIR /Trace/include/tracelib
 RUN flatc -c trace_prot.fbs
+WORKDIR /Trace
 
 # Build SIRT
+FROM base as streamersirt
 WORKDIR /Trace/build
 RUN cmake ..
 RUN make
+WORKDIR /Trace/build/bin
 
-# Setup streamer-dist
+
+# Build streamer-daq
+FROM streamersirt as StreamerDAQ
+RUN conda install -y -c conda-forge \
+    tomopy \
+    dxchange
+
 WORKDIR /Trace/build/python
-#RUN mkdir streamer-dist
-RUN cp ../../python/streamer-dist/ModDistStreamPubDemo.py ./streamer-dist
-RUN cp -r ../../python/common ./ 
-# Setup streamer-daq
 RUN mkdir streamer-daq
+RUN cp -r ../../python/common ./
 RUN cp ../../python/streamer-daq/DAQStream.py ./streamer-daq
-# Setup quality checker
-RUN mkdir quality
-RUN cp ../../python/quality/iqcheck.py ./quality
-
-# Reset the working directory
-WORKDIR /Trace
+WORKDIR /Trace/build/python/streamer-daq
+EXPOSE 50000
+EXPOSE 50001
