@@ -1,1 +1,0 @@
-python ModDistStreamPubDemo.py --data_source_addr tcp://localhost:50000 --data_source_synch_addr tcp://localhost:50001 --cast_to_float32 --normalize --my_distributor_addr tcp://*:50010 --beg_sinogram 1000 --num_sinograms 2 --num_columns 2560
