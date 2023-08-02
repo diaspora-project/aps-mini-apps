@@ -48,7 +48,7 @@
 
 # Job scripts #
 ###############
-*.sh
+#*.sh
 
 # Log/Output/Error files #
 ##########################
