@@ -30,11 +30,7 @@ RUN git checkout stream_test
 
 RUN mkdir build
 RUN mkdir build/python
-RUN mkdir build/python/quality
 
-# Setup quality checker
-RUN pip install sewar
-RUN cp ./python/quality/iqcheck.py ./build/python/quality
 
 # Setup flatbuffers data structures
 WORKDIR /Trace/include/tracelib
