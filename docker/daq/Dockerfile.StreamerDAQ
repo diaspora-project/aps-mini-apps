@@ -60,5 +60,4 @@ RUN mkdir streamer-daq
 RUN cp -r ../../python/common ./
 RUN cp ../../python/streamer-daq/DAQStream.py ./streamer-daq
 WORKDIR /Trace/build/python/streamer-daq
-EXPOSE 50000
-EXPOSE 50001
+EXPOSE 50000 50001
