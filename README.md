@@ -4,11 +4,11 @@ This code lets users perform reconstruction on streaming tomography data. It pro
 
 ### TL;DR version to run the test case: 
 
-Go into each process folder and run their docker build files and process scripts. Specifically, follow the below steps:
+Go into each process folder, fix the hardcoded (input/output) paths, parameters (port addresses) in .sh files, and run their docker build files and process scripts. Specifically, follow the below steps:
 1. Data acquisition process that simulates tomography data acquisition:
 ```
 $ cd docker/daq
-$ . daq.docker.sh
+$ . daq.docker.sh #fix the hardcoded paths before running!
 ```
 2. Distributor process that partitions the data and streams it to the reconstruction processes:
 ```
@@ -18,7 +18,7 @@ $ . dist.docker.sh
 3. Reconstruction process that reconstructs the data:
 ```
 $ cd docker/sirt
-$ . sirt.docker.sh
+$ . sirt.docker.sh #fix the hardcoded paths before running!
 ```
 
 At this point the stream reconstruction should be working and the sirt reconstruction process should be generating reconstructed images and writing them to the ~/projects/data/output folder on the host machine.
