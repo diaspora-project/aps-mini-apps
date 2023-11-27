@@ -23,10 +23,10 @@ RUN make -j
 RUN make install
 
 WORKDIR /
-RUN git clone https://github.com/tekinbicer/Trace.git
-WORKDIR /Trace
+RUN git clone https://github.com/tekinbicer/aps-mini-apps.git
+WORKDIR /aps-mini-apps
 RUN git fetch origin
-RUN git checkout stream_test
+RUN git checkout master
 
 RUN mkdir build
 RUN mkdir build/python
@@ -37,16 +37,16 @@ RUN pip install sewar
 RUN cp ./python/quality/iqcheck.py ./build/python/quality
 
 # Setup flatbuffers data structures
-WORKDIR /Trace/include/tracelib
+WORKDIR /aps-mini-apps/include/tracelib
 RUN flatc -c trace_prot.fbs
-WORKDIR /Trace
+WORKDIR /aps-mini-apps
 
 # Build SIRT
 FROM base as streamersirt
-WORKDIR /Trace/build
+WORKDIR /aps-mini-apps/build
 RUN cmake ..
 RUN make
-WORKDIR /Trace/build/bin
+WORKDIR /aps-mini-apps/build/bin
 
 
 # Build streamer-daq
@@ -55,9 +55,9 @@ RUN conda install -y -c conda-forge \
     tomopy \
     dxchange
 
-WORKDIR /Trace/build/python
+WORKDIR /aps-mini-apps/build/python
 RUN mkdir streamer-daq
 RUN cp -r ../../python/common ./
 RUN cp ../../python/streamer-daq/DAQStream.py ./streamer-daq
-WORKDIR /Trace/build/python/streamer-daq
+WORKDIR /aps-mini-apps/build/python/streamer-daq
 EXPOSE 50000 50001

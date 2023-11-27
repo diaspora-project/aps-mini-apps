@@ -23,26 +23,26 @@ RUN make -j
 RUN make install
 
 WORKDIR /
-RUN git clone https://github.com/tekinbicer/Trace.git
-WORKDIR /Trace
+RUN git clone https://github.com/tekinbicer/aps-mini-apps.git
+WORKDIR /aps-mini-apps
 RUN git fetch origin
-RUN git checkout stream_test
+RUN git checkout master
 
 RUN mkdir build
 RUN mkdir build/python
 
 
 # Setup flatbuffers data structures
-WORKDIR /Trace/include/tracelib
+WORKDIR /aps-mini-apps/include/tracelib
 RUN flatc -c trace_prot.fbs
-WORKDIR /Trace
+WORKDIR /aps-mini-apps
 
 
 # Build SIRT
 FROM base as StreamerSIRT
-WORKDIR /Trace/build
+WORKDIR /aps-mini-apps/build
 RUN cmake ..
 RUN make
-WORKDIR /Trace/build/bin
+WORKDIR /aps-mini-apps/build/bin
 
 EXPOSE 52000
