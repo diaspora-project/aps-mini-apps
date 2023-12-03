@@ -8,10 +8,15 @@ float SIRTReconSpace::CalculateSimdata(
     float *leng)
 {
   float simdata = 0.;
-  for(int i=0; i<len-1; ++i){
 #ifdef PREFETCHON
-    size_t index = indi[i+32];
-    __builtin_prefetch(&(recon[index]),1,0);
+  int prefetch_count = 64 / sizeof(float); // for 64 bit cache line
+#endif
+  for (int i=0; i<len-1; ++i) {
+#ifdef PREFETCHON
+    if (i+prefetch_count < len) {
+      size_t index = indi[i+prefetch_count]; 
+      __builtin_prefetch(&(recon[index]), 0, 0); // TODO: this needs to be profiled
+    }
 #endif
     simdata += recon[indi[i]]*leng[i];
   }

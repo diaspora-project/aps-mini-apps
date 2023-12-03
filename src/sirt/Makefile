@@ -26,18 +26,15 @@ LIBDIRS = -L/home/beams/TBICER/miniconda3/envs/workflow/lib #-L$(HDF5LIB)  -L${Z
 INCLUDES = -I$(STREAMDIR) -I$(DISPDIR) -I${COMMONDIR} -I/home/beams/TBICER/miniconda3/envs/workflow/include #-I$(HDF5INC)
 
 # Executable/reconstruction objects
-SIRT_MODEL_OBJS = sirt_main_model.o
 SIRT_OBJS = sirt.o sirt_stream_main.o
 COMMON_OBJS = trace_utils.o trace_stream.o trace_mq.o #trace_h5io.o
 
 # Executables
-MODEL = sirt_model
 PROGS = sirt_stream
 
 .PHONY: default clean
 
 all: $(PROGS)
-model: $(MODEL)
 
 # SIRT
 sirt_stream: $(COMMON_OBJS) $(SIRT_OBJS)
@@ -46,19 +43,11 @@ sirt_stream: $(COMMON_OBJS) $(SIRT_OBJS)
 sirt_stream_main.o: sirt_stream_main.cc
 	$(CC) $(CFLAGS) -c sirt_stream_main.cc $(INCLUDES)
 
-sirt_model: $(COMMON_OBJS) $(SIRT_MODEL_OBJS)
-	$(CC) $(CFLAGS) -o $@ $(SIRT_MODEL_OBJS) $(COMMON_OBJS) $(LIBDIRS) $(LIBS) 
 sirt: $(COMMON_OBJS) $(SIRT_OBJS)
 	$(CC) $(CFLAGS) -o $@ $(SIRT_OBJS) $(COMMON_OBJS) $(LIBDIRS) $(LIBS) 
 
 sirt.o: sirt.cc sirt.h
 	$(CC) $(CFLAGS) -c sirt.cc $(INCLUDES)
-
-sirt_main_model.o: sirt_main_model.cc
-	$(CC) $(CFLAGS) -c sirt_main_model.cc $(INCLUDES)
-
-sirt_main.o: sirt_main.cc
-	$(CC) $(CFLAGS) -c sirt_main.cc $(INCLUDES)
 
 trace_h5io.o: $(COMMONDIR)/trace_h5io.cc $(COMMONDIR)/trace_h5io.h
 	$(CC) $(CFLAGS) -c $(COMMONDIR)/trace_h5io.cc $(INCLUDES)
@@ -76,4 +65,4 @@ install:
 	mv $(PROGS) $(BINDIR)
 
 clean:
-	rm -f $(PROGS) $(MODEL) *.o *.a *~ *.lst *.tmp .pure *.bak *.log
+	rm -f $(PROGS) *.o *.a *~ *.lst *.tmp .pure *.bak *.log
