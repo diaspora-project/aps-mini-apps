@@ -23,7 +23,7 @@ RUN make -j
 RUN make install
 
 WORKDIR /
-RUN git clone https://github.com/tekinbicer/aps-mini-apps.git
+RUN git clone https://github.com/diaspora-project/aps-mini-apps.git
 WORKDIR /aps-mini-apps
 RUN git fetch origin
 RUN git checkout master
@@ -50,7 +50,7 @@ WORKDIR /aps-mini-apps/build/bin
 
 
 # Build streamer-daq
-FROM streamersirt as StreamerDAQ
+FROM streamersirt as daq
 RUN conda install -y -c conda-forge \
     tomopy \
     dxchange

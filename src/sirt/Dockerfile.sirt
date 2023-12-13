@@ -23,7 +23,7 @@ RUN make -j
 RUN make install
 
 WORKDIR /
-RUN git clone https://github.com/tekinbicer/aps-mini-apps.git
+RUN git clone https://github.com/diaspora-project/aps-mini-apps.git
 WORKDIR /aps-mini-apps
 RUN git fetch origin
 RUN git checkout master
@@ -39,7 +39,7 @@ WORKDIR /aps-mini-apps
 
 
 # Build SIRT
-FROM base as StreamerSIRT
+FROM base as sirt
 WORKDIR /aps-mini-apps/build
 RUN cmake ..
 RUN make

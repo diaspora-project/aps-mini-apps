@@ -2,9 +2,9 @@ version: '3'
 services:
     streamer-daq:
         build:
-            context: ./daq
-            dockerfile: Dockerfile.StreamerDAQ
-            target: StreamerDAQ
+            context: ./python/streamer-daq
+            dockerfile: Dockerfile.daq
+            target: daq
         ports:
             - "50000-50001:50000-50001"
         command: python /aps-mini-apps/build/python/streamer-daq/DAQStream.py --mode 1 --simulation_file /aps-mini-apps/data/tomo_00058_all_subsampled1p_s1079s1081.h5 --d_iteration 1 --publisher_addr tcp://*:50000 --iteration_sleep 1 --synch_addr tcp://*:50001 --synch_count 1
@@ -13,16 +13,17 @@ services:
         depends_on:
             - streamer-daq
         build:
-            context: ./dst
-            dockerfile: Dockerfile.StreamerDIST
+            context: ./python/streamer-dist
+            dockerfile: Dockerfile.dist
+            target: dist
         ports:
             - 50010:50010
         command: python /aps-mini-apps/build/python/streamer-dist/ModDistStreamPubDemo.py --data_source_addr tcp://host.docker.internal:50000 --data_source_synch_addr tcp://host.docker.internal:50001 --cast_to_float32 --normalize --my_distributor_addr tcp://*:50010 --beg_sinogram 1000 --num_sinograms 2 --num_columns 2560
 
     streamer-quality:
         build:
-            context: ./quality
-            dockerfile: Dockerfile.StreamerQuality
+            context: ./python/quality
+            dockerfile: Dockerfile.quality
         volumes:
             - /Users/tbicer/projects/data/output:/mnt/output
         #command: python /aps-mini-apps/build/python/quality/iqcheck.py ${INPUT0} ${INPUT1}
@@ -31,9 +32,9 @@ services:
         depends_on:
             - streamer-dist
         build:
-            context: ./sirt
-            dockerfile: Dockerfile.StreamerSIRT
-            target: StreamerSIRT
+            context: ./src/sirt
+            dockerfile: Dockerfile.sirt
+            target: sirt
         volumes:
             - /Users/tbicer/projects/data/output:/mnt/output
         ports:
