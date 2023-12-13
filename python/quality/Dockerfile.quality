@@ -10,7 +10,7 @@ RUN conda install -y \
 RUN pip install --upgrade pip
 
 WORKDIR /
-RUN git clone https://github.com/tekinbicer/aps-mini-apps.git
+RUN git clone https://github.com/diaspora-project/aps-mini-apps.git
 WORKDIR /aps-mini-apps
 RUN git fetch origin
 RUN git checkout master
