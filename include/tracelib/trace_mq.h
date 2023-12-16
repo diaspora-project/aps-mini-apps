@@ -1,11 +1,7 @@
 #ifndef TRACE_COMMONS_STREAM_TRACE_MQ_H
 #define TRACE_COMMONS_STREAM_TRACE_MQ_H
 
-#include <string>
-#include <iostream>
-#include <vector>
 #include "trace_prot_generated.h"
-#include "zmq.h"
 
 #define TRACEMQ_MSG_FIN_REP       0x00000000
 #define TRACEMQ_MSG_DATAINFO_REQ  0x00000001
@@ -68,6 +64,7 @@ class TraceMQ
     void *server;
     void *server_pub;
 
+
     flatbuffers::FlatBufferBuilder fbuilder_;
 
     /* State of the TraceMQ
@@ -79,7 +76,13 @@ class TraceMQ
 
     uint64_t seq_;
 
+    std::string id_;
+
+
     tomo_msg_metadata_t metadata_;
+
+
+    std::string generate_uuid();
 
     //tomo_msg_t* prepare_data_req_msg(uint64_t seq_n);
     //tomo_msg_t* prepare_data_rep_msg(uint64_t seq_n, int projection_id,

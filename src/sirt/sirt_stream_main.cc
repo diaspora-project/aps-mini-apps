@@ -194,15 +194,6 @@ int main(int argc, char **argv)
 
       if(curr_slices == nullptr) break; /// If nullptr, there is no more projection 
       
-      /// Check window effect
-      /// and iteration
-      /*
-      if((passes/config.write_freq)>793){
-        tstream.WindowLength(5);
-        config.window_iter=5;
-      }
-      */
-
       /// Iterate on window
       for(int i=0; i<config.window_iter; ++i){
         #ifdef TIMERON
