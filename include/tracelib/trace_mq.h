@@ -65,6 +65,7 @@ class TraceMQ
     void *server_pub;
 
 
+
     flatbuffers::FlatBufferBuilder fbuilder_;
 
     /* State of the TraceMQ
@@ -79,9 +80,17 @@ class TraceMQ
     std::string id_;
 
 
+    std::string id_;
+
+
     tomo_msg_metadata_t metadata_;
 
 
+    /**
+     * Generates a universally unique identifier (UUID).
+     *
+     * @return A string representation of the generated UUID.
+     */
     std::string generate_uuid();
 
     //tomo_msg_t* prepare_data_req_msg(uint64_t seq_n);
