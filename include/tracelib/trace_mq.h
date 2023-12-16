@@ -66,6 +66,7 @@ class TraceMQ
 
 
 
+
     flatbuffers::FlatBufferBuilder fbuilder_;
 
     /* State of the TraceMQ
