@@ -2,6 +2,7 @@
 #include <sstream>
 #include <cstring>
 #include <cassert>
+#include <random>
 
 TraceMQ::TraceMQ(
   std::string dest_ip, int dest_port, int comm_rank, int comm_size, std::string pub_info) : 
@@ -12,18 +13,40 @@ TraceMQ::TraceMQ(
     pub_info_ {pub_info}, /// Publisher information
     fbuilder_ {1024},
     state_ {TMQ_State::DATA},  /// Initial state is expecting DATA
-    seq_ {0}
+    seq_ {0},
+    id_ {generate_uuid()}
 {
   std::string addr("tcp://" + dest_ip_ + ":" + 
-    std::to_string(static_cast<long long>(dest_port_+comm_rank_)));
+                std::to_string(static_cast<long long>(dest_port_+comm_rank_)));
   std::cout << "[" << comm_rank_ << "] Destination address: " << addr << std::endl;
 
   context = zmq_ctx_new();
-  server = zmq_socket(context, ZMQ_REQ);
-  int rc = zmq_connect(server, addr.c_str()); assert(rc==0); 
+  server = zmq_socket(context, ZMQ_DEALER);
+  // Set the identity of the DEALER socket
+  int rc = zmq_setsockopt(server, ZMQ_IDENTITY, id_.c_str(), id_.size());
+  assert(rc == 0);
+
+  rc = zmq_connect(server, addr.c_str()); assert(rc==0); 
 
   server_pub = zmq_socket(context, ZMQ_PUB);
   rc = zmq_bind(server_pub, pub_info_.c_str()); assert(rc==0);
+}
+
+std::string TraceMQ::generate_uuid() {
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::uniform_int_distribution<> distrib(0, 255);
+
+  std::stringstream ss;
+  ss << comm_rank_ << '-';
+  for(int i = 0; i < 16; ++i)
+  {
+      ss << std::hex << distrib(gen);
+  }
+
+  std::string id = ss.str();
+
+  return id;
 }
 
 void TraceMQ::Initialize() {

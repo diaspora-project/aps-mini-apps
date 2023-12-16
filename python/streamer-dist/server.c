@@ -73,7 +73,7 @@ int setup_mock_data(char *fp, int nsubsets)
 int handshake(char *bindip, int port, int row, int col)
 {
   /// Figure out how many ranks there is at the remote location
-  main_worker = zmq_socket(context, ZMQ_REP);
+  main_worker = zmq_socket(context, ZMQ_ROUTER);
   char addr[64];
   snprintf(addr, 64, "tcp://%s:%d", bindip, port++);
   printf("binding to=%s\n", addr);
@@ -92,7 +92,7 @@ int handshake(char *bindip, int port, int row, int col)
   /// Setup remaining workers' sockets 
   workers[0] = main_worker; /// We already know main worker
   for(int i=1; i<n_workers; ++i){
-    void *worker = zmq_socket(context, ZMQ_REP);
+    void *worker = zmq_socket(context, ZMQ_ROUTER);
     workers[i] = worker;
     char addr[64];
     snprintf(addr, 64, "tcp://%s:%d", bindip, port++);
