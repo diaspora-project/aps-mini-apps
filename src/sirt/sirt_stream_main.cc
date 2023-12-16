@@ -10,12 +10,8 @@
 
 class TraceRuntimeConfig {
   public:
-    std::string kReconOutputPath;
-    std::string kReconDatasetPath;
-    std::string kReconOutputDir;
-
-    std::string kLoadReconDatasetPath;
-    std::string kLoadReconPath;
+    std::string kSaveCheckpointPath;
+    std::string kLoadCheckpointPath;
 
     int thread_count;
     int window_len;
@@ -32,23 +28,13 @@ class TraceRuntimeConfig {
       try
       {
         TCLAP::CmdLine cmd("SIRT Iterative Image Reconstruction", ' ', "0.01");
-        TCLAP::ValueArg<std::string> argReconOutputPath(
-          "o", "reconOutputPath", "Output file path for reconstructed image (hdf5)",
+        TCLAP::ValueArg<std::string> argSaveCheckpointPath(
+          "o", "checkpointSavePath", "Save checkpoint path for stream reconstruction (hdf5)",
           false, "./output.h5", "string");
-        TCLAP::ValueArg<std::string> argReconOutputDir(
-          "", "recon-output-dir", "Output directory for the streaming outputs",
-          false, ".", "string");
-        TCLAP::ValueArg<std::string> argReconDatasetPath(
-          "r", "reconDatasetPath", "Reconstruction dataset path in hdf5 file",
-          false, "/data", "string");
+        TCLAP::ValueArg<std::string> argLoadCheckpointPath(
+          "o", "checkpointLoadPath", "Load checkpoint path for stream reconstruction (hdf5)",
+          false, "./output.h5", "string");
         
-        TCLAP::ValueArg<std::string> argLoadReconPath(
-          "", "load-recon-output-path", "Previous reconstruction file path (hdf5)",
-          false, "./output.h5", "string");
-        TCLAP::ValueArg<std::string> argLoadReconDatasetPath(
-          "", "load-recon-dataset-Path", "Previous reconstruction dataset path in hdf5 file",
-          false, "/data", "string");
-
         TCLAP::ValueArg<std::string> argPubAddr(
           "", "pub-addr", "Bind address for the publisher. Default tcp://*:52000", false, 
           "tcp://*:52000", "string");
@@ -77,12 +63,8 @@ class TraceRuntimeConfig {
         TCLAP::ValueArg<float> argDestPort(
           "", "dest-port", "Starting port of destination host", false, 5560, "int");
 
-        cmd.add(argReconOutputPath);
-        cmd.add(argReconOutputDir);
-        cmd.add(argReconDatasetPath);
-
-        cmd.add(argLoadReconPath);
-        cmd.add(argLoadReconPath);
+        cmd.add(argSaveCheckpointPath);
+        cmd.add(argLoadCheckpointPath);
 
         cmd.add(argPubFreq);
         cmd.add(argPubAddr);
@@ -98,11 +80,8 @@ class TraceRuntimeConfig {
         cmd.add(argDestPort);
 
         cmd.parse(argc, argv);
-        kReconOutputPath = argReconOutputPath.getValue();
-        kReconOutputDir = argReconOutputDir.getValue();
-        kReconDatasetPath = argReconDatasetPath.getValue();
-        kLoadReconDatasetPath = argLoadReconDatasetPath.getValue();
-        kLoadReconPath = argLoadReconPath.getValue();
+        kSaveCheckpointPath = argSaveCheckpointPath.getValue();
+        kLoadCheckpointPath= argLoadCheckpointPath.getValue();
         center = argCenter.getValue();
         thread_count = argThreadCount.getValue();
         write_freq= argWriteFreq.getValue();
@@ -117,11 +96,8 @@ class TraceRuntimeConfig {
         std::cout << "MPI rank:"<< rank << "; MPI size:" << size << std::endl;
         if(rank==0)
         {
-          std::cout << "Output file path=" << kReconOutputPath << std::endl;
-          std::cout << "Output dir path=" << kReconOutputDir << std::endl;
-          std::cout << "Recon. dataset path=" << kReconDatasetPath << std::endl;
-          std::cout << "Previous recon. file path=" << kLoadReconPath<< std::endl;
-          std::cout << "Previous recon. dataset path=" << kLoadReconDatasetPath<< std::endl;
+          std::cout << "Save checkpoint file path=" << kSaveCheckpointPath<< std::endl;
+          std::cout << "Load checkpoint file path=" << kLoadCheckpointPath<< std::endl;
           std::cout << "Center value=" << center << std::endl;
           std::cout << "Number of threads per process=" << thread_count << std::endl;
           std::cout << "Write frequency=" << write_freq << std::endl;
@@ -264,16 +240,14 @@ int main(int argc, char **argv)
       if(!(passes%config.write_freq)){
         std::stringstream iteration_stream;
         iteration_stream << std::setfill('0') << std::setw(6) << passes;
-        std::string outputpath = config.kReconOutputDir + "/" + 
-          iteration_stream.str() + "-recon.h5";
+        std::string outputpath = config.kSaveCheckpointPath + 
+                                  iteration_stream.str() + "-checkpoint.h5";
         trace_io::WriteRecon(
-            curr_slices->metadata(), h5md, 
-            outputpath, config.kReconDatasetPath);
+            curr_slices->metadata(), h5md, outputpath, "/data"); // The default path
       }
       #ifdef TIMERON
       write_tot += (std::chrono::system_clock::now()-write_beg);
       #endif
-
 
       //delete curr_slices->metadata(); //TODO Check for memory leak
       delete curr_slices;
