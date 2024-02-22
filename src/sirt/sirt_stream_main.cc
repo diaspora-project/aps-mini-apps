@@ -13,10 +13,6 @@ class TraceRuntimeConfig {
     std::string kReconOutputPath;
     std::string kReconDatasetPath;
     std::string kReconOutputDir;
-
-    std::string kLoadReconDatasetPath;
-    std::string kLoadReconPath;
-
     int thread_count;
     int window_len;
     int window_step;
@@ -41,14 +37,6 @@ class TraceRuntimeConfig {
         TCLAP::ValueArg<std::string> argReconDatasetPath(
           "r", "reconDatasetPath", "Reconstruction dataset path in hdf5 file",
           false, "/data", "string");
-        
-        TCLAP::ValueArg<std::string> argLoadReconPath(
-          "", "load-recon-output-path", "Previous reconstruction file path (hdf5)",
-          false, "./output.h5", "string");
-        TCLAP::ValueArg<std::string> argLoadReconDatasetPath(
-          "", "load-recon-dataset-Path", "Previous reconstruction dataset path in hdf5 file",
-          false, "/data", "string");
-
         TCLAP::ValueArg<std::string> argPubAddr(
           "", "pub-addr", "Bind address for the publisher. Default tcp://*:52000", false, 
           "tcp://*:52000", "string");
@@ -81,9 +69,6 @@ class TraceRuntimeConfig {
         cmd.add(argReconOutputDir);
         cmd.add(argReconDatasetPath);
 
-        cmd.add(argLoadReconPath);
-        cmd.add(argLoadReconPath);
-
         cmd.add(argPubFreq);
         cmd.add(argPubAddr);
 
@@ -101,8 +86,6 @@ class TraceRuntimeConfig {
         kReconOutputPath = argReconOutputPath.getValue();
         kReconOutputDir = argReconOutputDir.getValue();
         kReconDatasetPath = argReconDatasetPath.getValue();
-        kLoadReconDatasetPath = argLoadReconDatasetPath.getValue();
-        kLoadReconPath = argLoadReconPath.getValue();
         center = argCenter.getValue();
         thread_count = argThreadCount.getValue();
         write_freq= argWriteFreq.getValue();
@@ -120,8 +103,6 @@ class TraceRuntimeConfig {
           std::cout << "Output file path=" << kReconOutputPath << std::endl;
           std::cout << "Output dir path=" << kReconOutputDir << std::endl;
           std::cout << "Recon. dataset path=" << kReconDatasetPath << std::endl;
-          std::cout << "Previous recon. file path=" << kLoadReconPath<< std::endl;
-          std::cout << "Previous recon. dataset path=" << kLoadReconDatasetPath<< std::endl;
           std::cout << "Center value=" << center << std::endl;
           std::cout << "Number of threads per process=" << thread_count << std::endl;
           std::cout << "Write frequency=" << write_freq << std::endl;
