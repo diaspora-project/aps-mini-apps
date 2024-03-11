@@ -1,12 +1,18 @@
 FROM continuumio/miniconda3 as base
 
-RUN apt-get update && apt-get install -y \
+RUN apt-get update --fix-missing && apt-get install -y \
     build-essential \
     libzmq3-dev \
     swig \
     git \
     libmpich-dev \
-    libhdf5-mpich-dev
+    libhdf5-mpich-dev \
+    apt-utils \
+    net-tools \
+    iptables \
+    iputils-ping \
+    iproute2 \
+    nano
 RUN conda install -y \
     numpy \
     scipy \
