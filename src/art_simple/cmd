@@ -1,0 +1,9 @@
+# Build
+$ mkdir build; cd build; cmake ..; make;
+
+# To reconstruct
+$ ./art_simple_main ../../../data/tooth_preprocessed.h5 294.078 5 2
+
+# To restart from a previous checkpoint
+$ ./art_simple_main ../../../data/tooth_preprocessed.h5 294.078 5 2 ./recon_4.h5
+
