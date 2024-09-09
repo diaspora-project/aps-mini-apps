@@ -37,7 +37,7 @@ class ImageSerializer:
     self.builder.current_vtable = None
     self.builder.minalign = 1
     self.builder.objectEnd = None
-    self.builder.vtables = []
+    self.builder.vtables = {}
     self.builder.nested = False
     self.builder.finished = False
 
