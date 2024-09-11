@@ -186,6 +186,8 @@ docs/trunk/*
 # Credentials #
 ###############
 credentials.ini
+
+###############
 .devcontainer/devcontainer.json
 .github/dependabot.yml
 python/streamer-dist/.devcontainer/devcontainer.json
