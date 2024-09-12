@@ -1,7 +1,17 @@
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpedantic -Werror")
+# setup cache variables for ccmake
+if (NOT CMAKE_BUILD_TYPE)
+    set (CMAKE_BUILD_TYPE Release
+         CACHE STRING "Choose the type of build." FORCE)
+    set_property (CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
+                  "Debug" "Release" "RelWithDebInfo" "MinSizeRel")
+endif ()
+set (CMAKE_PREFIX_PATH "" CACHE STRING "External dependencies path")
+set (BUILD_SHARED_LIBS "ON" CACHE BOOL "Build a shared library")
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpedantic -Werror -Wno-unused-but-set-variable -Wno-unused-variable")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 add_definitions(-DTIMERON)
@@ -23,6 +33,9 @@ if(NOT HDF5_FOUND OR NOT HDF5_IS_PARALLEL)
     message(FATAL_ERROR "HDF5 library not compiled with parallel support.")
 endif()
 
+# find mofka
+find_package (mofka REQUIRED)
+
 include_directories(${Trace_SOURCE_DIR}/include)
 include_directories(${Trace_SOURCE_DIR}/include/tracelib)
 include_directories(${HDF5_INCLUDE_DIRS})
@@ -35,5 +48,5 @@ add_library(sirt ${CMAKE_CURRENT_LIST_DIR}/sirt.cc)
 
 
 add_executable(sirt_stream sirt_stream_main.cc)
-target_link_libraries(sirt_stream trace_stream trace_mq sirt trace_utils trace_h5io zmq MPI::MPI_CXX hdf5::hdf5 Threads::Threads)
+target_link_libraries(sirt_stream trace_stream trace_mq sirt trace_utils trace_h5io zmq MPI::MPI_CXX hdf5::hdf5 Threads::Threads mofka::client)
 #target_include_directories(sirt_stream PRIVATE ${HDF5_INCLUDE_DIRS})

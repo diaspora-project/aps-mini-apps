@@ -14,16 +14,16 @@ class ImageSerializer:
   Serialize image data using flatbuffers.
 
   """
-  
+
   def __init__(self):
     r"""
-    Serialization class for detector image data. 
+    Serialization class for detector image data.
 
     Parameters
     ----------
     builder : flatbuffer.Builder
       Used for buffer allocation and copying image data to serialization
-      buffer. 
+      buffer.
 
     """
     self.builder = flatbuffers.Builder(0)
@@ -37,7 +37,7 @@ class ImageSerializer:
     self.builder.current_vtable = None
     self.builder.minalign = 1
     self.builder.objectEnd = None
-    self.builder.vtables = []
+    self.builder.vtables = {}
     self.builder.nested = False
     self.builder.finished = False
 
@@ -61,7 +61,7 @@ class ImageSerializer:
     itype : IType
       Image's type. Currently, five options are supported (Projection,
       White, Dark, WhiteReset, DarkReset.) The remaining pipeline runs
-      according to this type information. 
+      according to this type information.
 
     center : np.float32
       Center information of the image. If nothing is passed, then center
@@ -89,7 +89,7 @@ class ImageSerializer:
     -----
     This code treats image data as byte sequence, which can provide better
     performance but it is not portable. We know that lyra machine is little endian,
-    thus there is no issues. However, if needed Flatbuffer documentation mentions 
+    thus there is no issues. However, if needed Flatbuffer documentation mentions
     builder.Prepend*(val) function can be used to copy data in portable way.
 
     Example for portable code is given below:
@@ -99,7 +99,7 @@ class ImageSerializer:
 
     Some serialization performance information:
     We note the following serialization times (on lyra machine) when dimensions are
-    2048*2048.  
+    2048*2048.
     Serialization time: 0.009891748428344727 - 0.014806032180786133 (mostly in 0.011* range)
 
     Below is the rough ratios for some of the time consuming steps:
@@ -116,9 +116,9 @@ class ImageSerializer:
 
     # Prepare image buffer in serialization buffer
     bytesOfImage = image.tobytes()
-    TImage.TImageStartTdataVector(builder, len(bytesOfImage)) 
+    TImage.TImageStartTdataVector(builder, len(bytesOfImage))
     builder.head=builder.head - len(bytesOfImage)
-    builder.Bytes[builder.head : (builder.head + len(bytesOfImage))] = bytesOfImage 
+    builder.Bytes[builder.head : (builder.head + len(bytesOfImage))] = bytesOfImage
     img_buf_offset = builder.EndVector(len(bytesOfImage))
 
     # Start serialization
@@ -142,7 +142,7 @@ class ImageSerializer:
     serialized_data = builder.Output()
 
     self._resetBuilder()
-    
+
     return serialized_data
 
   def deserialize(self, serialized_image, root_offset=0):
@@ -180,5 +180,5 @@ class ImageSerializer:
     if not isinstance(timage, TImage.TImage):
       print("Not an instance of TImage.TImage: {}".format(timage))
     print("Image seq id={}; unique id={}; dims={}; rotation={}; center={}; itype={}"
-            .format(timage.Seq(), timage.UniqueId(), (timage.Dims().Y(), timage.Dims().X()), 
+            .format(timage.Seq(), timage.UniqueId(), (timage.Dims().Y(), timage.Dims().X()),
                     timage.Rotation(), timage.Center(), timage.Itype()))
