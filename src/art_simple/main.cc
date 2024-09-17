@@ -175,7 +175,7 @@ int main(int argc, char* argv[])
         }
         hsize_t output_dims[3] = {dy, ngridy, ngridx};
         hid_t output_dataspace_id = H5Screate_simple(3, output_dims, NULL);
-        hid_t output_dataset_id = H5Dcreate(output_file_id, "/recon", H5T_NATIVE_FLOAT, output_dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+        hid_t output_dataset_id = H5Dcreate(output_file_id, "/data", H5T_NATIVE_FLOAT, output_dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
         H5Dwrite(output_dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, recon);
         H5Dclose(output_dataset_id);
         H5Sclose(output_dataspace_id);
