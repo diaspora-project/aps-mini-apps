@@ -191,52 +191,45 @@ class Builder(object):
         self.PrependSOffsetTRelative(0)
 
         objectOffset = self.Offset()
-        existingVtable = None
 
-        # Trim trailing 0 offsets.
-        while self.current_vtable and self.current_vtable[-1] == 0:
-            self.current_vtable.pop()
+        vtKey = []
+        trim = True
+        for elem in reversed(self.current_vtable):
+            if elem == 0:
+                if trim:
+                    continue
+            else:
+                elem = objectOffset - elem
+                trim = False
 
-        # Search backwards through existing vtables, because similar vtables
-        # are likely to have been recently appended. See
-        # BenchmarkVtableDeduplication for a case in which this heuristic
-        # saves about 30% of the time used in writing objects with duplicate
-        # tables.
+            vtKey.append(elem)
 
-        i = len(self.vtables) - 1
-        while i >= 0:
-            # Find the other vtable, which is associated with `i`:
-            vt2Offset = self.vtables[i]
-            vt2Start = len(self.Bytes) - vt2Offset
-            vt2Len = encode.Get(packer.voffset, self.Bytes, vt2Start)
-
-            metadata = VtableMetadataFields * N.VOffsetTFlags.bytewidth
-            vt2End = vt2Start + vt2Len
-            vt2 = self.Bytes[vt2Start+metadata:vt2End]
-
-            # Compare the other vtable to the one under consideration.
-            # If they are equal, store the offset and break:
-            if vtableEqual(self.current_vtable, objectOffset, vt2):
-                existingVtable = vt2Offset
-                break
-
-            i -= 1
-
-        if existingVtable is None:
+        vtKey = tuple(vtKey)
+        vt2Offset = self.vtables.get(vtKey)
+        if vt2Offset is None:
             # Did not find a vtable, so write this one to the buffer.
 
             # Write out the current vtable in reverse , because
             # serialization occurs in last-first order:
             i = len(self.current_vtable) - 1
+            trailing = 0
+            trim = True
             while i >= 0:
                 off = 0
-                if self.current_vtable[i] != 0:
+                elem = self.current_vtable[i]
+                i -= 1
+
+                if elem == 0:
+                    if trim:
+                        trailing += 1
+                        continue
+                else:
                     # Forward reference to field;
                     # use 32bit number to ensure no overflow:
-                    off = objectOffset - self.current_vtable[i]
+                    off = objectOffset - elem
+                    trim = False
 
                 self.PrependVOffsetT(off)
-                i -= 1
 
             # The two metadata fields are written last.
 
@@ -245,7 +238,7 @@ class Builder(object):
             self.PrependVOffsetT(VOffsetTFlags.py_type(objectSize))
 
             # Second, store the vtable bytesize:
-            vBytes = len(self.current_vtable) + VtableMetadataFields
+            vBytes = len(self.current_vtable) - trailing + VtableMetadataFields
             vBytes *= N.VOffsetTFlags.bytewidth
             self.PrependVOffsetT(VOffsetTFlags.py_type(vBytes))
 
@@ -257,20 +250,129 @@ class Builder(object):
 
             # Finally, store this vtable in memory for future
             # deduplication:
-            self.vtables.append(self.Offset())
+            self.vtables[vtKey] = self.Offset()
         else:
             # Found a duplicate vtable.
-
             objectStart = SOffsetTFlags.py_type(len(self.Bytes) - objectOffset)
             self.head = UOffsetTFlags.py_type(objectStart)
 
             # Write the offset to the found vtable in the
             # already-allocated SOffsetT at the beginning of this object:
             encode.Write(packer.soffset, self.Bytes, self.Head(),
-                         SOffsetTFlags.py_type(existingVtable - objectOffset))
+                         SOffsetTFlags.py_type(vt2Offset - objectOffset))
 
         self.current_vtable = None
         return objectOffset
+
+    #def WriteVtable(self):
+    #    """
+    #    WriteVtable serializes the vtable for the current object, if needed.
+
+    #    Before writing out the vtable, this checks pre-existing vtables for
+    #    equality to this one. If an equal vtable is found, point the object to
+    #    the existing vtable and return.
+
+    #    Because vtable values are sensitive to alignment of object data, not
+    #    all logically-equal vtables will be deduplicated.
+
+    #    A vtable has the following format:
+    #      <VOffsetT: size of the vtable in bytes, including this value>
+    #      <VOffsetT: size of the object in bytes, including the vtable offset>
+    #      <VOffsetT: offset for a field> * N, where N is the number of fields
+    #                 in the schema for this type. Includes deprecated fields.
+    #    Thus, a vtable is made of 2 + N elements, each VOffsetT bytes wide.
+
+    #    An object has the following format:
+    #      <SOffsetT: offset to this object's vtable (may be negative)>
+    #      <byte: data>+
+    #    """
+
+    #    # Prepend a zero scalar to the object. Later in this function we'll
+    #    # write an offset here that points to the object's vtable:
+    #    self.PrependSOffsetTRelative(0)
+
+    #    objectOffset = self.Offset()
+    #    existingVtable = None
+
+    #    # Trim trailing 0 offsets.
+    #    while self.current_vtable and self.current_vtable[-1] == 0:
+    #        self.current_vtable.pop()
+
+    #    # Search backwards through existing vtables, because similar vtables
+    #    # are likely to have been recently appended. See
+    #    # BenchmarkVtableDeduplication for a case in which this heuristic
+    #    # saves about 30% of the time used in writing objects with duplicate
+    #    # tables.
+
+    #    i = len(self.vtables) - 1
+    #    while i >= 0:
+    #        # Find the other vtable, which is associated with `i`:
+    #        vt2Offset = self.vtables[i]
+    #        vt2Start = len(self.Bytes) - vt2Offset
+    #        vt2Len = encode.Get(packer.voffset, self.Bytes, vt2Start)
+
+    #        metadata = VtableMetadataFields * N.VOffsetTFlags.bytewidth
+    #        vt2End = vt2Start + vt2Len
+    #        vt2 = self.Bytes[vt2Start+metadata:vt2End]
+
+    #        # Compare the other vtable to the one under consideration.
+    #        # If they are equal, store the offset and break:
+    #        if vtableEqual(self.current_vtable, objectOffset, vt2):
+    #            existingVtable = vt2Offset
+    #            break
+
+    #        i -= 1
+
+    #    if existingVtable is None:
+    #        # Did not find a vtable, so write this one to the buffer.
+
+    #        # Write out the current vtable in reverse , because
+    #        # serialization occurs in last-first order:
+    #        i = len(self.current_vtable) - 1
+    #        while i >= 0:
+    #            off = 0
+    #            if self.current_vtable[i] != 0:
+    #                # Forward reference to field;
+    #                # use 32bit number to ensure no overflow:
+    #                off = objectOffset - self.current_vtable[i]
+
+    #            self.PrependVOffsetT(off)
+    #            i -= 1
+
+    #        # The two metadata fields are written last.
+
+    #        # First, store the object bytesize:
+    #        objectSize = UOffsetTFlags.py_type(objectOffset - self.objectEnd)
+    #        self.PrependVOffsetT(VOffsetTFlags.py_type(objectSize))
+
+    #        # Second, store the vtable bytesize:
+    #        vBytes = len(self.current_vtable) + VtableMetadataFields
+    #        vBytes *= N.VOffsetTFlags.bytewidth
+    #        self.PrependVOffsetT(VOffsetTFlags.py_type(vBytes))
+
+    #        # Next, write the offset to the new vtable in the
+    #        # already-allocated SOffsetT at the beginning of this object:
+    #        objectStart = SOffsetTFlags.py_type(len(self.Bytes) - objectOffset)
+    #        encode.Write(packer.soffset, self.Bytes, objectStart,
+    #                     SOffsetTFlags.py_type(self.Offset() - objectOffset))
+
+    #        # Finally, store this vtable in memory for future
+    #        # deduplication:
+    #        # self.vtables.append(self.Offset())
+    #        self.vtables[vtKey] = self.Offset()
+    #    else:
+    #        # Found a duplicate vtable.
+
+    #        objectStart = SOffsetTFlags.py_type(len(self.Bytes) - objectOffset)
+    #        self.head = UOffsetTFlags.py_type(objectStart)
+
+    #        # Write the offset to the found vtable in the
+    #        # already-allocated SOffsetT at the beginning of this object:
+    #        encode.Write(packer.soffset, self.Bytes, self.Head(),
+    #                     SOffsetTFlags.py_type(existingVtable - objectOffset))
+
+    #    self.current_vtable = None
+    #    return objectOffset
 
     def EndObject(self):
         """EndObject writes data necessary to finish object construction."""
