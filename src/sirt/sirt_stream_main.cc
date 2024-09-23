@@ -275,10 +275,15 @@ int main(int argc, char **argv)
   #endif
 
   /* Clean-up the resources */
+  std::cout << "Deleting h5md.dimm" << std::endl;
   delete [] h5md.dims;
+  std::cout << "Deleting main_recon_space" << std::endl;
   delete main_recon_space;
   //delete curr_slices;
+  std::cout << "Deleting comm" << std::endl;
   delete comm;
+  std::cout << "Deleting engine" << std::endl;
   delete engine;
+  std::cout << "Exiting" << std::endl;
 }
 
