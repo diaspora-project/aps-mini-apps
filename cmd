@@ -1,3 +1,5 @@
+. ~/spack/share/spack/setup-env.sh && spack env activate mof
+
 bedrock na+sm -c ./build/config.json
 
 python ./build/python/streamer-daq/DAQStream.py --mode 1 --simulation_file \
@@ -13,4 +15,4 @@ python ./build/python/streamer-dist/ModDistStreamPubDemo.py  --cast_to_float32 \
       -t 2 -c 1427 --protocol na+sm --group-file mofka.json
 
 python ./python/streamer_denoiser/denoiser.py --model ./python/streamer_denoiser/testA40GPU-it07500.h5 \
-      --protocol na+sm --group-file mofka.json
+      --protocol na+sm --group_file mofka.json
