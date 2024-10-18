@@ -11,13 +11,17 @@ import math
 import TraceSerializer
 import tomopy as tp
 import tracemq as tmq
+import json
+from mofka_dist import MofkaDist
 
+mofka_protocol = "na+sm"
+group_file = "/home/agueroudji/tekin-aps-mini-apps/build/mofka.json"
 
 def parse_arguments():
   parser = argparse.ArgumentParser( description='Data Distributor Process')
   parser.add_argument('--data_source_addr', default=None,
       help='Remote publisher address for the data source.')
-  parser.add_argument('--data_source_hwm', type=int, default=0, 
+  parser.add_argument('--data_source_hwm', type=int, default=0,
       help='Sets high water mark value for this subscriber. Default=0.')
   parser.add_argument('--data_source_synch_addr', default=None,
       help='Synchronizes this subscriber to provided publisher REP socket address (publisher should wait for subscriptions)')
@@ -37,7 +41,7 @@ def parse_arguments():
   parser.add_argument('--num_columns', type=int,
                           help='Number of columns (cols)')
 
-  # Available pre-processing options 
+  # Available pre-processing options
   parser.add_argument('--degree_to_radian', action='store_true', default=False,
               help='Converts rotation information to radian.')
   parser.add_argument('--mlog', action='store_true', default=False,
@@ -78,6 +82,11 @@ def main():
 
   context = zmq.Context(io_threads=8)
 
+  # setup mofka
+  mofka = MofkaDist(mofka_protocol=mofka_protocol, group_file=group_file)
+  consumer = mofka.consumer(topic_name="daq_dist", consumer_name="dist")
+  producer = mofka.producer(topic_name="dist_sirt", producer_name="producer_dist")
+
   # TQM setup
   if args.my_distributor_addr is not None:
     addr_split = re.split("://|:", args.my_distributor_addr)
@@ -97,7 +106,7 @@ def main():
   # Local publisher socket
   if args.my_publisher_addr is not None:
     publisher_socket = context.socket(zmq.PUB)
-    publisher_socket.set_hwm(200) # TODO: parameterize high water mark value 
+    publisher_socket.set_hwm(200) # TODO: parameterize high water mark value
     publisher_socket.bind(args.my_publisher_addr)
 
   if args.data_source_synch_addr is not None:
@@ -108,35 +117,46 @@ def main():
   serializer = TraceSerializer.ImageSerializer()
 
   # White/dark fields
-  white_imgs=[]; tot_white_imgs=0; 
-  dark_imgs=[]; tot_dark_imgs=0;
-  
+  white_imgs=[]
+  tot_white_imgs=0
+  dark_imgs=[]
+  tot_dark_imgs=0
+
   # Receive images
   total_received=0
   total_size=0
   seq=0
   time0 = time.time()
+
   while True:
     msg = subscriber_socket.recv()
     total_received += 1
     total_size += len(msg)
     if msg == b"end_data": break # End of data acquisition
 
+    f = consumer.pull()
+    event = f.wait()
+    mofka_data = event.data[0]
+    mofka_metadata = json.loads(event.metadata)
+
     # This is mostly for data rate tests
-    if args.skip_serialize: 
+    if args.skip_serialize:
       print("Skipping rest. Received msg: {}".format(total_received))
-      continue 
+      continue
 
     # Deserialize msg to image
     read_image = serializer.deserialize(serialized_image=msg)
     serializer.info(read_image) # print image information
+
+    # Deserialize msg to image
+    mofka_read_image = serializer.deserialize(serialized_image=mofka_data)
+    serializer.info(mofka_read_image) # print image information
 
     # Local checks
     if args.check_seq:
       if seq != read_image.Seq():
         print("Wrong sequence number: {} != {}".format(seq, read_image.Seq()))
       seq += 1
-       
 
     # Push image to workers (REQ/REP)
     my_image_np = read_image.TdataAsNumpy()
@@ -152,24 +172,22 @@ def main():
     else: sub = my_image_np
     sub = sub.reshape((1, read_image.Dims().Y(), read_image.Dims().X()))
 
-
-
     # If incoming data is projection
     if read_image.Itype() is serializer.ITypes.Projection:
       rotation=read_image.Rotation()
       if args.degree_to_radian: rotation = rotation*math.pi/180.
 
       # Tomopy operations expect 3D data, reshape incoming projections.
-      if args.normalize: 
+      if args.normalize:
         # flat/dark fields' corresponding rows
         if tot_white_imgs>0 and tot_dark_imgs>0:
           # print("normalizing: white_imgs.shape={}; dark_imgs.shape={}".format(
                   #np.array(white_imgs).shape, np.array(dark_imgs).shape))
           sub = tp.normalize(sub, flat=white_imgs, dark=dark_imgs)
-      if args.remove_stripes: 
+      if args.remove_stripes:
         #print("removing stripes")
         sub = tp.remove_stripe_fw(sub, level=7, wname='sym16', sigma=1, pad=True)
-      if args.mlog: 
+      if args.mlog:
         #print("applying -log")
         sub = -np.log(sub)
       if args.remove_invalids:
@@ -178,36 +196,44 @@ def main():
         sub = tp.remove_neg(sub, val=0.00)
         sub[np.where(sub == np.inf)] = 0.00
 
-
-
       # Publish to the world
       if (args.my_publisher_addr is not None) and (total_received%args.my_publisher_freq==0):
         mub = np.reshape(sub,(read_image.Dims().Y(), read_image.Dims().X()))
+
         serialized_data = serializer.serialize(image=mub, uniqueId=0, rotation=0,
                     itype=serializer.ITypes.Projection)
         print("Publishing:{}".format(read_image.UniqueId()))
         publisher_socket.send(serialized_data)
+        f = producer.push({"id": read_image.UniqueId()}, serialized_data)
+        f.wait()
 
+      #to send from mofka:
+      mofka_sub = sub
       # Send to workers
       if args.num_sinograms is not None:
+        # print("blablablabla", type(sub), sub.shape) = (1, 2, 2560)
         sub = sub[:, args.beg_sinogram:args.beg_sinogram+args.num_sinograms, :]
-
-      ncols = sub.shape[2] 
+      # print("after this ", sub, sub.shape) = (1, 0, 2560)
+      ncols = sub.shape[2]
       sub = sub.reshape(sub.shape[0]*sub.shape[1]*sub.shape[2])
-
+      # print("sub, sub.shape: ", sub, sub.shape) this becomes [] (0, )
       if args.my_distributor_addr is not None:
-        tmq.push_image(sub, args.num_sinograms, ncols, rotation, 
+        tmq.push_image(sub, args.num_sinograms, ncols, rotation,
                         read_image.UniqueId(), read_image.Center())
+
+        mofka.push_image(mofka_sub, args.num_sinograms, ncols, rotation,
+                        read_image.UniqueId(), read_image.Center(), producer=producer)
+        print("pushed this producer push", read_image.UniqueId())
 
 
     # If incoming data is white field
-    if read_image.Itype() is serializer.ITypes.White: 
+    if read_image.Itype() is serializer.ITypes.White:
       #print("White field data is received: {}".format(read_image.UniqueId()))
       white_imgs.extend(sub)
       tot_white_imgs += 1
 
     # If incoming data is white-reset
-    if read_image.Itype() is serializer.ITypes.WhiteReset: 
+    if read_image.Itype() is serializer.ITypes.WhiteReset:
       #print("White-reset data is received: {}".format(read_image.UniqueId()))
       white_imgs=[]
       white_imgs.extend(sub)
@@ -215,19 +241,19 @@ def main():
 
     # If incoming data is dark field
     if read_image.Itype() is serializer.ITypes.Dark:
-      #print("Dark data is received: {}".format(read_image.UniqueId())) 
+      #print("Dark data is received: {}".format(read_image.UniqueId()))
       dark_imgs.extend(sub)
       tot_dark_imgs += 1
 
-    # If incoming data is dark-reset 
+    # If incoming data is dark-reset
     if read_image.Itype() is serializer.ITypes.DarkReset:
-      #print("Dark-reset data is received: {}".format(read_image.UniqueId())) 
+      #print("Dark-reset data is received: {}".format(read_image.UniqueId()))
       dark_imgs=[]
       dark_imgs.extend(sub)
       tot_dark_imgs += 1
 
   time1 = time.time()
-    
+
   # Profile information
   elapsed_time = time1-time0
   tot_MiBs = (total_size*1.)/2**20
@@ -240,9 +266,9 @@ def main():
     print("Sending finalize message")
     tmq.done_image()
     tmq.finalize_tmq()
+  producer.flush()
 
 
 
 if __name__ == '__main__':
   main()
-  

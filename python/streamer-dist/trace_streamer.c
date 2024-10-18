@@ -11,7 +11,7 @@ void tracemq_free_msg(tomo_msg_t *msg) {
 }
 
 void tracemq_setup_msg_header(
-  tomo_msg_t *msg_h, 
+  tomo_msg_t *msg_h,
   uint64_t seq_n, uint64_t type, uint64_t size)
 {
   msg_h->seq_n = seq_n;
@@ -28,8 +28,8 @@ tomo_msg_t* tracemq_prepare_data_req_msg(uint64_t seq_n)
   return msg;
 }
 
-tomo_msg_t* tracemq_prepare_data_rep_msg( uint64_t seq_n, int projection_id, 
-                                          float theta, float center, 
+tomo_msg_t* tracemq_prepare_data_rep_msg( uint64_t seq_n, int projection_id,
+                                          float theta, float center,
                                           uint64_t data_size, float *data)
 {
   uint64_t tot_msg_size=sizeof(tomo_msg_t)+sizeof(tomo_msg_data_t)+data_size;
@@ -41,7 +41,7 @@ tomo_msg_t* tracemq_prepare_data_rep_msg( uint64_t seq_n, int projection_id,
   msg->theta = theta;
   msg->center = center;
   memcpy(msg->data, data, data_size);
-  
+
   printf("theta=%f\n", theta);
 
   return msg_h;
@@ -52,14 +52,14 @@ tomo_msg_data_t* tracemq_read_data(tomo_msg_t *msg){
 }
 
 void tracemq_print_data(tomo_msg_data_t *msg, size_t data_count){
-  printf("projection_id=%u; theta=%f; center=%f\n", 
+  printf("projection_id=%u; theta=%f; center=%f\n",
     msg->projection_id, msg->theta, msg->center);
   for(size_t i=0; i<data_count; ++i)
     printf("%f ", msg->data[i]);
   printf("\n");
 }
 
-tomo_msg_t* tracemq_prepare_data_info_rep_msg(uint64_t seq_n, 
+tomo_msg_t* tracemq_prepare_data_info_rep_msg(uint64_t seq_n,
                                               int beg_sinogram, int n_sinograms,
                                               int n_rays_per_proj_row,
                                               uint64_t tn_sinograms)
@@ -81,7 +81,7 @@ tomo_msg_data_info_rep_t* tracemq_read_data_info_rep(tomo_msg_t *msg){
 }
 void tracemq_print_data_info_rep_msg(tomo_msg_data_info_rep_t *msg){
   printf("Total # sinograms=%u; Beginning sinogram id=%u;"
-          "# assigned sinograms=%u; # rays per projection row=%u\n", 
+          "# assigned sinograms=%u; # rays per projection row=%u\n",
           msg->tn_sinograms, msg->beg_sinogram, msg->n_sinograms, msg->n_rays_per_proj_row);
 }
 
@@ -123,7 +123,7 @@ tomo_msg_t* tracemq_recv_msg(void *server){
   /// Message size and calculated total message size needst to be the same
   /// FIXME?: We put tomo_msg_t.size to calculate zmq message size before it is
   /// being sent. It is being only being used for sanity check at the receiver
-  /// side. 
+  /// side.
   //printf("zmq_msg_size(&zmsg)=%zu; ((tomo_msg_t*)&zmsg)->size=%zu", zmq_msg_size(&zmsg), ((tomo_msg_t*)&zmsg)->size);
   //assert(zmq_msg_size(&zmsg)==((tomo_msg_t*)&zmsg)->size);
 
@@ -135,7 +135,7 @@ tomo_msg_t* tracemq_recv_msg(void *server){
   return msg;
 }
 
-tomo_msg_data_info_rep_t assign_data( uint32_t comm_rank, int comm_size, 
+tomo_msg_data_info_rep_t assign_data( uint32_t comm_rank, int comm_size,
                                       int tot_sino, int tot_cols)
 {
   uint32_t nsino = tot_sino/comm_size;
@@ -143,9 +143,9 @@ tomo_msg_data_info_rep_t assign_data( uint32_t comm_rank, int comm_size,
 
   int r = (comm_rank<remaining) ? 1 : 0;
   int my_nsino = r+nsino;
-  int beg_sino = (comm_rank<remaining) ? (1+nsino)*comm_rank : 
+  int beg_sino = (comm_rank<remaining) ? (1+nsino)*comm_rank :
                                         (1+nsino)*remaining + nsino*(comm_rank-remaining);
-  
+
   tomo_msg_data_info_rep_t info_rep;
   info_rep.tn_sinograms = tot_sino;
   info_rep.beg_sinogram = beg_sino;
@@ -169,8 +169,8 @@ tomo_msg_t** generate_tracemq_worker_msgs(float *data, int dims[], int data_id,
   for(int i=0; i<n_ranks; ++i){
     int r = ((remaining--) > 0) ? 1 : 0;
     size_t data_size = sizeof(*data)*(nsin+r)*dims[1];
-    tomo_msg_t *msg = tracemq_prepare_data_rep_msg(seq, 
-                              data_id, theta, center, data_size, 
+    tomo_msg_t *msg = tracemq_prepare_data_rep_msg(seq,
+                              data_id, theta, center, data_size,
                               data+curr_sinogram_id*dims[1]);
     msgs[i] = msg;
     curr_sinogram_id += (nsin+r);

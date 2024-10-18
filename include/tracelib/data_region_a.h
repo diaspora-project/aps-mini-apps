@@ -1,4 +1,4 @@
-/** \file data_region_a.h 
+/** \file data_region_a.h
  */
 #ifndef DISP_SRC_DISP_DATA_REGION_A_H
 #define DISP_SRC_DISP_DATA_REGION_A_H
@@ -14,17 +14,17 @@
 #include <vector>
 #include "mirrored_region_bare_base.h"
 
-template <typename T> 
+template <typename T>
 class ADataRegion {
   private:
     /**
-     * \brief Main pointer that points to the beginning of this data 
+     * \brief Main pointer that points to the beginning of this data
      * region's data.
      */
     T *data_ = nullptr;
 
     /**
-     * \brief Number of allocated data items. 
+     * \brief Number of allocated data items.
      *
      * The data pointer #data_ points to the beginning of allocated data region,
      * and #count_ specifies the number of allocated data items.
@@ -33,7 +33,7 @@ class ADataRegion {
 
 
     /**
-     * \brief Deletes the allocated data/mirrored regions and sets 
+     * \brief Deletes the allocated data/mirrored regions and sets
      * #count_ and #index_ to 0.
      *
      */
@@ -67,8 +67,8 @@ class ADataRegion {
 
     /**
      * \brief Creates a mirrored region using this class's #data_.
-     * 
-     * This function creates a mirrored region which points to the 
+     *
+     * This function creates a mirrored region which points to the
      * index address \p index with \p count items.
      *
      * \throws std::out_of_range if the sum of \p index and \p count is
@@ -76,7 +76,7 @@ class ADataRegion {
      */
     virtual MirroredRegionBareBase<T>* MirrorRegion(const size_t index, const size_t count)=0;
 
-    /** 
+    /**
      * \brief Deletes mirrored regions in #mirrored_regions_.
      */
     void DeleteMirroredRegions();
@@ -84,7 +84,7 @@ class ADataRegion {
     /**
      * \brief Accessor for #index_.
      *
-     * \return The following item's index that was mapped by the last 
+     * \return The following item's index that was mapped by the last
      * mirrored data region. Also see #index_.
      */
     size_t index() const { return index_; }
@@ -106,7 +106,7 @@ class ADataRegion {
      * memory region.
      *
      * This constructor overrides any existing values on this data region.
-     * It does not deallocate any memory (or mirrored region) which was allocated 
+     * It does not deallocate any memory (or mirrored region) which was allocated
      * previously.
      */
     explicit ADataRegion(T * const data, const size_t count)
@@ -119,7 +119,7 @@ class ADataRegion {
      * \brief Copy contructor.
      *
      * This constructor creates data region only.
-     * It copies the target data/mirrored regions data. 
+     * It copies the target data/mirrored regions data.
      */
     ADataRegion<T> (const ADataRegion<T> &region);
 
@@ -152,12 +152,12 @@ class ADataRegion {
 
     /**
      * \brief Destructor.
-     * 
-     * The memory allocated for this class is freed, i.e. #data_ and 
+     *
+     * The memory allocated for this class is freed, i.e. #data_ and
      * #mirrored_regions_. Since mirrored regions point to the memory locations
-     * pointed by #data_, no delete operation is performed on mirrored reionts' 
+     * pointed by #data_, no delete operation is performed on mirrored reionts'
      * #data_.
-     * In other words, destructors of mirrored regions do not release memory 
+     * In other words, destructors of mirrored regions do not release memory
      * pointed by their internal #data_ pointer.
      */
     virtual ~ADataRegion(){
@@ -167,7 +167,7 @@ class ADataRegion {
     /**
      * \brief Enables access to #data_ using [] operator.
      *
-     * This operator does not perform any checks while accessig the target 
+     * This operator does not perform any checks while accessig the target
      * index. For controlled reads and writes see #GetItem() and #SetItem().
      */
     T& operator[](size_t index) { return data_[index]; }
@@ -220,7 +220,7 @@ class ADataRegion {
 
     /**
      * \brief Creates another #DataRegion instance with the same #data_ and #count_
-     * 
+     *
      * \returns Cloned data region pointer.
      */
     virtual ADataRegion<T>* Clone()=0;
@@ -228,7 +228,7 @@ class ADataRegion {
     /**
      * \brief Compares the boundaries of this instance and \p region.
      *
-     * If boundaries are the same returns 0; otherwise returns -1. 
+     * If boundaries are the same returns 0; otherwise returns -1.
      */
     int CompareBoundary(ADataRegion<T> &region);
 
@@ -239,7 +239,7 @@ class ADataRegion {
     size_t size() const;
 
     /**
-     * \brief Creates a mirrored region from this data region and 
+     * \brief Creates a mirrored region from this data region and
      * returns its pointer.
      *
      * This function creates a new mirrored region starting from #index_
@@ -255,8 +255,8 @@ class ADataRegion {
     virtual MirroredRegionBareBase<T>* NextMirroredRegion(const size_t count)=0;
 
     /**
-     * \brief Resets the #index_ to 0, and deletes #mirrored_regions_ 
-     * using #DeleteMirroredRegions(). 
+     * \brief Resets the #index_ to 0, and deletes #mirrored_regions_
+     * using #DeleteMirroredRegions().
      */
     void ResetMirroredRegionIter();
 };
@@ -331,14 +331,14 @@ size_t ADataRegion<T>::size() const {
 
 template <typename T>
 T& ADataRegion<T>::item (size_t index) const {
-  if(index >= count_) 
+  if(index >= count_)
     throw std::out_of_range("Tried to access out of range index!");
   return data_[index];
 }
 
 template <typename T>
 void ADataRegion<T>::item(size_t index, T &&value){
-  if(index >= count_) 
+  if(index >= count_)
     throw std::out_of_range("Tried to update out of range index!");
   data_[index] = value;
 }

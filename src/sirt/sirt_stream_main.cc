@@ -8,6 +8,306 @@
 #include "sirt.h"
 #include "trace_stream.h"
 
+#include <mofka/Client.hpp>
+#include <mofka/TopicHandle.hpp>
+#include <mofka/ServiceHandle.hpp>
+#include <spdlog/spdlog.h>
+#include <fmt/format.h>
+#include <time.h>
+#include <string>
+#include <iostream>
+#include <nlohmann/json.hpp>
+
+using json = nlohmann::json;
+namespace tl = thallium;
+
+
+#include "trace_data.h"
+#include <vector>
+
+std::string backend_type = "memory";
+std::string group_file = "/home/agueroudji/tekin-aps-mini-apps/build/mofka.json";
+std::string protocol = "na+sm";
+
+class MofkaStream
+{
+  private:
+
+    uint32_t window_len;
+    uint32_t counter;
+    int comm_rank;
+    int comm_size;
+    tl::engine engine;
+    mofka::ServiceHandle service;
+
+    std::vector<float> vproj;
+    std::vector<float> vtheta;
+    std::vector<json> vmeta;
+    json info;
+
+    // /// Add streaming message to vectors
+    void addTomoMsg(mofka::Event event){
+
+      mofka::Data data = event.data();
+      mofka::Metadata metadata = event.metadata();
+      event.acknowledge();
+
+      vmeta.push_back(metadata.json()); /// Setup metadata
+      vtheta.push_back(metadata.json()["theta"].get<float_t>());
+      std::cout << "metadata:"<< metadata.string() << "size"<< static_cast<int>(data.segments()[0].size)<<
+      getInfo()["n_sinograms"].get<int32_t>()*getInfo()["n_rays_per_proj_row"].get<int32_t>()<<std::endl;
+      vproj.insert(vproj.end(),
+          static_cast<float*>(data.segments()[0].ptr),
+          static_cast<float*>(data.segments()[0].ptr)+
+          + getInfo()["n_sinograms"].get<int32_t>()*getInfo()["n_rays_per_proj_row"].get<int32_t>());
+    }
+
+    void eraseBegTraceMsg(){
+      vtheta.erase(vtheta.begin());
+      size_t n_rays_per_proj =
+      getInfo()["n_sinograms"].get<int64_t>() *
+      getInfo()["n_rays_per_proj_row"].get<int64_t>();
+      vproj.erase(vproj.begin(),vproj.begin()+n_rays_per_proj);
+      vmeta.erase(vmeta.begin());
+    }
+
+    /// Generates a data region that can be processed by Trace
+    DataRegionBase<float, TraceMetadata>* setupTraceDataRegion(
+      DataRegionBareBase<float> &recon_image){
+        TraceMetadata *mdata = new TraceMetadata(
+        vtheta.data(),
+        0,                                // metadata().proj_id(),
+        getInfo()["beg_sinogram"].get<int64_t>(),          // metadata().slice_id(),
+        0,                                // metadata().col_id(),
+        getInfo()["tn_sinograms"].get<int64_t>(),            // metadata().num_total_slices(),
+        vtheta.size(),                    // int const num_projs,
+        getInfo()["n_sinograms"].get<int64_t>(),            // metadata().num_slices(),
+        getInfo()["n_rays_per_proj_row"].get<int64_t>(),    // metadata().num_cols(),
+        getInfo()["n_rays_per_proj_row"].get<int64_t>(), // * metadata().n_rays_per_proj_row, // metadata().num_grids(),
+        vmeta.back()["center"].get<float>());             // use the last incoming center for recon.);
+
+      mdata->recon(recon_image);
+
+      //mdata->Print();
+
+      // Will be deleted at the end of main loop
+      float *data=new float[mdata->count()];
+      for(size_t i=0; i<mdata->count(); ++i) data[i]=vproj[i];
+      auto curr_data = new DataRegionBase<float, TraceMetadata> (
+          data,
+          mdata->count(),
+          mdata);
+
+      curr_data->ResetMirroredRegionIter();
+
+      return curr_data;
+
+
+      }
+
+    mofka::BatchSize   batchSize   = mofka::BatchSize::Adaptive();
+    mofka::ThreadCount threadCount = mofka::ThreadCount{1};
+    mofka::Ordering    ordering    = mofka::Ordering::Strict;
+
+    mofka::Validator         validator;
+    mofka::Serializer        serializer;
+    mofka::PartitionSelector selector;
+
+    mofka::DataSelector data_selector = [](const mofka::Metadata& metadata,
+                                    const mofka::DataDescriptor& descriptor) {
+      (void)metadata;
+      return descriptor;
+    };
+
+    mofka::DataBroker data_broker = [](const mofka::Metadata& metadata,
+                                  const mofka::DataDescriptor& descriptor) {
+        (void)metadata;
+        return mofka::Data{new float[descriptor.size()], descriptor.size()};
+    };
+
+  public:
+
+    MofkaStream(std::string protocol,
+        std::string group_file,
+        uint32_t window_len,
+        int rank,
+        int size):
+      window_len {window_len},
+      counter {0},
+      comm_rank {rank},
+      comm_size {size},
+      engine {protocol, THALLIUM_SERVER_MODE}
+      {
+        mofka::Client client(engine);
+        service = client.connect(group_file);
+      }
+
+    mofka::Producer producer( std::string topic_name,
+                              std::string producer_name="streamer_sirt"){
+      // -- Create/open a topic
+      try{
+        service.createTopic(topic_name, validator, selector, serializer);
+        service.addDefaultPartition(topic_name, 0);
+      }catch (const mofka::Exception& e){
+        spdlog::info("{}", e.what());
+        spdlog::info("Opening Topic! {}", topic_name);
+      }
+      mofka::TopicHandle topic = service.openTopic(topic_name);
+      // -- Get a producer for the topic
+      mofka::Producer producer = topic.producer(producer_name,
+                                                batchSize,
+                                                threadCount,
+                                                ordering);
+      return producer;
+    }
+
+    mofka::Consumer consumer( std::string topic_name,
+                              std::string consumer_name="dist_sirt"){
+      // -- Create/open a topic
+      try{
+        service.createTopic(topic_name, validator, selector, serializer);
+        service.addDefaultPartition(topic_name, 0);
+      }catch (const mofka::Exception& e){
+        spdlog::info("{}", e.what());
+        spdlog::info("Opening Topic! {}", topic_name);
+      }
+      mofka::TopicHandle topic = service.openTopic(topic_name);
+
+      // -- Get a consumer for the topic
+      mofka::Consumer consumer = topic.consumer(consumer_name,
+                                                batchSize,
+                                                threadCount,
+                                                data_selector,
+                                                data_broker);
+      return consumer;
+    }
+
+    /* Create a data region from sliding window
+      * @param recon_image Initial values of reconstructed image
+      * @param step        Sliding step. Waits at least step projection
+      *                    before returning window back to the reconstruction
+      *                    engine
+      *
+      * Return:  nullptr if there is no message and sliding window is empty
+      *          DataRegionBase if there is data in sliding window
+      */
+
+    DataRegionBase<float, TraceMetadata>* readSlidingWindow(
+      DataRegionBareBase<float> &recon_image,
+      int step,
+      mofka::Consumer consumer){
+
+      // Dynamically meet sizes
+      while(vtheta.size()> window_len)
+        eraseBegTraceMsg();
+
+      // Receive new message
+      std::vector<mofka::Event> mofka_events;
+
+      for(int i=0; i<step; ++i) {
+        // mofka messages
+        auto event = consumer.pull().wait();
+        mofka_events.push_back(event);
+        //if endMsg break
+        if (event.metadata().json()["Type"].get<std::string>() == "FIN") return nullptr;
+      }
+      // TODO: After receiving message corrections might need to be applied
+
+      /// End of the processing
+      if(mofka_events.size()==0 && vtheta.size()==0){
+        //std::cout << "End of the processing: " << vtheta.size() << std::endl;
+        return nullptr;
+      }
+      /// End of messages, but there is data to be processed in window
+      else if(mofka_events.size()==0 && vtheta.size()>0){
+        for(int i=0; i<step; ++i){  // Delete step size element
+          if(vtheta.size()>0) eraseBegTraceMsg();
+          else break;
+        }
+        //std::cout << "End of messages, but there might be data in window:" << vtheta.size() << std::endl;
+        if(vtheta.size()==0) return nullptr;
+      }
+      /// New message(s) arrived, there is space in window
+      else if(mofka_events.size()>0 && vtheta.size()<window_len){
+        //std::cout << "New message(s) arrived, there is space in window: " << window_len_ - vtheta.size() << std::endl;
+        for(auto msg : mofka_events){
+          addTomoMsg(msg);
+          ++counter;
+        }
+      std::cout << "After adding # items in window: " << vtheta.size() << std::endl;
+      }
+      /// New message arrived, there is no space in window
+      else if(mofka_events.size()>0 && vtheta.size()>=window_len){
+        //std::cout << "New message arrived, there is no space in window: " << vtheta.size() << std::endl;
+        for(int i=0; i<step; ++i) {
+          if(vtheta.size()>0) eraseBegTraceMsg();
+          else break;
+        }
+        for(auto msg : mofka_events){
+          addTomoMsg(msg);
+          ++counter;
+        }
+      }
+      else std::cerr << "Unknown state in ReadWindow!" << std::endl;
+
+      /// Clean-up vector
+      mofka_events.clear();
+
+      /// Generate new data and metadata
+      DataRegionBase<float, TraceMetadata>* data_region =
+        setupTraceDataRegion(recon_image);
+
+      return data_region;
+      }
+
+    void handshake(int rank, int size){
+      std::string topic = "handshake_d_s";
+      //mofka::Consumer hs_consumer = consumer(topic, "hs_c");
+
+      if (rank == 0) {
+        // Send comm size to dist_streamer
+        topic = "handshake_s_d";
+        mofka::Producer hs_producer = producer(topic, "hs_p");
+        json md = {{"comm_size", size}};
+        mofka::Metadata metadata{md};
+        auto future = hs_producer.push(metadata, mofka::Data{});
+        future.wait();
+      }
+      // Receive metadata info
+
+      try{
+        service.createTopic("handshake_d_s", validator, selector, serializer);
+        service.addDefaultPartition("handshake_d_s", 0);
+      }catch (const mofka::Exception& e){
+        spdlog::info("{}", e.what());
+        spdlog::info("Opening Topic! {}", "handshake_d_s");
+      }
+      mofka::TopicHandle t = service.openTopic("handshake_d_s");
+
+      // -- Get a consumer for the topic
+      mofka::Consumer hs_consumer = t.consumer("consumer_name",
+                                                batchSize, threadCount);
+      auto future = hs_consumer.pull();
+      auto event = future.wait();
+      mofka::Metadata m = event.metadata();
+      json mdata = m.json();
+      setInfo(mdata);
+    }
+
+    json getInfo(){ return info;}
+    uint32_t getCounter(){ return counter;}
+    void setInfo(json &j) {
+      info = j;}
+    void windowLength(uint32_t wlen){ window_len = wlen;}
+
+    // /* Publish reconstructed slices.
+    //   * @param slice Slice and its metadata information.
+    //   */
+    // void PublishImage(DataRegionBase<float, TraceMetadata> &slice){
+
+    // }
+};
+
 class TraceRuntimeConfig {
   public:
     std::string kReconOutputPath;
@@ -38,7 +338,7 @@ class TraceRuntimeConfig {
           "r", "reconDatasetPath", "Reconstruction dataset path in hdf5 file",
           false, "/data", "string");
         TCLAP::ValueArg<std::string> argPubAddr(
-          "", "pub-addr", "Bind address for the publisher. Default tcp://*:52000", false, 
+          "", "pub-addr", "Bind address for the publisher. Default tcp://*:52000", false,
           "tcp://*:52000", "string");
         TCLAP::ValueArg<float> argPubFreq(
           "", "pub-freq", "Publish frequency", false, 10000, "int");
@@ -60,7 +360,7 @@ class TraceRuntimeConfig {
           false, 1, "int");
 
         TCLAP::ValueArg<std::string> argDestHost(
-          "", "dest-host", "Destination host/ip address", false, "164.54.143.3", 
+          "", "dest-host", "Destination host/ip address", false, "164.54.143.3",
             "string");
         TCLAP::ValueArg<float> argDestPort(
           "", "dest-port", "Starting port of destination host", false, 5560, "int");
@@ -128,15 +428,28 @@ int main(int argc, char **argv)
   DISPCommBase<float> *comm =
         new DISPCommMPI<float>(&argc, &argv);
   TraceRuntimeConfig config(argc, argv, comm->rank(), comm->size());
-  TraceStream tstream(config.dest_host, config.dest_port, 
-                      config.window_len, 
-                      comm->rank(), comm->size(),
-                      config.pub_addr);
+  // TraceStream tstream(config.dest_host, config.dest_port,
+  //                     config.window_len,
+  //                     comm->rank(), comm->size(),
+  //                     config.pub_addr);
+
+  MofkaStream ms = MofkaStream{ protocol,
+                                group_file,
+                                static_cast<uint32_t>(config.window_len),
+                                comm->rank(),
+                                comm->size()};
+
+  std::string consuming_topic = "dist_sirt";
+  std::string producing_topic = "sirt_den";
+  mofka::Producer  producer = ms.producer(producing_topic, "sirt");
+  mofka::Consumer consumer = ms.consumer(consuming_topic, "sirt");
+
+  ms.handshake(comm->rank(), comm->size());
 
   /* Get metadata structure */
-  tomo_msg_metadata_t tmetadata = (tomo_msg_metadata_t)tstream.metadata();
-  int n_blocks = tmetadata.n_sinograms;
-  int num_cols = tmetadata.n_rays_per_proj_row;
+  json tmetadata = ms.getInfo();
+  auto n_blocks = tmetadata["n_sinograms"].get<int64_t>();
+  auto num_cols = tmetadata["n_rays_per_proj_row"].get<int64_t>();
 
   /***********************/
   /* Initiate middleware */
@@ -165,7 +478,7 @@ int main(int argc, char **argv)
   /* Perform reconstruction */
   /* Define job size per thread request */
   #ifdef TIMERON
-  std::chrono::duration<double> recon_tot(0.), inplace_tot(0.), update_tot(0.), 
+  std::chrono::duration<double> recon_tot(0.), inplace_tot(0.), update_tot(0.),
     datagen_tot(0.);
   std::chrono::duration<double> write_tot(0.);
   #endif
@@ -173,32 +486,32 @@ int main(int argc, char **argv)
   //DataRegionBase<float, TraceMetadata> *curr_slices = nullptr;
   DataRegionBase<float, TraceMetadata> *curr_slices = nullptr;
   /// Reconstructed image
-  DataRegionBareBase<float> recon_image(n_blocks*num_cols*num_cols);  
-  for(size_t i=0; i<recon_image.count(); ++i) 
+  DataRegionBareBase<float> recon_image(n_blocks*num_cols*num_cols);
+  for(size_t i=0; i<recon_image.count(); ++i)
     recon_image[i]=0.; /// Initial values of the reconstructe image
 
   /// Number of requested ray-sum values by each thread poll
-  int64_t req_number = num_cols; 
+  int64_t req_number = num_cols;
   /// Required data structure for dumping image to h5 file
-  trace_io::H5Metadata h5md; 
-  h5md.ndims=3; 
+  trace_io::H5Metadata h5md;
+  h5md.ndims=3;
   h5md.dims= new hsize_t[3];
-  h5md.dims[1] = tmetadata.tn_sinograms; 
+  h5md.dims[1] = tmetadata["tn_sinograms"].get<int64_t>();
   h5md.dims[0] = 0;   /// Number of projections is unknown
-  h5md.dims[2] = tmetadata.n_rays_per_proj_row; 
+  h5md.dims[2] = tmetadata["n_rays_per_proj_row"].get<int64_t>();
   for(int passes=0; ; ++passes){
       #ifdef TIMERON
       auto datagen_beg = std::chrono::system_clock::now();
       #endif
-      curr_slices = tstream.ReadSlidingWindow(recon_image, config.window_step);
-      if(config.center!=0 && curr_slices!=nullptr) 
+      curr_slices = ms.readSlidingWindow(recon_image, config.window_step, consumer); //have a look at this and what it returns
+      if(config.center!=0 && curr_slices!=nullptr)
         curr_slices->metadata().center(config.center);
       #ifdef TIMERON
       datagen_tot += (std::chrono::system_clock::now()-datagen_beg);
       #endif
 
-      if(curr_slices == nullptr) break; /// If nullptr, there is no more projection 
-      
+      if(curr_slices == nullptr) break; /// If nullptr, there is no more projection
+
       /// Check window effect
       /// and iteration
       /*
@@ -239,17 +552,51 @@ int main(int argc, char **argv)
       auto write_beg = std::chrono::system_clock::now();
       #endif
       /* Publish the reconstructed image (slices) outside */
-      if(!(passes%config.pub_freq)){
-        tstream.PublishImage(*curr_slices);
-      }
+      // if(!(passes%config.pub_freq)){
+      //   tstream.PublishImage(*curr_slices);
+      // }
       if(!(passes%config.write_freq)){
         std::stringstream iteration_stream;
         iteration_stream << std::setfill('0') << std::setw(6) << passes;
-        std::string outputpath = config.kReconOutputDir + "/" + 
+        std::string outputpath = config.kReconOutputDir + "/" +
           iteration_stream.str() + "-recon.h5";
         trace_io::WriteRecon(
-            curr_slices->metadata(), h5md, 
+            curr_slices->metadata(), h5md,
             outputpath, config.kReconDatasetPath);
+
+        try {
+          TraceMetadata &rank_metadata = curr_slices->metadata();
+
+          int recon_slice_data_index = rank_metadata.num_neighbor_recon_slices()* rank_metadata.num_grids() * rank_metadata.num_grids();
+          ADataRegion<float> &recon = rank_metadata.recon();
+
+          hsize_t ndims = static_cast<hsize_t>(h5md.ndims);
+          hsize_t rank_dims[3] = {
+            static_cast<hsize_t>(rank_metadata.num_slices()),
+            static_cast<hsize_t>(rank_metadata.num_cols()),
+            static_cast<hsize_t>(rank_metadata.num_cols())};
+          hsize_t app_dims[3] = {
+            static_cast<hsize_t>(h5md.dims[1]),
+            static_cast<hsize_t>(h5md.dims[2]),
+            static_cast<hsize_t>(h5md.dims[2])};
+
+          json md = {{"iteration_stream", iteration_stream.str()},
+                      {"rank_dims", rank_dims},
+                      {"app_dims", app_dims},
+                      {"recon_slice_data_index", recon_slice_data_index}};
+
+          mofka::Metadata metadata{md};
+
+          mofka::Data data = mofka::Data(&recon[recon_slice_data_index], 4*rank_dims[0]*rank_dims[1]*rank_dims[2]);
+          auto future = producer.push(metadata, data);
+          producer.flush();
+
+        } catch(const mofka::Exception& ex) {
+
+          spdlog::critical("{}", ex.what());
+          exit(-1);
+        }
+
       }
       #ifdef TIMERON
       write_tot += (std::chrono::system_clock::now()-write_beg);
@@ -269,16 +616,16 @@ int main(int argc, char **argv)
     //std::cout << "Write time=" << write_tot.count() << std::endl;
     std::cout << "Data gen total time=" << datagen_tot.count() << std::endl;
     std::cout << "Total comp=" << recon_tot.count() + inplace_tot.count() + update_tot.count() << std::endl;
-    std::cout << "Sustained proj/sec=" << tstream.counter() / 
-                                          (recon_tot.count()+inplace_tot.count()+update_tot.count()) << std::endl;
+    //std::cout << "Sustained proj/sec=" << tstream.counter() /
+    //                                      (recon_tot.count()+inplace_tot.count()+update_tot.count()) << std::endl;
   }
   #endif
 
   /* Clean-up the resources */
-  delete [] h5md.dims;
-  delete main_recon_space;
+  // delete [] h5md.dims;
+  // delete main_recon_space;
   //delete curr_slices;
-  delete comm;
-  delete engine;
+  // delete comm;
+  // delete engine;
+  // TODO mofka clean up
 }
-

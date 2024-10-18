@@ -1,0 +1,32 @@
+# This is a Spack Environment file.
+#
+# It describes a set of packages to be installed, along with
+# configuration settings.
+spack:
+  # add package specs to the `specs` list
+  specs:
+  - mofka@main+mpi+python ^json-c@0.13.0 ^libfabric@1.19.1 ^mercury~boostsys~checksum
+    ^mochi-bedrock~ssg ^mpich@3.4^gcc@13
+  - py-mochi-margo
+  - py-numpy
+  - py-scipy
+  - swig
+  - py-tomopy@1.11.0
+  - libzmq
+  - py-pyzmq
+  - py-matplotlib
+  - py-dxchange
+  - py-pip
+  - hdf5+mpi
+  - py-h5py
+  - flatbuffers
+  - py-flatbuffers
+  view: true
+  concretizer:
+    unify: true
+  repos:
+  - /home/agueroudji/mochi-spack-packages
+  mirrors:
+    mochi-buildcache:
+      url: oci://ghcr.io/mochi-hpc/mochi-spack-buildcache
+      signed: false

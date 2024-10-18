@@ -1,0 +1,60 @@
+Bootstrap: docker
+From: continuumio/miniconda3
+
+%post
+    # Install necessary system packages
+    apt-get update --fix-missing && apt-get install -y \
+        build-essential \
+        libzmq3-dev \
+        swig \
+        git \
+        libmpich-dev \
+        libhdf5-mpich-dev \
+        apt-utils \
+        net-tools \
+        iptables \
+        iputils-ping \
+        iproute2 \
+        nano
+
+    # Install necessary conda packages
+    conda install -y \
+        python=3.11 \
+        numpy \
+        scipy \
+        matplotlib \
+        pyzmq \
+        pip \
+        cmake
+
+    # Upgrade pip
+    pip install --upgrade pip
+
+    # Clone the flatbuffers repository and build it
+    git clone https://github.com/google/flatbuffers.git /flatbuffers
+    cd /flatbuffers
+    cmake -G "Unix Makefiles"
+    make -j
+    make install
+
+    # Clone the aps-mini-apps repository
+    git clone https://github.com/diaspora-project/aps-mini-apps.git /aps-mini-apps
+    cd /aps-mini-apps
+    git fetch origin
+    git checkout master
+
+    # Setup directory structure
+    mkdir -p /aps-mini-apps/build/python
+
+    # Setup flatbuffers data structures
+    cd /aps-mini-apps/include/tracelib
+    flatc -c trace_prot.fbs
+    cd /aps-mini-apps
+
+    # Build SIRT
+    cd /aps-mini-apps/build
+    cmake ..
+    make
+    cd /aps-mini-apps/build/bin
+
+

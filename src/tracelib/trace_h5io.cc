@@ -22,7 +22,7 @@ void trace_io::DistributeSlices(
 }
 
 trace_io::H5Metadata* trace_io::ReadMetadata(
-    char const *file_path, 
+    char const *file_path,
     char const *dataset_path)
 {
   hid_t file_id, dataspace_id, dataset_id;
@@ -111,8 +111,8 @@ trace_io::H5Data* trace_io::ReadTheta(H5Metadata *metadata_p){
 
   /* Read data into memory */
   H5Dread(
-      dataset_id, 
-      mem_type_id, 
+      dataset_id,
+      mem_type_id,
       H5S_ALL, /*hid_t mem_space_id*/
       H5S_ALL, /*hid_t file_space_id*/
       H5S_ALL, /*hid_t xfer_plist_id*/
@@ -129,7 +129,7 @@ trace_io::H5Data* trace_io::ReadTheta(H5Metadata *metadata_p){
 
 trace_io::H5Data* trace_io::ReadSlices(
     H5Metadata *metadata_p,
-    int beg_slice, int count, 
+    int beg_slice, int count,
     int filter_id)
 {
   auto &metadata = *metadata_p;
@@ -374,7 +374,7 @@ void trace_io::WriteData(
     int target_dim,
     char const *file_name, char const *dataset_name,
     MPI_Comm comm, MPI_Info info, H5FD_mpio_xfer_t mpio_xfer_flag)
-{ 
+{
   if(ndims!=3 || recon==NULL || file_name==NULL || dataset_name==NULL)
     throw std::runtime_error("Wrong input parameter is passed");
 
@@ -421,7 +421,7 @@ void trace_io::WriteData(
 
   /* Below might be unnecessary, since we work on the whole memory */
   /*
-   * herr_t status = H5Sselect_hyperslab(memspace, H5S_SELECT_SET, 
+   * herr_t status = H5Sselect_hyperslab(memspace, H5S_SELECT_SET,
    * m_offset, NULL, m_count, m_block);
    */
   /* End of memory space and hyberslap selection */
@@ -475,15 +475,15 @@ void trace_io::WriteRecon(
 
 void trace_io::WriteRecon(
     TraceMetadata &rank_metadata,
-    H5Metadata &dataset_metadata, 
-    std::string const output_path, 
+    H5Metadata &dataset_metadata,
+    std::string const output_path,
     std::string const dataset_path,
     H5FD_mpio_xfer_t mpio_xfer_flag)
 {
   hsize_t ndims = static_cast<hsize_t>(dataset_metadata.ndims);
   hsize_t rank_dims[3] = {
-    static_cast<hsize_t>(rank_metadata.num_slices()), 
-    static_cast<hsize_t>(rank_metadata.num_cols()), 
+    static_cast<hsize_t>(rank_metadata.num_slices()),
+    static_cast<hsize_t>(rank_metadata.num_cols()),
     static_cast<hsize_t>(rank_metadata.num_cols())};
   hsize_t app_dims[3] = {
     static_cast<hsize_t>(dataset_metadata.dims[1]),

@@ -2,6 +2,39 @@
 
 This is APS mini-app that simulates the tomographic reconstruction on streaming tomography data. The reconstruction component provides a sliding window data structure to store (partial) data and a reconstruction process to reconstruct the data in the window. The reconstruction algorithm is based on the simultaneous iterative reconstruction technique (SIRT). This is a CPU-based code and is optimized for parallel and distributed memory. We plan to add the GPU-based version as well. 
 
+## Instructions to Run Mini-App on Polaris
+
+### Step 1: Build Apptainer Images
+
+To build the Apptainer images, you need to be on the Polaris compute nodes. Follow these steps:
+
+1. **Start an Interactive Session:**
+   ```bash
+   qsub -I -A <Project> -q debug -l select=1 -l walltime=01:00:00 -l filesystems=home:eagle -l singularity_fakeroot=true
+   
+2. **Set Proxy Environment Variables:**
+   ```bash
+   export HTTP_PROXY=http://proxy.alcf.anl.gov:3128
+   export HTTPS_PROXY=http://proxy.alcf.anl.gov:3128
+   export http_proxy=http://proxy.alcf.anl.gov:3128
+   export https_proxy=http://proxy.alcf.anl.gov:3128
+3. **Load Apptainer Module:**
+   ```bash
+   module use /soft/spack/gcc/0.6.1/install/modulefiles/Core
+   module load apptainer
+4. **Build Apptainer Images:**
+   ```bash
+   apptainer build --fakeroot streamer-daq.sif ./python/streamer-daq/streamer-daq.def
+   apptainer build --fakeroot streamer-quality.sif ./python/quality/streamer-quality.def
+   apptainer build --fakeroot streamer-dist.sif ./python/streamer-dist/streamer-dist.def
+   apptainer build --fakeroot streamer-sirt.sif ./src/sirt/streamer-sirt.def
+
+### Step 2: Modify and Submit the Script
+After building the Apptainer images, modify the single-node-PBS-job-script.sh according to your specific usage requirements. Then, submit the script using the following command:
+```bash
+qsub single-node-PBS-job-script.sh
+```
+
 ### TL;DR version to run the test case: 
 
 Go into the root folder of the project and edit the hard-coded parameters, specifically, the volume paths in docker-compose.yaml file. After then you can run the following command:

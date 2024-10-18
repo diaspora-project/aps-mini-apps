@@ -1,0 +1,73 @@
+Bootstrap: docker
+From: continuumio/miniconda3
+
+%post
+    # Update and install necessary packages
+    apt-get update --fix-missing && apt-get install -y \
+        build-essential \
+        libzmq3-dev \
+        swig \
+        git \
+        libmpich-dev \
+        libhdf5-mpich-dev \
+        apt-utils \
+        net-tools \
+        iptables \
+        iputils-ping \
+        iproute2 \
+        nano
+
+    # Install conda packages
+    conda install -y \
+        python=3.11 \
+        numpy \
+        scipy \
+        matplotlib \
+        pyzmq \
+        pip \
+        cmake
+
+    # Upgrade pip
+    pip install --upgrade pip
+
+    # Clone and build flatbuffers
+    git clone https://github.com/google/flatbuffers.git /flatbuffers
+    cd /flatbuffers
+    cmake -G "Unix Makefiles"
+    make -j
+    make install
+
+    # Clone aps-mini-apps repository
+    cd /
+    git clone https://github.com/diaspora-project/aps-mini-apps.git /aps-mini-apps
+    cd /aps-mini-apps
+    git fetch origin
+    git checkout master
+
+    # Setup directory structure
+    mkdir -p /aps-mini-apps/build/python/quality
+
+    # Install sewar for quality checker
+    pip install sewar
+    cp /aps-mini-apps/python/quality/iqcheck.py /aps-mini-apps/build/python/quality
+
+    # Setup flatbuffers data structures
+    cd /aps-mini-apps/include/tracelib
+    flatc -c trace_prot.fbs
+    cd /aps-mini-apps
+
+    # Build SIRT
+    mkdir -p /aps-mini-apps/build
+    cd /aps-mini-apps/build
+    cmake ..
+    make
+
+    # Setup streamer-daq
+    conda install -y -c conda-forge \
+        tomopy \
+        dxchange
+
+    mkdir -p /aps-mini-apps/build/python/streamer-daq
+    cp -r /aps-mini-apps/python/common /aps-mini-apps/build/python/
+    cp /aps-mini-apps/python/streamer-daq/DAQStream.py /aps-mini-apps/build/python/streamer-daq
+
