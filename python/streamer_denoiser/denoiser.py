@@ -15,14 +15,11 @@ import matplotlib.pyplot as plt
 def data_selector(metadata, descriptor):
     return descriptor
 
-
 def data_broker(metadata, descriptor):
-    # note that we return a *list* of objects satisfying the buffer protocol
     return [ bytearray(descriptor.size) ]
 
 mofka_protocol = "na+sm"
 group_file = "/home/agueroudji/tekin-aps-mini-apps/build/mofka.json"
-
 
 def adjust_contrast(image_data):
     # Flatten the image data to 1D for histogram calculation
