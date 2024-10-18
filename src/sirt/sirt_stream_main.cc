@@ -6,7 +6,6 @@
 #include "disp_comm_mpi.h"
 #include "disp_engine_reduction.h"
 #include "sirt.h"
-#include "trace_stream.h"
 
 #include <mofka/Client.hpp>
 #include <mofka/TopicHandle.hpp>
@@ -54,8 +53,7 @@ class MofkaStream
 
       vmeta.push_back(metadata.json()); /// Setup metadata
       vtheta.push_back(metadata.json()["theta"].get<float_t>());
-      std::cout << "metadata:"<< metadata.string() << "size"<< static_cast<int>(data.segments()[0].size)<<
-      getInfo()["n_sinograms"].get<int32_t>()*getInfo()["n_rays_per_proj_row"].get<int32_t>()<<std::endl;
+      spdlog::info("Received data {}", metadata.string());
       vproj.insert(vproj.end(),
           static_cast<float*>(data.segments()[0].ptr),
           static_cast<float*>(data.segments()[0].ptr)+
@@ -99,10 +97,7 @@ class MofkaStream
           mdata);
 
       curr_data->ResetMirroredRegionIter();
-
       return curr_data;
-
-
       }
 
     mofka::BatchSize   batchSize   = mofka::BatchSize::Adaptive();
@@ -328,6 +323,11 @@ class TraceRuntimeConfig {
       try
       {
         TCLAP::CmdLine cmd("SIRT Iterative Image Reconstruction", ' ', "0.01");
+        TCLAP::ValueArg<std::string> argMofkaProtocol(
+          "", "protocol", "Mofka protocol", false, "na+sm", "string");
+        TCLAP::ValueArg<std::string> argGroupFile(
+          "", "group-file", "Mofka group file", false, "mofka.json", "string");
+
         TCLAP::ValueArg<std::string> argReconOutputPath(
           "o", "reconOutputPath", "Output file path for reconstructed image (hdf5)",
           false, "./output.h5", "string");
@@ -337,12 +337,8 @@ class TraceRuntimeConfig {
         TCLAP::ValueArg<std::string> argReconDatasetPath(
           "r", "reconDatasetPath", "Reconstruction dataset path in hdf5 file",
           false, "/data", "string");
-        TCLAP::ValueArg<std::string> argPubAddr(
-          "", "pub-addr", "Bind address for the publisher. Default tcp://*:52000", false,
-          "tcp://*:52000", "string");
         TCLAP::ValueArg<float> argPubFreq(
           "", "pub-freq", "Publish frequency", false, 10000, "int");
-
         TCLAP::ValueArg<float> argCenter(
           "c", "center", "Center value", false, 0., "float");
         TCLAP::ValueArg<int> argThreadCount(
@@ -359,18 +355,13 @@ class TraceRuntimeConfig {
           "", "window-iter", "Number of iterations on received window",
           false, 1, "int");
 
-        TCLAP::ValueArg<std::string> argDestHost(
-          "", "dest-host", "Destination host/ip address", false, "164.54.143.3",
-            "string");
-        TCLAP::ValueArg<float> argDestPort(
-          "", "dest-port", "Starting port of destination host", false, 5560, "int");
-
+        cmd.add(argMofkaProtocol);
+        cmd.add(argGroupFile);
         cmd.add(argReconOutputPath);
         cmd.add(argReconOutputDir);
         cmd.add(argReconDatasetPath);
 
         cmd.add(argPubFreq);
-        cmd.add(argPubAddr);
 
         cmd.add(argCenter);
         cmd.add(argThreadCount);
@@ -378,9 +369,6 @@ class TraceRuntimeConfig {
         cmd.add(argWindowLen);
         cmd.add(argWindowStep);
         cmd.add(argWindowIter);
-
-        cmd.add(argDestHost);
-        cmd.add(argDestPort);
 
         cmd.parse(argc, argv);
         kReconOutputPath = argReconOutputPath.getValue();
@@ -392,10 +380,8 @@ class TraceRuntimeConfig {
         window_len= argWindowLen.getValue();
         window_step= argWindowStep.getValue();
         window_iter= argWindowIter.getValue();
-        dest_host= argDestHost.getValue();
-        dest_port= argDestPort.getValue();
-        pub_addr= argPubAddr.getValue();
-        pub_freq= argPubFreq.getValue();
+        protocol = argMofkaProtocol.getValue();
+        group_file = argGroupFile.getValue();
 
         std::cout << "MPI rank:"<< rank << "; MPI size:" << size << std::endl;
         if(rank==0)
@@ -409,10 +395,9 @@ class TraceRuntimeConfig {
           std::cout << "Window length=" << window_len << std::endl;
           std::cout << "Window step=" << window_step << std::endl;
           std::cout << "Window iter=" << window_iter << std::endl;
-          std::cout << "Destination host address=" << dest_host << std::endl;
-          std::cout << "Destination port=" << dest_port << std::endl;
-          std::cout << "Publisher address=" << pub_addr << std::endl;
           std::cout << "Publish frequency=" << pub_freq << std::endl;
+          std::cout << "Mofka Protocol=" << protocol << std::endl;
+          std::cout << "Group file=" << group_file << std::endl;
         }
       }
       catch (TCLAP::ArgException &e)
@@ -428,10 +413,6 @@ int main(int argc, char **argv)
   DISPCommBase<float> *comm =
         new DISPCommMPI<float>(&argc, &argv);
   TraceRuntimeConfig config(argc, argv, comm->rank(), comm->size());
-  // TraceStream tstream(config.dest_host, config.dest_port,
-  //                     config.window_len,
-  //                     comm->rank(), comm->size(),
-  //                     config.pub_addr);
 
   MofkaStream ms = MofkaStream{ protocol,
                                 group_file,
@@ -482,8 +463,6 @@ int main(int argc, char **argv)
     datagen_tot(0.);
   std::chrono::duration<double> write_tot(0.);
   #endif
-
-  //DataRegionBase<float, TraceMetadata> *curr_slices = nullptr;
   DataRegionBase<float, TraceMetadata> *curr_slices = nullptr;
   /// Reconstructed image
   DataRegionBareBase<float> recon_image(n_blocks*num_cols*num_cols);
@@ -510,17 +489,7 @@ int main(int argc, char **argv)
       datagen_tot += (std::chrono::system_clock::now()-datagen_beg);
       #endif
 
-      if(curr_slices == nullptr) break; /// If nullptr, there is no more projection
-
-      /// Check window effect
-      /// and iteration
-      /*
-      if((passes/config.write_freq)>793){
-        tstream.WindowLength(5);
-        config.window_iter=5;
-      }
-      */
-
+      if(curr_slices == nullptr) break; /// If nullptr, there is no more projections
       /// Iterate on window
       for(int i=0; i<config.window_iter; ++i){
         #ifdef TIMERON
@@ -551,10 +520,6 @@ int main(int argc, char **argv)
       #ifdef TIMERON
       auto write_beg = std::chrono::system_clock::now();
       #endif
-      /* Publish the reconstructed image (slices) outside */
-      // if(!(passes%config.pub_freq)){
-      //   tstream.PublishImage(*curr_slices);
-      // }
       if(!(passes%config.write_freq)){
         std::stringstream iteration_stream;
         iteration_stream << std::setfill('0') << std::setw(6) << passes;
@@ -601,8 +566,6 @@ int main(int argc, char **argv)
       #ifdef TIMERON
       write_tot += (std::chrono::system_clock::now()-write_beg);
       #endif
-
-
       //delete curr_slices->metadata(); //TODO Check for memory leak
       delete curr_slices;
   }
@@ -616,16 +579,8 @@ int main(int argc, char **argv)
     //std::cout << "Write time=" << write_tot.count() << std::endl;
     std::cout << "Data gen total time=" << datagen_tot.count() << std::endl;
     std::cout << "Total comp=" << recon_tot.count() + inplace_tot.count() + update_tot.count() << std::endl;
-    //std::cout << "Sustained proj/sec=" << tstream.counter() /
-    //                                      (recon_tot.count()+inplace_tot.count()+update_tot.count()) << std::endl;
+    std::cout << "Sustained proj/sec=" << ms.getCounter() /
+                                          (recon_tot.count()+inplace_tot.count()+update_tot.count()) << std::endl;
   }
   #endif
-
-  /* Clean-up the resources */
-  // delete [] h5md.dims;
-  // delete main_recon_space;
-  //delete curr_slices;
-  // delete comm;
-  // delete engine;
-  // TODO mofka clean up
 }

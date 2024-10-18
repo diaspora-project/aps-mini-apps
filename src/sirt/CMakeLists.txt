@@ -40,13 +40,12 @@ include_directories(${Trace_SOURCE_DIR}/include)
 include_directories(${Trace_SOURCE_DIR}/include/tracelib)
 include_directories(${HDF5_INCLUDE_DIRS})
 
-add_library(trace_stream ${Trace_SOURCE_DIR}/src/tracelib/trace_stream.cc)
-add_library(trace_mq ${Trace_SOURCE_DIR}/src/tracelib/trace_mq.cc)
+
 add_library(trace_utils ${Trace_SOURCE_DIR}/src/tracelib/trace_utils.cc)
 add_library(trace_h5io ${Trace_SOURCE_DIR}/src/tracelib/trace_h5io.cc)
 add_library(sirt ${CMAKE_CURRENT_LIST_DIR}/sirt.cc)
 
 
 add_executable(sirt_stream sirt_stream_main.cc)
-target_link_libraries(sirt_stream trace_stream trace_mq sirt trace_utils trace_h5io zmq MPI::MPI_CXX hdf5::hdf5 Threads::Threads mofka::client)
+target_link_libraries(sirt_stream  sirt trace_utils trace_h5io zmq MPI::MPI_CXX hdf5::hdf5 Threads::Threads mofka::client)
 #target_include_directories(sirt_stream PRIVATE ${HDF5_INCLUDE_DIRS})

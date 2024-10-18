@@ -3,14 +3,11 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '../common'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '../common/local'))
 import argparse
-import re
 import numpy as np
-import zmq
 import time
 import math
 import TraceSerializer
 import tomopy as tp
-import tracemq as tmq
 import json
 from mofka_dist import MofkaDist
 
@@ -19,21 +16,11 @@ group_file = "/home/agueroudji/tekin-aps-mini-apps/build/mofka.json"
 
 def parse_arguments():
   parser = argparse.ArgumentParser( description='Data Distributor Process')
-  parser.add_argument('--data_source_addr', default=None,
-      help='Remote publisher address for the data source.')
-  parser.add_argument('--data_source_hwm', type=int, default=0,
-      help='Sets high water mark value for this subscriber. Default=0.')
-  parser.add_argument('--data_source_synch_addr', default=None,
-      help='Synchronizes this subscriber to provided publisher REP socket address (publisher should wait for subscriptions)')
+  parser.add_argument('--protocol', default="na+sm", help='Mofka protocol')
 
-  # Publisher for the others
-  parser.add_argument('--my_publisher_addr', default=None,
-      help='Publishes preprocessed data on given publisher address.')
-  parser.add_argument('--my_publisher_freq', type=int, default=1,
-              help='Publishes preprocessed data to with given frequency. E.g. if this equals 2, every other preprocessed projection is published. Default is 1.')
-
+  parser.add_argument('--group_file', type=str, default="mofka.json",
+                      help='Group file for the mofka server')
   # TQ communication
-  parser.add_argument('--my_distributor_addr', default=None, help='IP address to bind tmq')
   parser.add_argument('--beg_sinogram', type=int,
                           help='Starting sinogram for reconstruction')
   parser.add_argument('--num_sinograms', type=int,
@@ -68,50 +55,13 @@ def parse_arguments():
 
   return parser.parse_args()
 
-
-def synchronize_subs(context, publisher_rep_address):
-  sync_socket = context.socket(zmq.REQ)
-  sync_socket.connect(publisher_rep_address)
-
-  sync_socket.send(b'') # Send synchronization signal
-  sync_socket.recv() # Receive reply
-
-
 def main():
   args = parse_arguments()
-
-  context = zmq.Context(io_threads=8)
-
   # setup mofka
-  mofka = MofkaDist(mofka_protocol=mofka_protocol, group_file=group_file)
+  mofka = MofkaDist(mofka_protocol=args.protocol, group_file=args.group_file)
   consumer = mofka.consumer(topic_name="daq_dist", consumer_name="dist")
   producer = mofka.producer(topic_name="dist_sirt", producer_name="producer_dist")
-
-  # TQM setup
-  if args.my_distributor_addr is not None:
-    addr_split = re.split("://|:", args.my_distributor_addr)
-    tmq.init_tmq()
-    # Handshake w. remote processes
-    print(addr_split)
-    tmq.handshake(addr_split[1], int(addr_split[2]), args.num_sinograms, args.num_columns)
-  else: print("No distributor..")
-
-  # Subscriber setup
-  print("Subscribing to: {}".format(args.data_source_addr))
-  subscriber_socket = context.socket(zmq.SUB)
-  subscriber_socket.set_hwm(args.data_source_hwm)
-  subscriber_socket.connect(args.data_source_addr)
-  subscriber_socket.setsockopt(zmq.SUBSCRIBE, b'')
-
-  # Local publisher socket
-  if args.my_publisher_addr is not None:
-    publisher_socket = context.socket(zmq.PUB)
-    publisher_socket.set_hwm(200) # TODO: parameterize high water mark value
-    publisher_socket.bind(args.my_publisher_addr)
-
-  if args.data_source_synch_addr is not None:
-    print("Synchronizing with {}".format(args.data_source_synch_addr))
-    synchronize_subs(context, args.data_source_synch_addr)
+  mofka.handshake(args.num_sinograms, args.num_columns)
 
   # Setup serializer
   serializer = TraceSerializer.ImageSerializer()
@@ -129,15 +79,12 @@ def main():
   time0 = time.time()
 
   while True:
-    msg = subscriber_socket.recv()
     total_received += 1
-    total_size += len(msg)
-    if msg == b"end_data": break # End of data acquisition
-
     f = consumer.pull()
     event = f.wait()
     mofka_data = event.data[0]
     mofka_metadata = json.loads(event.metadata)
+    if mofka_metadata["Type"] == "FIN": break
 
     # This is mostly for data rate tests
     if args.skip_serialize:
@@ -145,21 +92,17 @@ def main():
       continue
 
     # Deserialize msg to image
-    read_image = serializer.deserialize(serialized_image=msg)
-    serializer.info(read_image) # print image information
-
-    # Deserialize msg to image
     mofka_read_image = serializer.deserialize(serialized_image=mofka_data)
     serializer.info(mofka_read_image) # print image information
 
-    # Local checks
-    if args.check_seq:
-      if seq != read_image.Seq():
-        print("Wrong sequence number: {} != {}".format(seq, read_image.Seq()))
-      seq += 1
+    # # Local checks
+    # if args.check_seq:
+    #   if seq != mofka_read_image.Seq():
+    #     print("Wrong sequence number: {} != {}".format(seq, mofka_read_image.Seq()))
+    #   seq += 1
 
     # Push image to workers (REQ/REP)
-    my_image_np = read_image.TdataAsNumpy()
+    my_image_np = mofka_read_image.TdataAsNumpy()
     if args.uint8_to_float32:
       my_image_np.dtype = np.uint8
       sub = np.array(my_image_np, dtype="float32")
@@ -170,11 +113,11 @@ def main():
       my_image_np.dtype=np.float32
       sub = my_image_np
     else: sub = my_image_np
-    sub = sub.reshape((1, read_image.Dims().Y(), read_image.Dims().X()))
 
+    sub = sub.reshape((1, mofka_read_image.Dims().Y(), mofka_read_image.Dims().X()))
     # If incoming data is projection
-    if read_image.Itype() is serializer.ITypes.Projection:
-      rotation=read_image.Rotation()
+    if mofka_read_image.Itype() is serializer.ITypes.Projection:
+      rotation=mofka_read_image.Rotation()
       if args.degree_to_radian: rotation = rotation*math.pi/180.
 
       # Tomopy operations expect 3D data, reshape incoming projections.
@@ -196,57 +139,34 @@ def main():
         sub = tp.remove_neg(sub, val=0.00)
         sub[np.where(sub == np.inf)] = 0.00
 
-      # Publish to the world
-      if (args.my_publisher_addr is not None) and (total_received%args.my_publisher_freq==0):
-        mub = np.reshape(sub,(read_image.Dims().Y(), read_image.Dims().X()))
-
-        serialized_data = serializer.serialize(image=mub, uniqueId=0, rotation=0,
-                    itype=serializer.ITypes.Projection)
-        print("Publishing:{}".format(read_image.UniqueId()))
-        publisher_socket.send(serialized_data)
-        f = producer.push({"id": read_image.UniqueId()}, serialized_data)
-        f.wait()
-
       #to send from mofka:
-      mofka_sub = sub
-      # Send to workers
-      if args.num_sinograms is not None:
-        # print("blablablabla", type(sub), sub.shape) = (1, 2, 2560)
-        sub = sub[:, args.beg_sinogram:args.beg_sinogram+args.num_sinograms, :]
-      # print("after this ", sub, sub.shape) = (1, 0, 2560)
+      mofka_sub = sub.flatten()
       ncols = sub.shape[2]
-      sub = sub.reshape(sub.shape[0]*sub.shape[1]*sub.shape[2])
-      # print("sub, sub.shape: ", sub, sub.shape) this becomes [] (0, )
-      if args.my_distributor_addr is not None:
-        tmq.push_image(sub, args.num_sinograms, ncols, rotation,
-                        read_image.UniqueId(), read_image.Center())
 
-        mofka.push_image(mofka_sub, args.num_sinograms, ncols, rotation,
-                        read_image.UniqueId(), read_image.Center(), producer=producer)
-        print("pushed this producer push", read_image.UniqueId())
-
+      mofka.push_image(mofka_sub, args.num_sinograms, ncols, rotation,
+                      mofka_read_image.UniqueId(), mofka_read_image.Center(), producer=producer)
 
     # If incoming data is white field
-    if read_image.Itype() is serializer.ITypes.White:
+    if mofka_read_image.Itype() is serializer.ITypes.White:
       #print("White field data is received: {}".format(read_image.UniqueId()))
       white_imgs.extend(sub)
       tot_white_imgs += 1
 
     # If incoming data is white-reset
-    if read_image.Itype() is serializer.ITypes.WhiteReset:
+    if mofka_read_image.Itype() is serializer.ITypes.WhiteReset:
       #print("White-reset data is received: {}".format(read_image.UniqueId()))
       white_imgs=[]
       white_imgs.extend(sub)
       tot_white_imgs += 1
 
     # If incoming data is dark field
-    if read_image.Itype() is serializer.ITypes.Dark:
+    if mofka_read_image.Itype() is serializer.ITypes.Dark:
       #print("Dark data is received: {}".format(read_image.UniqueId()))
       dark_imgs.extend(sub)
       tot_dark_imgs += 1
 
     # If incoming data is dark-reset
-    if read_image.Itype() is serializer.ITypes.DarkReset:
+    if mofka_read_image.Itype() is serializer.ITypes.DarkReset:
       #print("Dark-reset data is received: {}".format(read_image.UniqueId()))
       dark_imgs=[]
       dark_imgs.extend(sub)
@@ -261,14 +181,10 @@ def main():
   print("Rate (MiB/s): {:.2f}; (msg/s): {:.2f}".format(
             tot_MiBs/elapsed_time, total_received/elapsed_time))
 
-  # Finalize TMQ
-  if args.my_distributor_addr is not None:
-    print("Sending finalize message")
-    tmq.done_image()
-    tmq.finalize_tmq()
-  producer.flush()
 
-
+  mofka.done_image(producer)
+  del producer
+  del consumer
 
 if __name__ == '__main__':
   main()
