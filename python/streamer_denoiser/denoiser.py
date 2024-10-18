@@ -88,16 +88,23 @@ def process_directory(model, directory_path):
                 file_path = os.path.join(root, file)
                 process_file(model, file_path)
 
-def main(input_path, model_path):
+def main(input_path, model_path, protocol, group_file):
     # Load the saved model
     model = tf.keras.models.load_model(model_path)
-    engine = Engine(mofka_protocol)
+    engine = Engine(protocol)
     client = mofka.Client(engine)
     service = client.connect(group_file)
     batch_size = AdaptiveBatchSize
     thread_pool = ThreadPool(0)
     # create a topic
-    topic_name = "recon"
+    topic_name = "sirt_den"
+
+    try:
+        service.creat_topic(topic_name)
+        service.add_memory_partition(topic_name, 0)
+    except:
+        pass
+
     topic = service.open_topic(topic_name)
     consumer_name = "denoiser"
     consumer = topic.consumer(name=consumer_name, thread_pool=thread_pool,
@@ -125,7 +132,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Denoise HDF5 files using a trained model.')
     parser.add_argument('--input', type=str, required=False, help='Input file or directory path.')
     parser.add_argument('--model', type=str, required=True, help='Path to the saved model.')
+    parser.add_argument('--protocol', type=str, required=True, help='Mofka protocol')
+    parser.add_argument('--group_file', type=str, required=True, help='Path to group file')
 
     args = parser.parse_args()
-    main(args.input, args.model)
+    main(args.input, args.model, args.protocol, args.group_file)
 

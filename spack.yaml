@@ -10,10 +10,10 @@ spack:
   - py-mochi-margo
   - py-numpy
   - py-scipy
-  - swig
+  - swig # rm
   - py-tomopy@1.11.0
-  - libzmq
-  - py-pyzmq
+  - libzmq # rm
+  - py-pyzmq # rm
   - py-matplotlib
   - py-dxchange
   - py-pip
@@ -21,6 +21,7 @@ spack:
   - py-h5py
   - flatbuffers
   - py-flatbuffers
+  - py-tensorflow
   view: true
   concretizer:
     unify: true

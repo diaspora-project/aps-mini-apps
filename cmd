@@ -11,3 +11,6 @@ python ./build/python/streamer-dist/ModDistStreamPubDemo.py  --cast_to_float32 \
 
 ./bin/sirt_stream --write-freq 4  --window-iter 1 --window-step 4 --window-length 4 \
       -t 2 -c 1427 --protocol na+sm --group-file mofka.json
+
+python ./python/streamer_denoiser/denoiser.py --model ./python/streamer_denoiser/testA40GPU-it07500.h5 \
+      --protocol na+sm --group-file mofka.json
