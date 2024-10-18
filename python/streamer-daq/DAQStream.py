@@ -15,6 +15,13 @@ import signal
 import sys
 
 
+import json
+from pymargo.core import Engine
+import mochi.mofka.client as mofka
+
+mofka_protocol = "na+sm"
+group_file = "/home/agueroudji/tekin-aps-mini-apps/build/mofka.json"
+
 def parse_arguments():
   parser = argparse.ArgumentParser(
           description='Data Acquisition Process Simulator')
@@ -53,7 +60,7 @@ def synchronize_subs(context, subscriber_count, bind_address_rep):
   # Prepare synch. sockets
   sync_socket = context.socket(zmq.REP)
   sync_socket.bind(bind_address_rep)
-  
+
   counter = 0
   print("Waiting {} subscriber(s) to synchronize...".format(subscriber_count))
   while counter < subscriber_count:
@@ -71,8 +78,8 @@ def setup_simulation_data(input_f, beg_sinogram=0, num_sinograms=0):
   if flat is not None: flat = np.array(flat, dtype=np.float32) #dtype('uint16'))
   if dark is not None: dark = np.array(dark, dtype=np.float32) #dtype('uint16'))
   if itheta is not None: itheta = np.array(itheta, dtype=np.float32) #dtype('float32'))
-  # XXX: degree_to_radian is applied twice since the dataset is already normalized. Return it back to correct values. 
-  itheta = itheta*180/np.pi 
+  # XXX: degree_to_radian is applied twice since the dataset is already normalized. Return it back to correct values.
+  itheta = itheta*180/np.pi
   print("Projection dataset IO time={:.2f}; dataset shape={}; size={}; Theta shape={};".format(
                              time.time()-t0 , idata.shape, idata.size, itheta.shape))
 
@@ -86,13 +93,13 @@ def serialize_dataset(idata, flat, dark, itheta, seq=0):
 
   print("Starting serialization")
   if flat is not None:
-    for uniqueFlatId, flatId in zip(range(start_index, 
+    for uniqueFlatId, flatId in zip(range(start_index,
                              start_index+flat.shape[0]), range(flat.shape[0])):
       t_ser0 =  time.time()
       #builder.Reset()
       dflat = flat[flatId]
       itype = serializer.ITypes.WhiteReset if flatId==0 else serializer.ITypes.White
-      serialized_data = serializer.serialize(image=dflat, uniqueId=uniqueFlatId, 
+      serialized_data = serializer.serialize(image=dflat, uniqueId=uniqueFlatId,
                                         itype=itype,
                                         rotation=0, seq=seq)
       data.append(serialized_data)
@@ -102,14 +109,14 @@ def serialize_dataset(idata, flat, dark, itheta, seq=0):
 
   # dark data
   if dark is not None:
-    for uniqueDarkId, darkId in zip(range(start_index, start_index+dark.shape[0]), 
+    for uniqueDarkId, darkId in zip(range(start_index, start_index+dark.shape[0]),
                                     range(dark.shape[0])):
       t_ser0 =  time.time()
       #builder.Reset()
       dflat = dark[flatId]
       #serializer = TraceSerializer.ImageSerializer(builder)
       itype = serializer.ITypes.DarkReset if darkId==0 else serializer.ITypes.Dark
-      serialized_data = serializer.serialize(image=dflat, uniqueId=uniqueDarkId, 
+      serialized_data = serializer.serialize(image=dflat, uniqueId=uniqueDarkId,
                                         itype=itype,
                                         rotation=0, seq=seq) #, center=10.)
       time_ser += time.time()-t_ser0
@@ -118,7 +125,7 @@ def serialize_dataset(idata, flat, dark, itheta, seq=0):
     start_index+=dark.shape[0]
 
   # projection data
-  for uniqueId, projId, rotation in zip(range(start_index, start_index+idata.shape[0]), 
+  for uniqueId, projId, rotation in zip(range(start_index, start_index+idata.shape[0]),
                                         range(idata.shape[0]), itheta):
     t_ser0 =  time.time()
     #builder.Reset()
@@ -140,8 +147,8 @@ def ordered_subset(max_ind, nelem):
   for i in np.arange(nsubsets):
     all_arr = np.append(all_arr, np.arange(start=i, stop=max_ind, step=nsubsets))
   return all_arr.astype(int)
-  
-def simulate_daq_serialized(publisher_socket, input_f, 
+
+def simulate_daq_serialized(publisher_socket, input_f, producer,
                       beg_sinogram=0, num_sinograms=0, seq=0, slp=0,
                       iteration=1, save_after_serialize=False, prj_slp=0):
   global bsignal
@@ -162,7 +169,7 @@ def simulate_daq_serialized(publisher_socket, input_f,
   start_index=0
   time0 = time.time()
   nelems_per_subset = 16
-  indices = ordered_subset(serialized_data.shape[0], 
+  indices = ordered_subset(serialized_data.shape[0],
                               nelems_per_subset)
   for it in range(iteration): # Simulate data acquisition
     print("Current iteration over dataset: {}/{}".format(it+1, iteration))
@@ -187,6 +194,11 @@ def simulate_daq_serialized(publisher_socket, input_f,
       dchunk = serialized_data[index]
       publisher_socket.send(dchunk, copy=False)
       tot_transfer_size+=len(dchunk)
+      # mofka send
+      f = producer.push({"index": int(index)}, dchunk)
+      f.wait()
+      producer.flush()
+      print("done", int(index))
     time.sleep(slp)
   time1 = time.time()
 
@@ -201,7 +213,7 @@ def simulate_daq_serialized(publisher_socket, input_f,
 
 
 bsignal=False
-def simulate_daq(publisher_socket, input_f, 
+def simulate_daq(publisher_socket, input_f,
                       beg_sinogram=0, num_sinograms=0, seq=0, slp=0,
                       iteration=1):
 
@@ -215,7 +227,7 @@ def simulate_daq(publisher_socket, input_f,
     # Send flat data
     print("Current iteration over dataset: {}/{}".format(it+1, iteration))
     if flat is not None:
-      for uniqueFlatId, flatId in zip(range(start_index, 
+      for uniqueFlatId, flatId in zip(range(start_index,
                                start_index+flat.shape[0]), range(flat.shape[0])):
         t_ser0 =  time.time()
         #builder.Reset()
@@ -223,7 +235,7 @@ def simulate_daq(publisher_socket, input_f,
         #print("Publishing flat={}; shape={}".format(uniqueFlatId, flat.shape))
         #serializer = TraceSerializer.ImageSerializer(builder)
         itype = serializer.ITypes.WhiteReset if flatId==0 else serializer.ITypes.White
-        serialized_data = serializer.serialize(image=dflat, uniqueId=uniqueFlatId, 
+        serialized_data = serializer.serialize(image=dflat, uniqueId=uniqueFlatId,
                                           itype=itype,
                                           rotation=0, seq=seq) #, center=10.)
         time_ser += time.time()-t_ser0
@@ -234,7 +246,7 @@ def simulate_daq(publisher_socket, input_f,
 
     # Send dark data
     if dark is not None:
-      for uniqueDarkId, darkId in zip(range(start_index, start_index+dark.shape[0]), 
+      for uniqueDarkId, darkId in zip(range(start_index, start_index+dark.shape[0]),
                                       range(dark.shape[0])):
         t_ser0 =  time.time()
         #builder.Reset()
@@ -242,7 +254,7 @@ def simulate_daq(publisher_socket, input_f,
         #print("Publishing dark={}; shape={}".format(uniqueDarkId, flat.shape))
         #serializer = TraceSerializer.ImageSerializer(builder)
         itype = serializer.ITypes.DarkReset if darkId==0 else serializer.ITypes.Dark
-        serialized_data = serializer.serialize(image=dflat, uniqueId=uniqueDarkId, 
+        serialized_data = serializer.serialize(image=dflat, uniqueId=uniqueDarkId,
                                           itype=itype,
                                           rotation=0, seq=seq) #, center=10.)
         time_ser += time.time()-t_ser0
@@ -252,9 +264,9 @@ def simulate_daq(publisher_socket, input_f,
     start_index+=dark.shape[0]
 
     # Send projection data
-    for uniqueId, projId, rotation in zip(range(start_index, start_index+idata.shape[0]), 
+    for uniqueId, projId, rotation in zip(range(start_index, start_index+idata.shape[0]),
                                           range(idata.shape[0]), itheta):
-        
+
       t_ser0 =  time.time()
       #builder.Reset()
       proj =  idata[projId]
@@ -279,7 +291,7 @@ def simulate_daq(publisher_socket, input_f,
 
 
 def test_daq(publisher_socket,
-              rotation_step=0.25, num_sinograms=0, 
+              rotation_step=0.25, num_sinograms=0,
               num_sinogram_columns=2048, seq=0,
               num_sinogram_projections=1440, slp=0):
   print("Sending projections")
@@ -292,8 +304,8 @@ def test_daq(publisher_socket,
 
   for uniqueId in range(num_sinogram_projections):
     serialized_data = serializer.serialize(image=image, uniqueId=uniqueId+7,
-                                      itype=serializer.ITypes.Projection, 
-                                      rotation_step=rotation_step, seq=seq) 
+                                      itype=serializer.ITypes.Projection,
+                                      rotation_step=rotation_step, seq=seq)
     seq+=1
     publisher_socket.send(serialized_data)
     time.sleep(slp)
@@ -335,7 +347,7 @@ class TImageTransfer:
     self.sequence=0
     print(self.dims)
     if self.num_sinograms>0:
-      if (self.beg_sinogram<0) or (self.beg_sinogram+self.num_sinograms>self.dims[0]): 
+      if (self.beg_sinogram<0) or (self.beg_sinogram+self.num_sinograms>self.dims[0]):
         raise Exception("Exceeds the sinogram boundary: {} vs. {}".format(
                             self.beg_sinogram+self.num_sinograms, self.dims[0]))
       self.beg_index = self.beg_sinogram*self.dims[1]
@@ -372,12 +384,12 @@ class TImageTransfer:
     if itype == "/exchange/data_white":
       print("White field: {}".format(uniqueId))
       itype=serializer.ITypes.White
-      self.sequence+=1; 
+      self.sequence+=1;
       self.flat_counter+=1
     if itype == "/exchange/data_dark":
       print("Dark field: {}".format(uniqueId))
       itype=serializer.ITypes.Dark
-      self.sequence+=1; 
+      self.sequence+=1;
       self.dark_counter+=1
 
     # XXX with flat/dark field data uniquId is not a correct value any more
@@ -413,7 +425,7 @@ class TImageTransfer:
       print("{}: {}".format(i, self.mlists[i]))
     if exc_type is not None:
       print("{} {} {}".format(exc_type, exc_value, traceback))
-      return False 
+      return False
     return self
 
 
@@ -423,9 +435,23 @@ def main():
   # Register a signal handler for this function
   def signal_handler(sig, frame):
     global bsignal
-    bsignal = True 
+    bsignal = True
   signal.signal(signal.SIGINT, signal_handler)
 
+  engine = Engine(mofka_protocol)
+  client = mofka.Client(engine)
+  service = client.connect(group_file)
+
+  # create a topic
+  topic_name = "daq_dist"
+  service.create_topic(topic_name)
+  service.add_memory_partition(topic_name, 0)
+  topic = service.open_topic(topic_name)
+  producer_name = "daq_producer"
+  batchsize = mofka.AdaptiveBatchSize
+  thread_pool = mofka.ThreadPool(1)
+  ordering = mofka.Ordering.Strict
+  producer = topic.producer(producer_name, batchsize, thread_pool, ordering)
 
   # Setup zmq context
   context = zmq.Context()#(io_threads=2)
@@ -444,21 +470,22 @@ def main():
   if args.mode == 0: # Read data from PV
     with TImageTransfer(publisher_socket=publisher_socket,
                         pv_image=args.image_pv,
-                        beg_sinogram=args.beg_sinogram, 
+                        beg_sinogram=args.beg_sinogram,
                         num_sinograms=args.num_sinograms, seq=0) as tdet:
       tdet.start_monitor()  # Infinite loop
 
   elif args.mode == 1: # Simulate data acquisition with a file
     print("Simulating data acquisition on file: {}; iteration: {}".format(args.simulation_file, args.d_iteration))
-    simulate_daq_serialized(publisher_socket=publisher_socket, 
+    simulate_daq_serialized(publisher_socket=publisher_socket,
               input_f=args.simulation_file,
+              producer=producer,
               beg_sinogram=args.beg_sinogram, num_sinograms=args.num_sinograms,
               iteration=args.d_iteration,
               slp=args.iteration_sleep, prj_slp=0.6)
   elif args.mode == 2: # Test data acquisition
     test_daq(publisher_socket=publisher_socket,
               num_sinograms=args.num_sinograms,                       # Y
-              num_sinogram_columns=args.num_sinogram_columns,         # X 
+              num_sinogram_columns=args.num_sinogram_columns,         # X
               num_sinogram_projections=args.num_sinogram_projections, # Z
               slp=args.iteration_sleep)
   else:
@@ -467,6 +494,13 @@ def main():
   publisher_socket.send("end_data".encode())
   time1 = time.time()
   print("Total time (s): {:.2f}".format(time1-time0))
+
+  del service
+  del client
+  del topic
+  del producer
+  engine.finalize()
+  del engine
 
 
 if __name__ == '__main__':

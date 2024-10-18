@@ -7,6 +7,12 @@
 #include "trace_mq.h"
 #include <vector>
 
+#include <mofka/Client.hpp>
+#include <mofka/TopicHandle.hpp>
+#include <string>
+#include <iostream>
+#include <nlohmann/json.hpp>
+
 class TraceStream
 {
   private:
@@ -32,19 +38,19 @@ class TraceStream
   public:
     TraceStream(std::string dest_ip,
                 int dest_port,
-                uint32_t window_len, 
+                uint32_t window_len,
                 int comm_rank,
-                int comm_size, 
+                int comm_size,
                 std::string pub_info);
     TraceStream(std::string dest_ip,
                 int dest_port,
-                uint32_t window_len, 
+                uint32_t window_len,
                 int comm_rank,
                 int comm_size);
 
     /* Create a data region from sliding window
      * @param recon_image Initial values of reconstructed image
-     * @param step        Sliding step. Waits at least step projection 
+     * @param step        Sliding step. Waits at least step projection
      *                    before returning window back to the reconstruction
      *                    engine
      *
@@ -52,8 +58,9 @@ class TraceStream
      *          DataRegionBase if there is data in sliding window
      */
     DataRegionBase<float, TraceMetadata>* ReadSlidingWindow(
-      DataRegionBareBase<float> &recon_image, 
-      int step);
+      DataRegionBareBase<float> &recon_image,
+      int step,
+      mofka::Consumer consumer);
 
     tomo_msg_metadata_t metadata() { return traceMQ().metadata(); }
     uint32_t counter() const { return counter_; }

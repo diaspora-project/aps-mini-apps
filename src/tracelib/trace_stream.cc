@@ -1,9 +1,18 @@
 #include "trace_stream.h"
 
+#include <mofka/Client.hpp>
+#include <mofka/TopicHandle.hpp>
+#include <string>
+#include <iostream>
+#include <nlohmann/json.hpp>
+
+using json = nlohmann::json;
+namespace tl = thallium;
+
 TraceStream::TraceStream(
     std::string dest_ip, int dest_port,
-    uint32_t window_len, 
-    int comm_rank, int comm_size, 
+    uint32_t window_len,
+    int comm_rank, int comm_size,
     std::string pub_info) :
   window_len_ {window_len},
   counter_ {0},
@@ -14,37 +23,41 @@ TraceStream::TraceStream(
 
 TraceStream::TraceStream(
     std::string dest_ip, int dest_port,
-    uint32_t window_len, 
+    uint32_t window_len,
     int comm_rank, int comm_size) :
   TraceStream(dest_ip, dest_port, window_len, comm_rank, comm_size, "")
 { }
 
 
 DataRegionBase<float, TraceMetadata>* TraceStream::ReadSlidingWindow(
-  DataRegionBareBase<float> &recon_image, 
-  int step) 
+  DataRegionBareBase<float> &recon_image,
+  int step, mofka::Consumer consumer)
 {
   // Dynamically meet sizes
   while(vtheta.size()>window_len_)
     EraseBegTraceMsg();
 
   // Receive new message
-  std::vector<tomo_msg_t*> received_msgs; 
+  std::vector<tomo_msg_t*> received_msgs;
+  std::vector<mofka::Event> mofka_events;
+
   for(int i=0; i<step; ++i) {
     tomo_msg_t *msg = traceMQ().ReceiveMsg();
-    if(msg == nullptr) break;
     received_msgs.push_back(msg);
+    if(msg == nullptr) break;
+    // mofka messages
+    auto event = consumer.pull().wait();
+    mofka_events.push_back(event);
   }
-
   // TODO: After receiving message corrections might need to be applied
 
   /// End of the processing
   if(received_msgs.size()==0 && vtheta.size()==0){
     //std::cout << "End of the processing: " << vtheta.size() << std::endl;
-    return nullptr; 
+    return nullptr;
   }
   /// End of messages, but there is data to be processed in window
-  else if(received_msgs.size()==0 && vtheta.size()>0){ 
+  else if(received_msgs.size()==0 && vtheta.size()>0){
     for(int i=0; i<step; ++i){  // Delete step size element
       if(vtheta.size()>0) EraseBegTraceMsg();
       else break;
@@ -58,11 +71,24 @@ DataRegionBase<float, TraceMetadata>* TraceStream::ReadSlidingWindow(
     for(auto msg : received_msgs){
       tomo_msg_data_t *dmsg = traceMQ().read_data(msg);
       //traceMQ().print_data(dmsg, metadata().n_sinograms*metadata().n_rays_per_proj_row);
-      AddTomoMsg(*dmsg);   
+      AddTomoMsg(*dmsg);
       traceMQ().free_msg(msg);
       ++counter_;
     }
-    //std::cout << "After adding # items in window: " << vtheta.size() << std::endl;
+    // mofka part
+    for(auto event : mofka_events) {
+      mofka::Data data_m = event.data();
+      mofka::Metadata metadata_m = event.metadata();
+      //std::cout << "\n metadata" << metadata_m.string() << "\n" << std::endl;
+      //tomo_msg_data_t *dmsg = nullptr;
+      auto center = metadata_m.json()["center"].get<float_t>();
+      auto projection_id = metadata_m.json()["projection_id"].get<int64_t>();
+      auto theta = metadata_m.json()["theta"].get<float_t>();
+      auto data_ptr = data_m.segments()[0].ptr;
+      //dmsg->data = reinterpret_cast<const float*>(data_m.segments()[0].ptr);
+      event.acknowledge();
+    }
+  std::cout << "After adding # items in window: " << vtheta.size() << std::endl;
   }
   /// New message arrived, there is no space in window
   else if(received_msgs.size()>0 && vtheta.size()>=window_len_){
@@ -74,9 +100,21 @@ DataRegionBase<float, TraceMetadata>* TraceStream::ReadSlidingWindow(
     for(auto msg : received_msgs){
       tomo_msg_data_t *dmsg = traceMQ().read_data(msg);
       //traceMQ().print_data(dmsg, metadata().n_sinograms*metadata().n_rays_per_proj_row);
-      AddTomoMsg(*dmsg);   
+      AddTomoMsg(*dmsg);
       traceMQ().free_msg(msg);
       ++counter_;
+    }
+    // mofka part
+    for(auto event : mofka_events) {
+      mofka::Data data_m = event.data();
+      mofka::Metadata metadata_m = event.metadata();
+      std::cout << "metdata" << metadata_m.string() << std::endl;
+      auto center = metadata_m.json()["center"].get<float_t>();
+      auto projection_id = metadata_m.json()["projection_id"].get<int64_t>();
+      auto theta = metadata_m.json()["theta"].get<float_t>();
+      std::cout << "\n metadata center " << center <<" theta " << theta << "\n" << std::endl;
+      auto data_ptr = data_m.segments()[0].ptr;
+      event.acknowledge();
     }
     //std::cout << "After remove/add, new window size: " << vtheta.size() << std::endl;
   }
@@ -86,10 +124,10 @@ DataRegionBase<float, TraceMetadata>* TraceStream::ReadSlidingWindow(
   received_msgs.clear();
 
   /// Generate new data and metadata
-  DataRegionBase<float, TraceMetadata>* data_region = 
+  DataRegionBase<float, TraceMetadata>* data_region =
     SetupTraceDataRegion(recon_image);
 
-  return data_region; 
+  return data_region;
 }
 
 void TraceStream::AddTomoMsg(tomo_msg_data_t &dmsg){
@@ -105,7 +143,7 @@ void TraceStream::AddTomoMsg(tomo_msg_data_t &dmsg){
   */
   vmeta.push_back(rdmsg); /// Setup metadata
   vtheta.push_back(rdmsg.theta);
-  vproj.insert(vproj.end(), 
+  vproj.insert(vproj.end(),
       dmsg.data,
       dmsg.data + metadata().n_sinograms*metadata().n_rays_per_proj_row);
 }
@@ -113,7 +151,7 @@ void TraceStream::AddTomoMsg(tomo_msg_data_t &dmsg){
 void TraceStream::EraseBegTraceMsg(){
   vtheta.erase(vtheta.begin());
   size_t n_rays_per_proj = metadata().n_sinograms * metadata().n_rays_per_proj_row;
-  vproj.erase(vproj.begin(),vproj.begin()+n_rays_per_proj); 
+  vproj.erase(vproj.begin(),vproj.begin()+n_rays_per_proj);
   vmeta.erase(vmeta.begin());
 }
 
@@ -143,7 +181,7 @@ DataRegionBase<float, TraceMetadata>* TraceStream::SetupTraceDataRegion(
       data,
       mdata->count(),
       mdata);
-  
+
   curr_data->ResetMirroredRegionIter();
 
   return curr_data;
@@ -156,7 +194,7 @@ void TraceStream::WindowLength(int wlen){
 void TraceStream::PublishImage(DataRegionBase<float, TraceMetadata> &slice){
   auto &mdata = slice.metadata();
   auto &image = mdata.recon();
-  traceMQ().PublishMsg( &image[0], 
+  traceMQ().PublishMsg( &image[0],
                           {mdata.num_slices(), mdata.num_cols(), mdata.num_cols()});
 }
 

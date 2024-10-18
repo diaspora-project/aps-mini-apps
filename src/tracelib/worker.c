@@ -36,7 +36,7 @@ int main (int argc, char *argv[])
   snprintf(addr, 64, "tcp://%s:%d", argv[1], dest_port+comm_rank);
   printf("[%d] Destination address=%s\n", comm_rank, addr);
 
-  // Connect to server 
+  // Connect to server
   void *context = zmq_ctx_new();
   void *server = zmq_socket(context, ZMQ_REQ);
   zmq_connect(server, addr);
@@ -73,6 +73,7 @@ int main (int argc, char *argv[])
 
     /// Right after receiving message, tell server that you received it
     msg = tracemq_prepare_data_req_msg(seq);
+    printf("I am called ");
     tracemq_send_msg(server, msg);
     tracemq_free_msg(msg);
     ++seq;
@@ -101,7 +102,7 @@ int main (int argc, char *argv[])
   // Cleanup
   zmq_close(server);
   zmq_ctx_destroy(context);
-  
+
   MPI_Finalize();
 }
 

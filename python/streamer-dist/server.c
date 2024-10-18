@@ -60,12 +60,12 @@ int setup_mock_data(char *fp, int nsubsets)
   mock_interval_t interval = { 0, 0 };
   dacq_file = mock_dacq_file(fp, interval);
   if(nsubsets!=0) {
-    dacq_file_t *ndacq_file = (nsubsets>0) ? 
+    dacq_file_t *ndacq_file = (nsubsets>0) ?
                 mock_dacq_interleaved(dacq_file, nsubsets) :
                 mock_dacq_interleaved_equally(dacq_file);
     mock_dacq_file_delete(dacq_file);
     dacq_file = ndacq_file;
-  } 
+  }
 
   return 0;
 }
@@ -89,7 +89,7 @@ int handshake(char *bindip, int port, int row, int col)
   worker_ids[0] = info->comm_rank;
   tracemq_free_msg(msg);
 
-  /// Setup remaining workers' sockets 
+  /// Setup remaining workers' sockets
   workers[0] = main_worker; /// We already know main worker
   for(int i=1; i<n_workers; ++i){
     void *worker = zmq_socket(context, ZMQ_REP);
@@ -110,10 +110,10 @@ int handshake(char *bindip, int port, int row, int col)
 
   /// Distribute data info
   for(int i=0; i<n_workers; ++i){
-   tomo_msg_data_info_rep_t info = assign_data(worker_ids[i], n_workers, 
+   tomo_msg_data_info_rep_t info = assign_data(worker_ids[i], n_workers,
                                       row, col);
-   tomo_msg_t *msg = tracemq_prepare_data_info_rep_msg(seq, 
-                         info.beg_sinogram, info.n_sinograms, 
+   tomo_msg_t *msg = tracemq_prepare_data_info_rep_msg(seq,
+                         info.beg_sinogram, info.n_sinograms,
                          info.n_rays_per_proj_row, info.tn_sinograms);
    tracemq_send_msg(workers[i], msg);
    tracemq_free_msg(msg);
@@ -138,31 +138,29 @@ int handshake(char *bindip, int port, int row, int col)
 int push_image(float *data, int n, int row, int col, float theta, int id, float center)
 {
   if(data == NULL) return 0;
-  int dims[2] = {row, col}; 
+  int dims[2] = {row, col};
   ts_proj_data_t proj = { dims, theta, id, data };
 
-  center = (center==0.) ? proj.dims[1]/2. : center;  
-  printf("Sending proj: id=%d; center=%f; dims[0]=%d; dims[1]=%d; theta=%f\n", 
+  center = (center==0.) ? proj.dims[1]/2. : center;
+  printf("Sending proj: id=%d; center=%f; dims[0]=%d; dims[1]=%d; theta=%f\n",
       proj.id, center, dims[0], dims[1], theta);
 
   /// Default center is middle of columns
   tomo_msg_t **worker_msgs = generate_tracemq_worker_msgs(
-      proj.data, proj.dims, proj.id, 
+      proj.data, proj.dims, proj.id,
       proj.theta, n_workers, center, seq);
 
   /// Send data to workers
   for(int i=0; i<n_workers; ++i){
     /// Prepare zmq message
     tomo_msg_t *curr_msg = worker_msgs[i];
-
     zmq_msg_t msg;
     int rc = zmq_msg_init_size(&msg, curr_msg->size); assert(rc==0);
     memcpy((void*)zmq_msg_data(&msg), (void*)curr_msg, curr_msg->size);
-    rc = zmq_msg_send(&msg, workers[i], ZMQ_DONTWAIT); 
+    rc = zmq_msg_send(&msg, workers[i], ZMQ_DONTWAIT);
     assert(rc==(int)curr_msg->size);
   }
   ++seq;
-
   /// Check if workers received their corresponding data chunks
   for (int i=0; i<n_workers; ++i) {
     tomo_msg_t *msg = tracemq_recv_msg(workers[i]);
@@ -171,7 +169,6 @@ int push_image(float *data, int n, int row, int col, float theta, int id, float 
     tracemq_free_msg(msg);
   }
   ++seq;
-
   /// Clean-up data chunks
   for(int i=0; i<n_workers; ++i)
     free(worker_msgs[i]);
@@ -185,14 +182,14 @@ int done_image()
   /// All the projections are finished
   for(int i=0; i<n_workers; ++i){
     zmq_msg_t msg;
-    tomo_msg_t msg_fin = {.seq_n=seq, .type = TRACEMQ_MSG_FIN_REP, 
+    tomo_msg_t msg_fin = {.seq_n=seq, .type = TRACEMQ_MSG_FIN_REP,
                           .size=sizeof(tomo_msg_t) };
     int rc = zmq_msg_init_size(&msg, sizeof(msg_fin)); assert(rc==0);
     memcpy((void*)zmq_msg_data(&msg), (void*)&msg_fin, sizeof(msg_fin));
     rc = zmq_msg_send(&msg, workers[i], 0); assert(rc==sizeof(msg_fin));
   }
   ++seq;
-  
+
   // Receive worker fin reply
   for(int j=0; j<n_workers; ++j){
     tomo_msg_t *msg = tracemq_recv_msg(workers[j]);

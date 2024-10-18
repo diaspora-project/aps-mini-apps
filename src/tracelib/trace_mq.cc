@@ -4,23 +4,23 @@
 #include <cassert>
 
 TraceMQ::TraceMQ(
-  std::string dest_ip, int dest_port, int comm_rank, int comm_size, std::string pub_info) : 
-    dest_ip_ {dest_ip}, 
-    dest_port_ {dest_port}, 
-    comm_rank_ {comm_rank}, 
+  std::string dest_ip, int dest_port, int comm_rank, int comm_size, std::string pub_info) :
+    dest_ip_ {dest_ip},
+    dest_port_ {dest_port},
+    comm_rank_ {comm_rank},
     comm_size_ {comm_size},
     pub_info_ {pub_info}, /// Publisher information
     fbuilder_ {1024},
     state_ {TMQ_State::DATA},  /// Initial state is expecting DATA
     seq_ {0}
 {
-  std::string addr("tcp://" + dest_ip_ + ":" + 
+  std::string addr("tcp://" + dest_ip_ + ":" +
     std::to_string(static_cast<long long>(dest_port_+comm_rank_)));
   std::cout << "[" << comm_rank_ << "] Destination address: " << addr << std::endl;
 
   context = zmq_ctx_new();
   server = zmq_socket(context, ZMQ_REQ);
-  int rc = zmq_connect(server, addr.c_str()); assert(rc==0); 
+  int rc = zmq_connect(server, addr.c_str()); assert(rc==0);
 
   server_pub = zmq_socket(context, ZMQ_PUB);
   rc = zmq_bind(server_pub, pub_info_.c_str()); assert(rc==0);
@@ -48,7 +48,6 @@ void TraceMQ::Initialize() {
   std::cout << "Server has any projection ?" << std::endl;
   msg = prepare_data_req_msg(seq_);
   send_msg(server, msg);
-  std::cout << "Sent the message" << std::endl;
   free_msg(msg);
   ++seq_;
 }
@@ -60,14 +59,14 @@ void TraceMQ::PublishMsg(float *msg, std::vector<int> dims)
   msg_size *= sizeof(float);
 
   std::ostringstream out;
-  out << "Image is ready to be published at " << pub_info_ << 
+  out << "Image is ready to be published at " << pub_info_ <<
          ", size of the message=" << msg_size;
   std::cout << out.str() << std::endl;
   /// Serialized data
   MONA::TraceDS::Dim3 ddims {dims[0], dims[1], dims[2]};
   uint8_t *bmsg = reinterpret_cast<uint8_t*>(msg);
   std::vector<uint8_t> data {bmsg, bmsg+msg_size};
-  auto img_offset = MONA::TraceDS::CreateTImageDirect(fbuilder_, 
+  auto img_offset = MONA::TraceDS::CreateTImageDirect(fbuilder_,
                       0, //int32_t seq = 0,
                       &ddims, //const Dim3 *dims = 0,
                       0.0f, //float rotation = 0.0f,
@@ -109,7 +108,9 @@ tomo_msg_t* TraceMQ::ReceiveMsg() {
   if(dmsg->type == TRACEMQ_MSG_DATA_REP) { /// Message has data
     /// Tell data acquisition machine that you received the projection data
     tomo_msg_t *msg = prepare_data_req_msg(seq_);
+    printf("prepare acquisition msg \n");
     send_msg(server, msg);
+
     free_msg(msg);
     ++seq_;
 
@@ -118,7 +119,7 @@ tomo_msg_t* TraceMQ::ReceiveMsg() {
     print_data(read_data(dmsg), count);
 
     return dmsg;
-  } 
+  }
   else if (dmsg->type == TRACEMQ_MSG_FIN_REP){ /// Message is for finalization
     free_msg(dmsg);
 
@@ -144,7 +145,7 @@ TraceMQ::~TraceMQ() {
 }
 
 void TraceMQ::setup_msg_header(
-  tomo_msg_t *msg_h, 
+  tomo_msg_t *msg_h,
   uint64_t seq_n, uint64_t type, uint64_t size)
 {
   msg_h->seq_n = seq_n;
@@ -162,8 +163,8 @@ tomo_msg_t* TraceMQ::prepare_data_req_msg(uint64_t seq_n)
 }
 
 tomo_msg_t* TraceMQ::prepare_data_rep_msg(uint64_t seq_n,
-                                         int projection_id,        
-                                         float theta,              
+                                         int projection_id,
+                                         float theta,
                                          float center,
                                          uint64_t data_size,
                                          float *data)
@@ -186,7 +187,7 @@ tomo_msg_data_t* TraceMQ::read_data(tomo_msg_t *msg){
 }
 
 void TraceMQ::print_data(tomo_msg_data_t *msg, size_t data_count){
-  printf("projection_id=%u; theta=%f; center=%f\n", 
+  printf("projection_id=%u; theta=%f; center=%f\n",
     msg->projection_id, msg->theta, msg->center);
   for(size_t i=0; i<data_count; ++i)
     printf("%f ", msg->data[i]);
@@ -195,7 +196,7 @@ void TraceMQ::print_data(tomo_msg_data_t *msg, size_t data_count){
 
 
 
-tomo_msg_t* TraceMQ::prepare_data_info_rep_msg(uint64_t seq_n, 
+tomo_msg_t* TraceMQ::prepare_data_info_rep_msg(uint64_t seq_n,
                                               int beg_sinogram, int n_sinograms,
                                               int n_rays_per_proj_row,
                                               uint64_t tn_sinograms)
@@ -217,13 +218,13 @@ tomo_msg_data_info_rep_t* TraceMQ::read_data_info_rep(tomo_msg_t *msg){
 }
 void TraceMQ::print_data_info_rep_msg(tomo_msg_data_info_rep_t *msg){
   printf("Total # sinograms=%u; Beginning sinogram id=%u;"
-          "# assigned sinograms=%u; # rays per projection row=%u\n", 
-          msg->tn_sinograms, msg->beg_sinogram, msg->n_sinograms, 
+          "# assigned sinograms=%u; # rays per projection row=%u\n",
+          msg->tn_sinograms, msg->beg_sinogram, msg->n_sinograms,
           msg->n_rays_per_proj_row);
 }
 
-tomo_msg_t* TraceMQ::prepare_data_info_req_msg(uint64_t seq_n, 
-                                               uint32_t comm_rank, 
+tomo_msg_t* TraceMQ::prepare_data_info_req_msg(uint64_t seq_n,
+                                               uint32_t comm_rank,
                                                uint32_t comm_size)
 {
   uint64_t tot_msg_size = sizeof(tomo_msg_t)+sizeof(tomo_msg_data_info_req_t);
@@ -263,7 +264,7 @@ tomo_msg_t* TraceMQ::recv_msg(void *server){
   /// Message size and calculated total message size needst to be the same
   /// FIXME?: We put tomo_msg_t.size to calculate zmq message size before it is
   /// being sent. It is being only being used for sanity check at the receiver
-  /// side. 
+  /// side.
   //printf("zmq_msg_size(&zmsg)=%zu; ((tomo_msg_t*)&zmsg)->size=%zu", zmq_msg_size(&zmsg), ((tomo_msg_t*)&zmsg)->size);
   //assert(zmq_msg_size(&zmsg)==((tomo_msg_t*)&zmsg)->size);
 
