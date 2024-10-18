@@ -115,9 +115,10 @@ def main(input_path, model_path, protocol, group_file):
     while True:
         f = consumer.pull()
         event = f.wait()
+        metadata = json.loads(event.metadata)
+        if metadata["Type"] == "FIN": break
         data = event.data[0]
         data = np.frombuffer(data, dtype=np.float32)
-        metadata = json.loads(event.metadata)
         data = data.reshape(metadata["rank_dims"])
         process_stream(model, data, metadata)
 

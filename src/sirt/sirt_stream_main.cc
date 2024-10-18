@@ -545,7 +545,8 @@ int main(int argc, char **argv)
             static_cast<hsize_t>(h5md.dims[2]),
             static_cast<hsize_t>(h5md.dims[2])};
 
-          json md = {{"iteration_stream", iteration_stream.str()},
+          json md = { {"Type", "DATA"},
+                      {"iteration_stream", iteration_stream.str()},
                       {"rank_dims", rank_dims},
                       {"app_dims", app_dims},
                       {"recon_slice_data_index", recon_slice_data_index}};
@@ -569,6 +570,9 @@ int main(int argc, char **argv)
       //delete curr_slices->metadata(); //TODO Check for memory leak
       delete curr_slices;
   }
+
+  json md = {{"Type", "FIN"}};
+  auto future = producer.push(mofka::Metadata{md}, mofka::Data{});
 
   /**************************/
   #ifdef TIMERON
