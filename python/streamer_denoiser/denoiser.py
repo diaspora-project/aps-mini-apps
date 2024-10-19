@@ -111,7 +111,7 @@ def main(input_path, model_path, protocol, group_file):
         batch_size=batch_size,
         data_selector=data_selector,
         data_broker=data_broker)
-    i = 0
+
     while True:
         f = consumer.pull()
         event = f.wait()
@@ -122,12 +122,14 @@ def main(input_path, model_path, protocol, group_file):
         data = data.reshape(metadata["rank_dims"])
         process_stream(model, data, metadata)
 
-    if os.path.isdir(input_path):
-        process_directory(model, input_path)
-    elif os.path.isfile(input_path) and input_path.endswith('.h5'):
-        process_file(model, input_path)
-    else:
-        print(f"Invalid input path: {input_path}")
+
+    if input_path is not None:
+        if os.path.isdir(input_path):
+            process_directory(model, input_path)
+        elif os.path.isfile(input_path) and input_path.endswith('.h5'):
+            process_file(model, input_path)
+        else:
+            print(f"Invalid input path: {input_path}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Denoise HDF5 files using a trained model.')
