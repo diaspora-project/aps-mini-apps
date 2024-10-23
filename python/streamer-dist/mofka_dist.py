@@ -68,18 +68,17 @@ class MofkaDist:
     def __init__(self, mofka_protocol: str, group_file: str):
         # setup mofka
         self.engine = Engine(mofka_protocol)
-        self.client = mofka.Client(self.engine)
-        self.service = self.client.connect(group_file)
+        self.driver = mofka.MofkaDriver(group_file, self.engine)
         self.seq = 0
         self.nranks = 1
 
     def producer(self, topic_name: str, producer_name: str) -> mofka.Producer:
         try:
-            topic = self.service.create_topic(topic_name)
-            self.service.add_memory_partition(topic_name, 0)
+            topic = self.driver.create_topic(topic_name)
+            self.driver.add_memory_partition(topic_name, 0)
         except Exception as err:
             print("Exception ", err, " trying to open topic", topic_name)
-        topic = self.service.open_topic(topic_name)
+        topic = self.driver.open_topic(topic_name)
         batchsize = mofka.AdaptiveBatchSize
         thread_pool = mofka.ThreadPool(1)
         ordering = mofka.Ordering.Strict
@@ -91,11 +90,11 @@ class MofkaDist:
         batch_size = mofka.AdaptiveBatchSize
         thread_pool = mofka.ThreadPool(0)
         try:
-            topic = self.service.create_topic(topic_name)
-            self.service.add_memory_partition(topic_name, 0)
+            topic = self.driver.create_topic(topic_name)
+            self.driver.add_memory_partition(topic_name, 0)
         except Exception as err:
             print("Exception ", err, " trying to open topic", topic_name)
-        topic = self.service.open_topic(topic_name)
+        topic = self.driver.open_topic(topic_name)
         consumer = topic.consumer(name=consumer_name,
                                   thread_pool=thread_pool,
                                   batch_size=batch_size,
@@ -159,12 +158,12 @@ class MofkaDist:
         self.seq += 1
         return 0
 
-    def init(self, mofka_protocol: str, group_file: str) -> mofka.ServiceHandle:
+    def init(self, mofka_protocol: str, group_file: str) -> mofka.MofkaDriver:
         self.__init__(mofka_protocol, group_file)
-        return self.service
+        return self.driver
 
     def finalize(self):
-        del self.service
+        del self.driver
         del self.client
         self.engine.finalize()
         del self.engine

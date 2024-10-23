@@ -363,14 +363,13 @@ def main():
   signal.signal(signal.SIGINT, signal_handler)
 
   engine = Engine(args.protocol)
-  client = mofka.Client(engine)
-  service = client.connect(args.group_file)
+  driver = mofka.MofkaDriver(args.group_file, engine)
 
   # create a topic
   topic_name = "daq_dist"
-  service.create_topic(topic_name)
-  service.add_memory_partition(topic_name, 0)
-  topic = service.open_topic(topic_name)
+  driver.create_topic(topic_name)
+  driver.add_memory_partition(topic_name, 0)
+  topic = driver.open_topic(topic_name)
   producer_name = "daq_producer"
   batchsize = mofka.AdaptiveBatchSize
   thread_pool = mofka.ThreadPool(1)
@@ -415,6 +414,7 @@ def main():
   else:
     print("Unknown mode: {}".format(args.mode))
   producer.push({"Type": "FIN"}, b"")
+  producer.flush()
   time1 = time.time()
   print("Total time (s): {:.2f}".format(time1-time0))
 

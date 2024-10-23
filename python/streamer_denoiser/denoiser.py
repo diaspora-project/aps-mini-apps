@@ -92,20 +92,19 @@ def main(input_path, model_path, protocol, group_file):
     # Load the saved model
     model = tf.keras.models.load_model(model_path)
     engine = Engine(protocol)
-    client = mofka.Client(engine)
-    service = client.connect(group_file)
+    driver = mofka.MofkaDriver(group_file, engine)
     batch_size = AdaptiveBatchSize
     thread_pool = ThreadPool(0)
     # create a topic
     topic_name = "sirt_den"
 
     try:
-        service.creat_topic(topic_name)
-        service.add_memory_partition(topic_name, 0)
+        driver.creat_topic(topic_name)
+        driver.add_memory_partition(topic_name, 0)
     except:
         pass
 
-    topic = service.open_topic(topic_name)
+    topic = driver.open_topic(topic_name)
     consumer_name = "denoiser"
     consumer = topic.consumer(name=consumer_name, thread_pool=thread_pool,
         batch_size=batch_size,

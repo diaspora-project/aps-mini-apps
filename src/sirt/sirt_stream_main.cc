@@ -9,7 +9,7 @@
 
 #include <mofka/Client.hpp>
 #include <mofka/TopicHandle.hpp>
-#include <mofka/ServiceHandle.hpp>
+#include <mofka/MofkaDriver.hpp>
 #include <spdlog/spdlog.h>
 #include <fmt/format.h>
 #include <time.h>
@@ -37,7 +37,7 @@ class MofkaStream
     int comm_rank;
     int comm_size;
     tl::engine engine;
-    mofka::ServiceHandle service;
+    mofka::MofkaDriver driver;
 
     std::vector<float> vproj;
     std::vector<float> vtheta;
@@ -131,23 +131,21 @@ class MofkaStream
       counter {0},
       comm_rank {rank},
       comm_size {size},
-      engine {protocol, THALLIUM_SERVER_MODE}
-      {
-        mofka::Client client(engine);
-        service = client.connect(group_file);
-      }
+      engine {protocol, THALLIUM_SERVER_MODE},
+      driver {group_file, engine}
+      {}
 
     mofka::Producer producer( std::string topic_name,
                               std::string producer_name="streamer_sirt"){
       // -- Create/open a topic
       try{
-        service.createTopic(topic_name, validator, selector, serializer);
-        service.addDefaultPartition(topic_name, 0);
+        driver.createTopic(topic_name, validator, selector, serializer);
+        driver.addDefaultPartition(topic_name, 0);
       }catch (const mofka::Exception& e){
         spdlog::info("{}", e.what());
         spdlog::info("Opening Topic! {}", topic_name);
       }
-      mofka::TopicHandle topic = service.openTopic(topic_name);
+      mofka::TopicHandle topic = driver.openTopic(topic_name);
       // -- Get a producer for the topic
       mofka::Producer producer = topic.producer(producer_name,
                                                 batchSize,
@@ -160,13 +158,13 @@ class MofkaStream
                               std::string consumer_name="dist_sirt"){
       // -- Create/open a topic
       try{
-        service.createTopic(topic_name, validator, selector, serializer);
-        service.addDefaultPartition(topic_name, 0);
+        driver.createTopic(topic_name, validator, selector, serializer);
+        driver.addDefaultPartition(topic_name, 0);
       }catch (const mofka::Exception& e){
         spdlog::info("{}", e.what());
         spdlog::info("Opening Topic! {}", topic_name);
       }
-      mofka::TopicHandle topic = service.openTopic(topic_name);
+      mofka::TopicHandle topic = driver.openTopic(topic_name);
 
       // -- Get a consumer for the topic
       mofka::Consumer consumer = topic.consumer(consumer_name,
@@ -271,13 +269,13 @@ class MofkaStream
       // Receive metadata info
 
       try{
-        service.createTopic("handshake_d_s", validator, selector, serializer);
-        service.addDefaultPartition("handshake_d_s", 0);
+        driver.createTopic("handshake_d_s", validator, selector, serializer);
+        driver.addDefaultPartition("handshake_d_s", 0);
       }catch (const mofka::Exception& e){
         spdlog::info("{}", e.what());
         spdlog::info("Opening Topic! {}", "handshake_d_s");
       }
-      mofka::TopicHandle t = service.openTopic("handshake_d_s");
+      mofka::TopicHandle t = driver.openTopic("handshake_d_s");
 
       // -- Get a consumer for the topic
       mofka::Consumer hs_consumer = t.consumer("consumer_name",
@@ -419,12 +417,10 @@ int main(int argc, char **argv)
                                 static_cast<uint32_t>(config.window_len),
                                 comm->rank(),
                                 comm->size()};
-
   std::string consuming_topic = "dist_sirt";
   std::string producing_topic = "sirt_den";
   mofka::Producer  producer = ms.producer(producing_topic, "sirt");
   mofka::Consumer consumer = ms.consumer(consuming_topic, "sirt");
-
   ms.handshake(comm->rank(), comm->size());
 
   /* Get metadata structure */
