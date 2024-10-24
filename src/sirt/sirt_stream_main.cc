@@ -56,8 +56,7 @@ class MofkaStream
       spdlog::info("Received data {}", metadata.string());
       vproj.insert(vproj.end(),
           static_cast<float*>(data.segments()[0].ptr),
-          static_cast<float*>(data.segments()[0].ptr)+
-          + getInfo()["n_sinograms"].get<int32_t>()*getInfo()["n_rays_per_proj_row"].get<int32_t>());
+          static_cast<float*>(data.segments()[0].ptr)+ getInfo()["n_sinograms"].get<int32_t>()*getInfo()["n_rays_per_proj_row"].get<int32_t>());
     }
 
     void eraseBegTraceMsg(){
@@ -159,12 +158,13 @@ class MofkaStream
       // -- Create/open a topic
       try{
         driver.createTopic(topic_name, validator, selector, serializer);
-        driver.addDefaultPartition(topic_name, 0);
       }catch (const mofka::Exception& e){
         spdlog::info("{}", e.what());
         spdlog::info("Opening Topic! {}", topic_name);
       }
+      //driver.addDefaultPartition(topic_name, 0);
       mofka::TopicHandle topic = driver.openTopic(topic_name);
+
 
       // -- Get a consumer for the topic
       mofka::Consumer consumer = topic.consumer(consumer_name,
@@ -325,7 +325,6 @@ class TraceRuntimeConfig {
           "", "protocol", "Mofka protocol", false, "na+sm", "string");
         TCLAP::ValueArg<std::string> argGroupFile(
           "", "group-file", "Mofka group file", false, "mofka.json", "string");
-
         TCLAP::ValueArg<std::string> argReconOutputPath(
           "o", "reconOutputPath", "Output file path for reconstructed image (hdf5)",
           false, "./output.h5", "string");
@@ -474,6 +473,7 @@ int main(int argc, char **argv)
   h5md.dims[1] = tmetadata["tn_sinograms"].get<int64_t>();
   h5md.dims[0] = 0;   /// Number of projections is unknown
   h5md.dims[2] = tmetadata["n_rays_per_proj_row"].get<int64_t>();
+  std::cout << "comm rank " << comm->rank() << " comm size " << comm->size() << std::endl;
   for(int passes=0; ; ++passes){
       #ifdef TIMERON
       auto datagen_beg = std::chrono::system_clock::now();
