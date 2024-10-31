@@ -12,7 +12,7 @@
             "provider_id" : 1,
             "config": {
                 "bootstrap": "self",
-                "file": "/home/agueroudji/tekin-aps-mini-apps/build/mofka.json",
+                "file": "/home/agueroudji/TekApp/mofka.json",
                 "group": {
                     "type": "static"
                 }
