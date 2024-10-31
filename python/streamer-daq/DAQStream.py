@@ -13,9 +13,6 @@ import signal
 from pymargo.core import Engine
 import mochi.mofka.client as mofka
 
-mofka_protocol = "na+sm"
-group_file = "/home/agueroudji/tekin-aps-mini-apps/build/mofka.json"
-
 def parse_arguments():
   parser = argparse.ArgumentParser(
           description='Data Acquisition Process Simulator')
@@ -198,9 +195,7 @@ def simulate_daq(producer, input_f,
       # mofka send
       f = producer.push({"index": int(index), "Type" : "DATA"}, dchunk)
       f.wait()
-
-      print("done", int(index))
-
+      tot_transfer_size+=len(dchunk)
     time.sleep(slp)
   time1 = time.time()
 
@@ -209,10 +204,7 @@ def simulate_daq(producer, input_f,
   nproj = iteration*len(serialized_data)
   print("Sent number of projections: {}; Total size (MiB): {:.2f}; Elapsed time (s): {:.2f}".format(nproj, tot_MiBs, elapsed_time))
   print("Rate (MiB/s): {:.2f}; (msg/s): {:.2f}".format(tot_MiBs/elapsed_time, nproj/elapsed_time))
-
   return seq
-
-
 
 bsignal=False
 
@@ -376,7 +368,6 @@ def main():
   ordering = mofka.Ordering.Strict
   producer = topic.producer(producer_name, batchsize, thread_pool, ordering)
 
-
   time0 = time.time()
   if args.mode == 0: # Read data from PV
 
@@ -400,20 +391,20 @@ def main():
 
   elif args.mode == 1: # Simulate data acquisition with a file
     print("Simulating data acquisition on file: {}; iteration: {}".format(args.simulation_file, args.d_iteration))
-    simulate_daq(producer=producer,
-              input_f=args.simulation_file,
-              beg_sinogram=args.beg_sinogram, num_sinograms=args.num_sinograms,
-              iteration=args.d_iteration,
-              slp=args.iteration_sleep, prj_slp=0.6)
+    simulate_daq( producer=producer,
+                  input_f=args.simulation_file,
+                  beg_sinogram=args.beg_sinogram, num_sinograms=args.num_sinograms,
+                  iteration=args.d_iteration,
+                  slp=args.iteration_sleep, prj_slp=0.6)
   elif args.mode == 2: # Test data acquisition
-    test_daq(producer=producer,
+    test_daq( producer=producer,
               num_sinograms=args.num_sinograms,                       # Y
               num_sinogram_columns=args.num_sinogram_columns,         # X
               num_sinogram_projections=args.num_sinogram_projections, # Z
               slp=args.iteration_sleep)
   else:
     print("Unknown mode: {}".format(args.mode))
-  producer.push({"Type": "FIN"}, b"")
+  producer.push({"Type": "FIN"})
   producer.flush()
   time1 = time.time()
   print("Total time (s): {:.2f}".format(time1-time0))

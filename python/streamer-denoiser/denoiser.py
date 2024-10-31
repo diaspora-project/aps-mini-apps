@@ -18,9 +18,6 @@ def data_selector(metadata, descriptor):
 def data_broker(metadata, descriptor):
     return [ bytearray(descriptor.size) ]
 
-mofka_protocol = "na+sm"
-group_file = "/home/agueroudji/tekin-aps-mini-apps/build/mofka.json"
-
 def adjust_contrast(image_data):
     # Flatten the image data to 1D for histogram calculation
     flattened_image = image_data.flatten()
@@ -98,11 +95,9 @@ def main(input_path, model_path, protocol, group_file):
     # create a topic
     topic_name = "sirt_den"
 
-    try:
+    if not driver.topic_exists(topic_name):
         driver.creat_topic(topic_name)
         driver.add_memory_partition(topic_name, 0)
-    except:
-        pass
 
     topic = driver.open_topic(topic_name)
     consumer_name = "denoiser"
@@ -120,7 +115,6 @@ def main(input_path, model_path, protocol, group_file):
         data = np.frombuffer(data, dtype=np.float32)
         data = data.reshape(metadata["rank_dims"])
         process_stream(model, data, metadata)
-
 
     if input_path is not None:
         if os.path.isdir(input_path):

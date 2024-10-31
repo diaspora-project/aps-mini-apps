@@ -11,9 +11,6 @@ import tomopy as tp
 import json
 from mofka_dist import MofkaDist
 
-mofka_protocol = "na+sm"
-group_file = "/home/agueroudji/tekin-aps-mini-apps/build/mofka.json"
-
 def parse_arguments():
   parser = argparse.ArgumentParser( description='Data Distributor Process')
   parser.add_argument('--protocol', default="na+sm", help='Mofka protocol')
@@ -57,11 +54,13 @@ def parse_arguments():
 
 def main():
   args = parse_arguments()
-  # setup mofka
+  # Setup mofka
   mofka = MofkaDist(mofka_protocol=args.protocol, group_file=args.group_file)
+  # Handshake with Sirt
+  mofka.handshake(args.num_sinograms, args.num_columns)
+
   consumer = mofka.consumer(topic_name="daq_dist", consumer_name="dist")
   producer = mofka.producer(topic_name="dist_sirt", producer_name="producer_dist")
-  mofka.handshake(args.num_sinograms, args.num_columns)
 
   # Setup serializer
   serializer = TraceSerializer.ImageSerializer()
