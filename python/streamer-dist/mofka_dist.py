@@ -5,8 +5,8 @@ import mochi.mofka.client as mofka
 
 def generate_worker_msgs(data: np.ndarray, dims: list, projection_id: int, theta: float,
                          n_ranks: int, center: float, seq: int) -> list:
-    nsin = dims[1] // n_ranks  # Sinograms per rank
-    remaining = dims[1] % n_ranks  # Remaining sinograms
+    nsin = dims[0] // n_ranks  # Sinograms per rank
+    remaining = dims[0] % n_ranks  # Remaining sinograms
     msgs = []
     curr_sinogram_id = 0
     for i in range(n_ranks):
