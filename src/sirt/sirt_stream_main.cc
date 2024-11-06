@@ -48,7 +48,7 @@ class MofkaStream
 
       vmeta.push_back(metadata.json()); /// Setup metadata
       vtheta.push_back(metadata.json()["theta"].get<float_t>());
-      spdlog::info("Received data {}", metadata.string());
+      spdlog::info("Received data {} and pt size {}", metadata.string(), data.segments()[0].size);
       vproj.insert(vproj.end(),
           static_cast<float*>(data.segments()[0].ptr),
           static_cast<float*>(data.segments()[0].ptr)+
@@ -129,14 +129,23 @@ class MofkaStream
       driver {group_file, engine}
       {}
 
-    mofka::Producer producer( std::string topic_name,
-                            std::string producer_name="streamer_sirt"){
+    mofka::Producer get_producer( std::string topic_name,
+                                  std::string producer_name="streamer_sirt"){
       // -- Create/open a topic
       if (!driver.topicExists(topic_name)){
-        driver.createTopic(topic_name, validator, selector, serializer);
-        driver.addDefaultPartition(topic_name, 0);
+        try {
+          driver.createTopic(topic_name, validator, selector, serializer);
+        } catch(const mofka::Exception& ex) {
+          spdlog::critical("{}", ex.what());
+        }
       }
-      mofka::TopicHandle topic = driver.openTopic(topic_name);
+      if (comm_rank==0) driver.addDefaultPartition(topic_name, 0);
+      auto topic = driver.openTopic(topic_name);
+      while (static_cast<int>(topic.partitions().size()) < 1){
+        topic = driver.openTopic(topic_name);
+        continue;
+      }
+      // spdlog::info("topic  {} partition in {} is {}", topic_name, comm_rank, topic.partitions().size());
       // -- Get a producer for the topic
       mofka::Producer producer = topic.producer(producer_name,
                                                 batchSize,
@@ -145,16 +154,17 @@ class MofkaStream
       return producer;
     }
 
-    mofka::Consumer consumer( std::string topic_name,
-                              std::string consumer_name="dist_sirt",
-                              std::vector<size_t> targets={0}){
+    mofka::Consumer get_consumer( std::string topic_name,
+                                  std::string consumer_name="dist_sirt",
+                                  std::vector<size_t> targets={0}){
       // -- wait for topic to be created
       while (!driver.topicExists(topic_name)){
         continue;
+        sleep(1);
       }
       // -- Wait until all partitions are created by producer
       mofka::TopicHandle topic = driver.openTopic(topic_name);
-      while (static_cast<int>(topic.partitions().size()) < comm_size) {
+      while (static_cast<int>(topic.partitions().size()) < comm_size){
         topic = driver.openTopic(topic_name);
         continue;
       }
@@ -247,9 +257,8 @@ class MofkaStream
 
     void handshake(int rank, int size){
       std::string topic = "handshake_s_d";
-
       // Send comm size to dist_streamer
-      mofka::Producer hs_producer = producer(topic, "hs_p");
+      mofka::Producer hs_producer = get_producer(topic, "hs_p");
       json md = {{"comm_size", size}};
       mofka::Metadata metadata{md};
       auto future = hs_producer.push(metadata);
@@ -257,7 +266,7 @@ class MofkaStream
       // Receive metadata info
       topic = "handshake_d_s";
       std::vector<size_t> targets = {static_cast<size_t>(rank)};
-      mofka::Consumer hs_consumer = consumer(topic,
+      mofka::Consumer hs_consumer = get_consumer(topic,
                                             "hs_c",
                                             targets);
       auto event = hs_consumer.pull().wait();
@@ -266,10 +275,10 @@ class MofkaStream
       setInfo(mdata);
     }
 
-
     json getInfo(){ return info;}
     uint32_t getCounter(){ return counter;}
     void setInfo(json &j) {
+      // std::cout << "metadata in rank: " << comm_rank << "start" << j["beg_sinogram"] <<  " toto  " <<j["tn_sinograms"] << std::endl;
       info = j;}
     void windowLength(uint32_t wlen){ window_len = wlen;}
 
@@ -402,8 +411,9 @@ int main(int argc, char **argv)
   ms.handshake(comm->rank(), comm->size());
   std::string consuming_topic = "dist_sirt";
   std::string producing_topic = "sirt_den";
-  mofka::Producer  producer = ms.producer(producing_topic, "sirt");
-  mofka::Consumer consumer = ms.consumer(consuming_topic, "sirt");
+  std::vector<size_t> targets = {static_cast<size_t>(comm->rank())};
+  mofka::Producer  producer = ms.get_producer(producing_topic, "sirt");
+  mofka::Consumer consumer = ms.get_consumer(consuming_topic, "sirt", targets);
 
   /* Get metadata structure */
   json tmetadata = ms.getInfo();
@@ -504,6 +514,7 @@ int main(int argc, char **argv)
         iteration_stream << std::setfill('0') << std::setw(6) << passes;
         std::string outputpath = config.kReconOutputDir + "/" +
           iteration_stream.str() + "-recon.h5";
+
         trace_io::WriteRecon(
             curr_slices->metadata(), h5md,
             outputpath, config.kReconDatasetPath);
@@ -515,6 +526,7 @@ int main(int argc, char **argv)
           ADataRegion<float> &recon = rank_metadata.recon();
 
           hsize_t ndims = static_cast<hsize_t>(h5md.ndims);
+
           hsize_t rank_dims[3] = {
             static_cast<hsize_t>(rank_metadata.num_slices()),
             static_cast<hsize_t>(rank_metadata.num_cols()),
@@ -525,6 +537,7 @@ int main(int argc, char **argv)
             static_cast<hsize_t>(h5md.dims[2])};
 
           json md = { {"Type", "DATA"},
+                      {"rank", comm->rank()},
                       {"iteration_stream", iteration_stream.str()},
                       {"rank_dims", rank_dims},
                       {"app_dims", app_dims},
@@ -532,16 +545,17 @@ int main(int argc, char **argv)
 
           mofka::Metadata metadata{md};
 
+          spdlog::info("rank {} sending stream {}, slice_id {}", comm->rank(), iteration_stream.str(), rank_metadata.slice_id() );
+
           mofka::Data data = mofka::Data(&recon[recon_slice_data_index], 4*rank_dims[0]*rank_dims[1]*rank_dims[2]);
           auto future = producer.push(metadata, data);
-          producer.flush();
+          future.wait();
 
         } catch(const mofka::Exception& ex) {
-
           spdlog::critical("{}", ex.what());
           exit(-1);
         }
-
+      MPI_Barrier(MPI_COMM_WORLD);
       }
       #ifdef TIMERON
       write_tot += (std::chrono::system_clock::now()-write_beg);
@@ -551,7 +565,7 @@ int main(int argc, char **argv)
   }
 
   json md = {{"Type", "FIN"}};
-  auto future = producer.push(mofka::Metadata{md}, mofka::Data{});
+  auto future = producer.push(mofka::Metadata{md});
 
   /**************************/
   #ifdef TIMERON

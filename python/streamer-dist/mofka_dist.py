@@ -13,13 +13,12 @@ def generate_worker_msgs(data: np.ndarray, dims: list, projection_id: int, theta
         r = 1 if remaining > 0 else 0
         remaining -= 1
         data_size = data.dtype.itemsize*(nsin + r) * dims[1]
-
         # Prepare the message for the worker
         msg = prepare_data_rep_msg(seq,
                                    projection_id,
                                    theta, center,
                                    data_size,
-                                   data[curr_sinogram_id:curr_sinogram_id+(nsin+r)*dims[1]]
+                                   data[curr_sinogram_id*dims[1]:(curr_sinogram_id+(nsin+r))*dims[1]]
         )
         msgs.append(msg)
         curr_sinogram_id += (nsin + r)

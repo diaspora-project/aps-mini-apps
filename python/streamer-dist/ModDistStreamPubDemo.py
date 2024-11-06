@@ -82,6 +82,7 @@ def main():
     f = consumer.pull()
     event = f.wait()
     mofka_data = event.data[0]
+    total_size += len(mofka_data)
     mofka_metadata = json.loads(event.metadata)
     if mofka_metadata["Type"] == "FIN": break
 

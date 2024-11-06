@@ -495,6 +495,8 @@ void trace_io::WriteRecon(
     rank_metadata.num_neighbor_recon_slices()*
     rank_metadata.num_grids() * rank_metadata.num_grids();
 
+  //std::cout << "metadata slide id : " << rank_metadata.slice_id()  << std::endl;
+
   WriteData(
       &recon[recon_slice_data_index],
       ndims, rank_dims,

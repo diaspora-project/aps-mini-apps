@@ -49,7 +49,6 @@ def denoise_data(model, data):
     # Adjust contrast for each image in the dataset
     adjusted_images = np.array([adjust_contrast(image) for image in data])
     # adjusted_data = adjust_contrast(data)
-
     # Apply the model to denoise the data
     if len(adjusted_images.shape) == 3:
         denoised_data = model.predict(adjusted_images[:, :, :, np.newaxis]).squeeze()
@@ -63,7 +62,7 @@ def denoise_data(model, data):
 def process_stream(model, data, metadata):
     denoised_data = denoise_data(model, data)
     # Save the denoised data to a new file
-    output_path = metadata["iteration_stream"]+'-denoised.h5'
+    output_path = metadata[0]["iteration_stream"]+'-denoised.h5'
     with h5py.File(output_path, 'w') as h5_output:
         h5_output.create_dataset('/data', data=denoised_data)
 
@@ -95,11 +94,13 @@ def main(input_path, model_path, protocol, group_file):
     # create a topic
     topic_name = "sirt_den"
 
-    if not driver.topic_exists(topic_name):
-        driver.creat_topic(topic_name)
-        driver.add_memory_partition(topic_name, 0)
+    while not driver.topic_exists(topic_name):
+        pass
 
     topic = driver.open_topic(topic_name)
+    while len(topic.partitions) < 1:
+        topic = driver.open_topic(topic_name)
+
     consumer_name = "denoiser"
     consumer = topic.consumer(name=consumer_name, thread_pool=thread_pool,
         batch_size=batch_size,
@@ -107,14 +108,25 @@ def main(input_path, model_path, protocol, group_file):
         data_broker=data_broker)
 
     while True:
-        f = consumer.pull()
-        event = f.wait()
-        metadata = json.loads(event.metadata)
-        if metadata["Type"] == "FIN": break
-        data = event.data[0]
-        data = np.frombuffer(data, dtype=np.float32)
-        data = data.reshape(metadata["rank_dims"])
-        process_stream(model, data, metadata)
+        data = []
+        metadata = []
+        for i in range(2):
+            f = consumer.pull()
+            event = f.wait()
+            metadata.append(json.loads(event.metadata))
+            if metadata[i]["Type"] == "FIN": break
+            else:
+                dd = event.data[0]
+                dd = np.frombuffer(dd, dtype=np.float32)
+                dd = dd.reshape(metadata[i]["rank_dims"])
+                data.append(dd)
+        else:
+            print(metadata)
+            correct_order = [d for _,d in sorted(zip([m["rank"] for m in metadata], data), key=lambda d: d[0])]
+            data = np.concatenate(correct_order, axis=0)
+            process_stream(model, data, metadata)
+            continue
+        break
 
     if input_path is not None:
         if os.path.isdir(input_path):
