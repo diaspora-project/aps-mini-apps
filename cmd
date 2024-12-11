@@ -16,3 +16,4 @@ mpiexec -n 2 ./build/bin/sirt_stream --write-freq 4  --window-iter 1 --window-st
 
 python ./build/python/streamer-denoiser/denoiser.py --model ./build/python/streamer-denoiser/testA40GPU-it07500.h5 \
       --protocol na+sm --group_file mofka.json
+

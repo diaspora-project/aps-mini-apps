@@ -2,7 +2,7 @@ import numpy as np
 import json
 from pymargo.core import Engine
 import mochi.mofka.client as mofka
-
+import time
 def generate_worker_msgs(data: np.ndarray, dims: list, projection_id: int, theta: float,
                          n_ranks: int, center: float, seq: int) -> list:
     nsin = dims[0] // n_ranks  # Sinograms per rank
@@ -16,7 +16,8 @@ def generate_worker_msgs(data: np.ndarray, dims: list, projection_id: int, theta
         # Prepare the message for the worker
         msg = prepare_data_rep_msg(seq,
                                    projection_id,
-                                   theta, center,
+                                   theta,
+                                   center,
                                    data_size,
                                    data[curr_sinogram_id*dims[1]:(curr_sinogram_id+(nsin+r))*dims[1]]
         )
@@ -138,14 +139,16 @@ class MofkaDist:
         # Generate worker messages
         worker_msgs = generate_worker_msgs(data, dims, projection_id, theta,
                                            self.nranks, center, self.seq)
-
+        mofka_t = []
         # Send data to workers
         for i in range(self.nranks):
+            ts = time.perf_counter()
             f = producer.push(worker_msgs[i][0], worker_msgs[i][1])
             f.wait()
+            mofka_t.append(["push", projection_id, ts, time.perf_counter(), time.perf_counter() - ts, len(worker_msgs[i][1])])
 
         self.seq += 1
-        return 0
+        return mofka_t
 
 
     def done_image(self, producer) -> int:

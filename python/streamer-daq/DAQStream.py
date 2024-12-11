@@ -12,6 +12,7 @@ import tomopy as tp
 import signal
 from pymargo.core import Engine
 import mochi.mofka.client as mofka
+import csv
 
 def parse_arguments():
   parser = argparse.ArgumentParser(
@@ -103,9 +104,11 @@ def serialize_dataset(idata, flat, dark, itheta, seq=0):
       #builder.Reset()
       dflat = flat[flatId]
       itype = serializer.ITypes.WhiteReset if flatId==0 else serializer.ITypes.White
-      serialized_data = serializer.serialize(image=dflat, uniqueId=uniqueFlatId,
-                                        itype=itype,
-                                        rotation=0, seq=seq)
+      serialized_data = serializer.serialize(image=dflat,
+                                             uniqueId=uniqueFlatId,
+                                             itype=itype,
+                                             rotation=0,
+                                             seq=seq)
       data.append(serialized_data)
       time_ser += time.time()-t_ser0
       seq+=1
@@ -120,9 +123,11 @@ def serialize_dataset(idata, flat, dark, itheta, seq=0):
       dflat = dark[flatId]
       #serializer = TraceSerializer.ImageSerializer(builder)
       itype = serializer.ITypes.DarkReset if darkId==0 else serializer.ITypes.Dark
-      serialized_data = serializer.serialize(image=dflat, uniqueId=uniqueDarkId,
-                                        itype=itype,
-                                        rotation=0, seq=seq) #, center=10.)
+      serialized_data = serializer.serialize(image=dflat,
+                                             uniqueId=uniqueDarkId,
+                                             itype=itype,
+                                             rotation=0,
+                                             seq=seq) #, center=10.)
       time_ser += time.time()-t_ser0
       seq+=1
       data.append(serialized_data)
@@ -152,9 +157,15 @@ def ordered_subset(max_ind, nelem):
     all_arr = np.append(all_arr, np.arange(start=i, stop=max_ind, step=nsubsets))
   return all_arr.astype(int)
 
-def simulate_daq(producer, input_f,
-                      beg_sinogram=0, num_sinograms=0, seq=0, slp=0,
-                      iteration=1, save_after_serialize=False, prj_slp=0):
+def simulate_daq(producer,
+                 input_f,
+                 beg_sinogram=0,
+                 num_sinograms=0,
+                 seq=0,
+                 slp=0,
+                 iteration=1,
+                 save_after_serialize=False,
+                 prj_slp=0):
   global bsignal
 
   serialized_data = None
@@ -171,6 +182,7 @@ def simulate_daq(producer, input_f,
   nelems_per_subset = 16
   indices = ordered_subset(serialized_data.shape[0],
                               nelems_per_subset)
+  mofka_t = []
   for it in range(iteration): # Simulate data acquisition
     print("Current iteration over dataset: {}/{}".format(it+1, iteration))
     for index in indices:
@@ -193,8 +205,10 @@ def simulate_daq(producer, input_f,
       time.sleep(prj_slp)
       dchunk = serialized_data[index]
       # mofka send
+      ts = time.perf_counter()
       f = producer.push({"index": int(index), "Type" : "DATA"}, dchunk)
       f.wait()
+      mofka_t.append(["push", index, ts, time.perf_counter(), time.perf_counter() - ts, len(dchunk)])
       tot_transfer_size+=len(dchunk)
     time.sleep(slp)
   time1 = time.time()
@@ -204,14 +218,22 @@ def simulate_daq(producer, input_f,
   nproj = iteration*len(serialized_data)
   print("Sent number of projections: {}; Total size (MiB): {:.2f}; Elapsed time (s): {:.2f}".format(nproj, tot_MiBs, elapsed_time))
   print("Rate (MiB/s): {:.2f}; (msg/s): {:.2f}".format(tot_MiBs/elapsed_time, nproj/elapsed_time))
+  fields = ["type", "index", "start", "stop", "duration", "size"]
+  with open('Daq.csv', 'w') as f:
+    write = csv.writer(f)
+    write.writerow(fields)
+    write.writerows(mofka_t)
   return seq
 
 bsignal=False
 
 def test_daq(producer,
-              rotation_step=0.25, num_sinograms=0,
-              num_sinogram_columns=2048, seq=0,
-              num_sinogram_projections=1440, slp=0):
+             rotation_step=0.25,
+             num_sinograms=0,
+             num_sinogram_columns=2048,
+             seq=0,
+             num_sinogram_projections=1440,
+             slp=0):
   print("Sending projections")
   if num_sinograms<1: num_sinograms=2048
   # Randomly generate image data

@@ -5,8 +5,7 @@
 spack:
   # add package specs to the `specs` list
   specs:
-  - mofka@main+mpi+python ^json-c@0.13.0 ^libfabric@1.19.1 ^mercury~boostsys~checksum
-    ^mochi-bedrock~ssg ^mpich@3.4^gcc@13
+  - mofka@main+mpi+python ^json-c@0.13.0 ^libfabric@1.19.1 ^mercury~boostsys~checksum ^mpich@3.4^gcc@13
   - py-mochi-margo
   - py-numpy
   - py-scipy

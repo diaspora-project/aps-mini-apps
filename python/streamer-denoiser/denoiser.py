@@ -102,10 +102,11 @@ def main(input_path, model_path, protocol, group_file):
         topic = driver.open_topic(topic_name)
 
     consumer_name = "denoiser"
-    consumer = topic.consumer(name=consumer_name, thread_pool=thread_pool,
-        batch_size=batch_size,
-        data_selector=data_selector,
-        data_broker=data_broker)
+    consumer = topic.consumer(name=consumer_name,
+                              thread_pool=thread_pool,
+                              batch_size=batch_size,
+                              data_selector=data_selector,
+                              data_broker=data_broker)
 
     while True:
         data = []

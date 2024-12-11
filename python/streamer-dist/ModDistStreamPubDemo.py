@@ -10,7 +10,7 @@ import TraceSerializer
 import tomopy as tp
 import json
 from mofka_dist import MofkaDist
-
+import csv
 def parse_arguments():
   parser = argparse.ArgumentParser( description='Data Distributor Process')
   parser.add_argument('--protocol', default="na+sm", help='Mofka protocol')
@@ -61,7 +61,7 @@ def main():
 
   consumer = mofka.consumer(topic_name="daq_dist", consumer_name="dist")
   producer = mofka.producer(topic_name="dist_sirt", producer_name="producer_dist")
-
+  mofka_t = []
   # Setup serializer
   serializer = TraceSerializer.ImageSerializer()
 
@@ -143,9 +143,9 @@ def main():
       mofka_sub = sub.flatten()
       ncols = sub.shape[2]
 
-      mofka.push_image(mofka_sub, args.num_sinograms, ncols, rotation,
+      t = mofka.push_image(mofka_sub, args.num_sinograms, ncols, rotation,
                       mofka_read_image.UniqueId(), mofka_read_image.Center(), producer=producer)
-
+      mofka_t.extend(t)
     # If incoming data is white field
     if mofka_read_image.Itype() is serializer.ITypes.White:
       #print("White field data is received: {}".format(read_image.UniqueId()))
@@ -181,7 +181,11 @@ def main():
   print("Rate (MiB/s): {:.2f}; (msg/s): {:.2f}".format(
             tot_MiBs/elapsed_time, total_received/elapsed_time))
 
-
+  fields = ["push", "projection_id", "start", "stop", "duration", "size"]
+  with open('Dist_push.csv', 'w') as f:
+    write = csv.writer(f)
+    write.writerow(fields)
+    write.writerows(mofka_t)
   mofka.done_image(producer)
   del producer
   del consumer

@@ -48,7 +48,7 @@ class MofkaStream
 
       vmeta.push_back(metadata.json()); /// Setup metadata
       vtheta.push_back(metadata.json()["theta"].get<float_t>());
-      spdlog::info("Received data {} and pt size {}", metadata.string(), data.segments()[0].size);
+      spdlog::info("Received data {}", metadata.string()); //, data.segments()[0].size);
       vproj.insert(vproj.end(),
           static_cast<float*>(data.segments()[0].ptr),
           static_cast<float*>(data.segments()[0].ptr)+
@@ -140,6 +140,7 @@ class MofkaStream
         }
       }
       if (comm_rank==0) driver.addDefaultPartition(topic_name, 0);
+      // make sur partitions visible
       auto topic = driver.openTopic(topic_name);
       while (static_cast<int>(topic.partitions().size()) < 1){
         topic = driver.openTopic(topic_name);
@@ -545,9 +546,10 @@ int main(int argc, char **argv)
 
           mofka::Metadata metadata{md};
 
-          spdlog::info("rank {} sending stream {}, slice_id {}", comm->rank(), iteration_stream.str(), rank_metadata.slice_id() );
+          //spdlog::info("rank {} sending stream {}, slice_id {}", comm->rank(), iteration_stream.str(), rank_metadata.slice_id() );
 
           mofka::Data data = mofka::Data(&recon[recon_slice_data_index], 4*rank_dims[0]*rank_dims[1]*rank_dims[2]);
+
           auto future = producer.push(metadata, data);
           future.wait();
 
