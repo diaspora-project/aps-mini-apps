@@ -1,13 +1,12 @@
 import sys
 import os
-sys.path.append(os.path.join(os.path.dirname(__file__), './local'))
-sys.path.append(os.path.join(os.path.dirname(__file__), './serialization'))
-import numpy as np
-import time
+#sys.path.append(os.path.join(os.path.dirname(__file__), '../../python/common/local'))
+#sys.path.append(os.path.join(os.path.dirname(__file__), '../../python/common/serialization'))
 import flatbuffers
-import MONA.TraceDS.Dim3 as Dim3
-import MONA.TraceDS.IType as IType
-import MONA.TraceDS.TImage as TImage
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '.')))
+from serialization.MONA.TraceDS.Dim3 import Dim3
+from serialization.MONA.TraceDS.IType import IType
+from serialization.MONA.TraceDS.TImage import TImage
 
 class ImageSerializer:
   """
