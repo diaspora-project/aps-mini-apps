@@ -12,7 +12,10 @@ RUN apt-get update --fix-missing && apt-get install -y \
     iptables \
     iputils-ping \
     iproute2 \
-    nano
+    nano \
+    ffmpeg \
+    libsm6 \
+    libxext6
 RUN conda install -y \
     python=3.11 \
     numpy \
