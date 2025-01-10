@@ -6,7 +6,7 @@
 #include "disp_comm_mpi.h"
 #include "disp_engine_reduction.h"
 #include "sirt.h"
-
+#include <cassert>
 #include <mofka/Client.hpp>
 #include <mofka/TopicHandle.hpp>
 #include <mofka/MofkaDriver.hpp>
@@ -31,7 +31,6 @@ class MofkaStream
     uint32_t counter;
     int comm_rank;
     int comm_size;
-    tl::engine engine;
     mofka::MofkaDriver driver;
 
     std::vector<float> vproj;
@@ -49,11 +48,17 @@ class MofkaStream
       vmeta.push_back(metadata.json()); /// Setup metadata
       vtheta.push_back(metadata.json()["theta"].get<float_t>());
       spdlog::info("Received data {}", metadata.string()); //, data.segments()[0].size);
-      vproj.insert(vproj.end(),
-          static_cast<float*>(data.segments()[0].ptr),
-          static_cast<float*>(data.segments()[0].ptr)+
-          getInfo()["n_sinograms"].get<int32_t>() *
-          getInfo()["n_rays_per_proj_row"].get<int32_t>());
+      size_t n_rays_per_proj =
+      getInfo()["n_sinograms"].get<int64_t>() *
+      getInfo()["n_rays_per_proj_row"].get<int64_t>();
+      size_t ptr_size = data.segments()[0].size / sizeof(float); // 4 bytes
+      assert(n_rays_per_proj == ptr_size && void("Pointer size does not match n_rays_per_projection"));
+      float* start = static_cast<float*>(data.segments()[0].ptr);
+      float* end = static_cast<float*>(data.segments()[0].ptr)+ n_rays_per_proj;
+      if (start == nullptr || end == nullptr) {
+        throw std::runtime_error("Invalid pointer arithmetic in insertion");
+      }
+      vproj.insert(vproj.end(), start, end);
     }
 
     void eraseBegTraceMsg(){
@@ -116,8 +121,7 @@ class MofkaStream
 
   public:
 
-    MofkaStream(std::string protocol,
-        std::string group_file,
+    MofkaStream(std::string group_file,
         uint32_t window_len,
         int rank,
         int size):
@@ -125,8 +129,7 @@ class MofkaStream
       counter {0},
       comm_rank {rank},
       comm_size {size},
-      engine {protocol, THALLIUM_SERVER_MODE},
-      driver {group_file, engine}
+      driver {group_file, true}
       {}
 
     mofka::Producer get_producer( std::string topic_name,
@@ -403,8 +406,7 @@ int main(int argc, char **argv)
         new DISPCommMPI<float>(&argc, &argv);
   TraceRuntimeConfig config(argc, argv, comm->rank(), comm->size());
 
-  MofkaStream ms = MofkaStream{ config.protocol,
-                                config.group_file,
+  MofkaStream ms = MofkaStream{ config.group_file,
                                 static_cast<uint32_t>(config.window_len),
                                 comm->rank(),
                                 comm->size()};
@@ -546,12 +548,14 @@ int main(int argc, char **argv)
 
           mofka::Metadata metadata{md};
 
-          //spdlog::info("rank {} sending stream {}, slice_id {}", comm->rank(), iteration_stream.str(), rank_metadata.slice_id() );
+          spdlog::info("rank {} sending stream {}, slice_id {} and recon slice {} et sizeof {} and dims {} ", comm->rank(), iteration_stream.str(),
+          rank_metadata.slice_id(), recon_slice_data_index, sizeof(float), rank_dims[0]*rank_dims[1]*rank_dims[2] );
 
-          mofka::Data data = mofka::Data(&recon[recon_slice_data_index], 4*rank_dims[0]*rank_dims[1]*rank_dims[2]);
+          mofka::Data data = mofka::Data(&recon[recon_slice_data_index], sizeof(float)*rank_dims[0]*rank_dims[1]*rank_dims[2]);
 
           auto future = producer.push(metadata, data);
           future.wait();
+
 
         } catch(const mofka::Exception& ex) {
           spdlog::critical("{}", ex.what());
@@ -568,7 +572,7 @@ int main(int argc, char **argv)
 
   json md = {{"Type", "FIN"}};
   auto future = producer.push(mofka::Metadata{md});
-
+  future.wait();
   /**************************/
   #ifdef TIMERON
   if(comm->rank()==0){
@@ -582,4 +586,13 @@ int main(int argc, char **argv)
                                           (recon_tot.count()+inplace_tot.count()+update_tot.count()) << std::endl;
   }
   #endif
+  /* Clean-up the resources */
+  std::cout << "Deleting h5md.dimm" << std::endl;
+  delete [] h5md.dims;
+  std::cout << "Deleting main_recon_space" << std::endl;
+  delete main_recon_space;
+  //delete curr_slices;
+  std::cout << "Deleting comm" << std::endl;
+  delete comm;
+  std::cout << "Exiting" << std::endl;
 }

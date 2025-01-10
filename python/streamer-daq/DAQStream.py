@@ -10,7 +10,6 @@ import h5py as h5
 import dxchange
 import tomopy as tp
 import signal
-from pymargo.core import Engine
 import mochi.mofka.client as mofka
 import csv
 
@@ -27,6 +26,9 @@ def parse_arguments():
 
   parser.add_argument('--group_file', type=str, default="mofka.json",
                       help='Group file for the mofka server')
+
+  parser.add_argument('--batchsize', type=int, default=16,
+                      help='Mofka batch size')
 
   parser.add_argument('--publisher_addr', default="tcp://*:50000",
                       help='Publisher addresss of data source process.')
@@ -158,6 +160,7 @@ def ordered_subset(max_ind, nelem):
   return all_arr.astype(int)
 
 def simulate_daq(producer,
+                 batchsize,
                  input_f,
                  beg_sinogram=0,
                  num_sinograms=0,
@@ -183,6 +186,8 @@ def simulate_daq(producer,
   indices = ordered_subset(serialized_data.shape[0],
                               nelems_per_subset)
   mofka_t = []
+  buffer = []
+  i = 0
   for it in range(iteration): # Simulate data acquisition
     print("Current iteration over dataset: {}/{}".format(it+1, iteration))
     for index in indices:
@@ -199,17 +204,23 @@ def simulate_daq(producer,
           bsignal = False
           print("Continue streaming projections.")
 
-    #for dchunk in serialized_data:
-      #print("Sending projection {}; sleep time={}".format(index, prj_slp))
       print("Sending projection {}".format(index))
       time.sleep(prj_slp)
-      dchunk = serialized_data[index]
       # mofka send
       ts = time.perf_counter()
-      f = producer.push({"index": int(index), "Type" : "DATA"}, dchunk)
-      f.wait()
-      mofka_t.append(["push", index, ts, time.perf_counter(), time.perf_counter() - ts, len(dchunk)])
-      tot_transfer_size+=len(dchunk)
+      buffer.append(serialized_data[index])
+      f = producer.push({"index": int(index), "Type" : "DATA"}, buffer[i])
+      #f.wait()
+      mofka_t.append(["push", index, ts, time.perf_counter(), time.perf_counter() - ts, len(buffer[i])])
+      tot_transfer_size+=len(buffer[i])
+      seq+=1
+      i+=1
+      if seq % batchsize == 0:
+        ts = time.perf_counter()
+        producer.flush()
+        mofka_t.append(["flush_after", index, ts, time.perf_counter(), time.perf_counter() - ts, len(buffer[i-1])])
+        buffer=[]
+        i = 0
     time.sleep(slp)
   time1 = time.time()
 
@@ -366,8 +377,6 @@ class TImageTransfer:
       return False
     return self
 
-
-
 def main():
   args = parse_arguments()
   # Register a signal handler for this function
@@ -376,8 +385,7 @@ def main():
     bsignal = True
   signal.signal(signal.SIGINT, signal_handler)
 
-  engine = Engine(args.protocol)
-  driver = mofka.MofkaDriver(args.group_file, engine)
+  driver = mofka.MofkaDriver(args.group_file, use_progress_thread=True)
 
   # create a topic
   topic_name = "daq_dist"
@@ -385,7 +393,7 @@ def main():
   driver.add_memory_partition(topic_name, 0)
   topic = driver.open_topic(topic_name)
   producer_name = "daq_producer"
-  batchsize = mofka.AdaptiveBatchSize
+  batchsize = args.batchsize #mofka.AdaptiveBatchSize
   thread_pool = mofka.ThreadPool(1)
   ordering = mofka.Ordering.Strict
   producer = topic.producer(producer_name, batchsize, thread_pool, ordering)
@@ -414,8 +422,10 @@ def main():
   elif args.mode == 1: # Simulate data acquisition with a file
     print("Simulating data acquisition on file: {}; iteration: {}".format(args.simulation_file, args.d_iteration))
     simulate_daq( producer=producer,
+                  batchsize=args.batchsize,
                   input_f=args.simulation_file,
-                  beg_sinogram=args.beg_sinogram, num_sinograms=args.num_sinograms,
+                  beg_sinogram=args.beg_sinogram,
+                  num_sinograms=args.num_sinograms,
                   iteration=args.d_iteration,
                   slp=args.iteration_sleep, prj_slp=0.6)
   elif args.mode == 2: # Test data acquisition
@@ -431,5 +441,19 @@ def main():
   time1 = time.time()
   print("Total time (s): {:.2f}".format(time1-time0))
 
+  print("del threadpool")
+  del thread_pool
+  print("del batchsze")
+  del batchsize
+  print("del ordering")
+  del ordering
+  print("del producer")
+  del producer
+  print("del topic")
+  del topic
+  print("del driver")
+  del driver
+  time.sleep(10)
+  print("Exiting ...")
 if __name__ == '__main__':
     main()

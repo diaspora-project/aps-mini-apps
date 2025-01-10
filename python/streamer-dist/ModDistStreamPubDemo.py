@@ -11,12 +11,16 @@ import tomopy as tp
 import json
 from mofka_dist import MofkaDist
 import csv
+
 def parse_arguments():
   parser = argparse.ArgumentParser( description='Data Distributor Process')
   parser.add_argument('--protocol', default="na+sm", help='Mofka protocol')
 
   parser.add_argument('--group_file', type=str, default="mofka.json",
                       help='Group file for the mofka server')
+
+  parser.add_argument('--batchsize', type=int, default=16,
+                      help='mofka batch size')
   # TQ communication
   parser.add_argument('--beg_sinogram', type=int,
                           help='Starting sinogram for reconstruction')
@@ -55,7 +59,7 @@ def parse_arguments():
 def main():
   args = parse_arguments()
   # Setup mofka
-  mofka = MofkaDist(mofka_protocol=args.protocol, group_file=args.group_file)
+  mofka = MofkaDist(group_file=args.group_file, batchsize=args.batchsize)
   # Handshake with Sirt
   mofka.handshake(args.num_sinograms, args.num_columns)
 
@@ -81,10 +85,11 @@ def main():
     total_received += 1
     f = consumer.pull()
     event = f.wait()
-    mofka_data = event.data[0]
-    total_size += len(mofka_data)
     mofka_metadata = json.loads(event.metadata)
     if mofka_metadata["Type"] == "FIN": break
+    total_received += 1
+    mofka_data = event.data[0]
+    total_size += len(mofka_data)
 
     # This is mostly for data rate tests
     if args.skip_serialize:
@@ -142,9 +147,14 @@ def main():
       #to send from mofka:
       mofka_sub = sub.flatten()
       ncols = sub.shape[2]
-
-      t = mofka.push_image(mofka_sub, args.num_sinograms, ncols, rotation,
-                      mofka_read_image.UniqueId(), mofka_read_image.Center(), producer=producer)
+      print("before push image")
+      t = mofka.push_image(mofka_sub,
+                           args.num_sinograms,
+                           ncols,
+                           rotation,
+                           mofka_read_image.UniqueId(),
+                           mofka_read_image.Center(),
+                           producer=producer)
       mofka_t.extend(t)
     # If incoming data is white field
     if mofka_read_image.Itype() is serializer.ITypes.White:
@@ -171,6 +181,7 @@ def main():
       dark_imgs=[]
       dark_imgs.extend(sub)
       tot_dark_imgs += 1
+    seq+=1
 
   time1 = time.time()
 
