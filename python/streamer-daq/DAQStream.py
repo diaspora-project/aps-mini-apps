@@ -12,6 +12,9 @@ import tomopy as tp
 import signal
 from pymargo.core import Engine
 import mochi.mofka.client as mofka
+import csv
+#from memory_profiler import profile
+
 
 def parse_arguments():
   parser = argparse.ArgumentParser(
@@ -26,6 +29,9 @@ def parse_arguments():
 
   parser.add_argument('--group_file', type=str, default="mofka.json",
                       help='Group file for the mofka server')
+
+  parser.add_argument('--batchsize', type=int, default=16,
+                      help='Mofka batch size')
 
   parser.add_argument('--publisher_addr', default="tcp://*:50000",
                       help='Publisher addresss of data source process.')
@@ -103,9 +109,11 @@ def serialize_dataset(idata, flat, dark, itheta, seq=0):
       #builder.Reset()
       dflat = flat[flatId]
       itype = serializer.ITypes.WhiteReset if flatId==0 else serializer.ITypes.White
-      serialized_data = serializer.serialize(image=dflat, uniqueId=uniqueFlatId,
-                                        itype=itype,
-                                        rotation=0, seq=seq)
+      serialized_data = serializer.serialize(image=dflat,
+                                             uniqueId=uniqueFlatId,
+                                             itype=itype,
+                                             rotation=0,
+                                             seq=seq)
       data.append(serialized_data)
       time_ser += time.time()-t_ser0
       seq+=1
@@ -120,9 +128,11 @@ def serialize_dataset(idata, flat, dark, itheta, seq=0):
       dflat = dark[flatId]
       #serializer = TraceSerializer.ImageSerializer(builder)
       itype = serializer.ITypes.DarkReset if darkId==0 else serializer.ITypes.Dark
-      serialized_data = serializer.serialize(image=dflat, uniqueId=uniqueDarkId,
-                                        itype=itype,
-                                        rotation=0, seq=seq) #, center=10.)
+      serialized_data = serializer.serialize(image=dflat,
+                                             uniqueId=uniqueDarkId,
+                                             itype=itype,
+                                             rotation=0,
+                                             seq=seq) #, center=10.)
       time_ser += time.time()-t_ser0
       seq+=1
       data.append(serialized_data)
@@ -152,9 +162,16 @@ def ordered_subset(max_ind, nelem):
     all_arr = np.append(all_arr, np.arange(start=i, stop=max_ind, step=nsubsets))
   return all_arr.astype(int)
 
-def simulate_daq(producer, input_f,
-                      beg_sinogram=0, num_sinograms=0, seq=0, slp=0,
-                      iteration=1, save_after_serialize=False, prj_slp=0):
+def simulate_daq(producer,
+                 batchsize,
+                 input_f,
+                 beg_sinogram=0,
+                 num_sinograms=0,
+                 seq=0,
+                 slp=0,
+                 iteration=1,
+                 save_after_serialize=False,
+                 prj_slp=0):
   global bsignal
 
   serialized_data = None
@@ -171,6 +188,9 @@ def simulate_daq(producer, input_f,
   nelems_per_subset = 16
   indices = ordered_subset(serialized_data.shape[0],
                               nelems_per_subset)
+  mofka_t = []
+  buffer = []
+  i = 0
   for it in range(iteration): # Simulate data acquisition
     print("Current iteration over dataset: {}/{}".format(it+1, iteration))
     for index in indices:
@@ -187,15 +207,23 @@ def simulate_daq(producer, input_f,
           bsignal = False
           print("Continue streaming projections.")
 
-    #for dchunk in serialized_data:
-      #print("Sending projection {}; sleep time={}".format(index, prj_slp))
       print("Sending projection {}".format(index))
       time.sleep(prj_slp)
-      dchunk = serialized_data[index]
       # mofka send
-      f = producer.push({"index": int(index), "Type" : "DATA"}, dchunk)
-      f.wait()
-      tot_transfer_size+=len(dchunk)
+      ts = time.perf_counter()
+      buffer.append(serialized_data[index])
+      f = producer.push({"index": int(index), "Type" : "DATA"}, buffer[i])
+      #f.wait()
+      mofka_t.append(["push", index, ts, time.perf_counter(), time.perf_counter() - ts, len(buffer[i])])
+      tot_transfer_size+=len(buffer[i])
+      seq+=1
+      i+=1
+      if seq % batchsize == 0:
+        ts = time.perf_counter()
+        producer.flush()
+        mofka_t.append(["flush_after", index, ts, time.perf_counter(), time.perf_counter() - ts, len(buffer[i-1])])
+        buffer=[]
+        i = 0
     time.sleep(slp)
   time1 = time.time()
 
@@ -204,14 +232,22 @@ def simulate_daq(producer, input_f,
   nproj = iteration*len(serialized_data)
   print("Sent number of projections: {}; Total size (MiB): {:.2f}; Elapsed time (s): {:.2f}".format(nproj, tot_MiBs, elapsed_time))
   print("Rate (MiB/s): {:.2f}; (msg/s): {:.2f}".format(tot_MiBs/elapsed_time, nproj/elapsed_time))
+  fields = ["type", "index", "start", "stop", "duration", "size"]
+  with open('Daq.csv', 'w') as f:
+    write = csv.writer(f)
+    write.writerow(fields)
+    write.writerows(mofka_t)
   return seq
 
 bsignal=False
 
 def test_daq(producer,
-              rotation_step=0.25, num_sinograms=0,
-              num_sinogram_columns=2048, seq=0,
-              num_sinogram_projections=1440, slp=0):
+             rotation_step=0.25,
+             num_sinograms=0,
+             num_sinogram_columns=2048,
+             seq=0,
+             num_sinogram_projections=1440,
+             slp=0):
   print("Sending projections")
   if num_sinograms<1: num_sinograms=2048
   # Randomly generate image data
@@ -344,8 +380,6 @@ class TImageTransfer:
       return False
     return self
 
-
-
 def main():
   args = parse_arguments()
   # Register a signal handler for this function
@@ -354,16 +388,16 @@ def main():
     bsignal = True
   signal.signal(signal.SIGINT, signal_handler)
 
-  engine = Engine(args.protocol)
-  driver = mofka.MofkaDriver(args.group_file, engine)
+  driver = mofka.MofkaDriver(args.group_file, use_progress_thread=True)
 
   # create a topic
   topic_name = "daq_dist"
-  driver.create_topic(topic_name)
+  if not driver.topic_exists(topic_name):
+    driver.create_topic(topic_name)
   driver.add_memory_partition(topic_name, 0)
   topic = driver.open_topic(topic_name)
   producer_name = "daq_producer"
-  batchsize = mofka.AdaptiveBatchSize
+  batchsize = args.batchsize #mofka.AdaptiveBatchSize
   thread_pool = mofka.ThreadPool(1)
   ordering = mofka.Ordering.Strict
   producer = topic.producer(producer_name, batchsize, thread_pool, ordering)
@@ -392,8 +426,10 @@ def main():
   elif args.mode == 1: # Simulate data acquisition with a file
     print("Simulating data acquisition on file: {}; iteration: {}".format(args.simulation_file, args.d_iteration))
     simulate_daq( producer=producer,
+                  batchsize=args.batchsize,
                   input_f=args.simulation_file,
-                  beg_sinogram=args.beg_sinogram, num_sinograms=args.num_sinograms,
+                  beg_sinogram=args.beg_sinogram,
+                  num_sinograms=args.num_sinograms,
                   iteration=args.d_iteration,
                   slp=args.iteration_sleep, prj_slp=0.6)
   elif args.mode == 2: # Test data acquisition
@@ -404,10 +440,24 @@ def main():
               slp=args.iteration_sleep)
   else:
     print("Unknown mode: {}".format(args.mode))
-  producer.push({"Type": "FIN"})
+  producer.push({"Type": "FIN"}, bytearray(1))
   producer.flush()
   time1 = time.time()
   print("Total time (s): {:.2f}".format(time1-time0))
 
+  print("del threadpool")
+  del thread_pool
+  print("del batchsze")
+  del batchsize
+  print("del ordering")
+  del ordering
+  print("del producer")
+  del producer
+  print("del topic")
+  del topic
+  print("del driver")
+  del driver
+  time.sleep(10)
+  print("Exiting ...")
 if __name__ == '__main__':
     main()

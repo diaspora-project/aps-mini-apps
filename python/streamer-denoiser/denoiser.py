@@ -4,11 +4,10 @@ import json
 import time
 import numpy as np
 import h5py
-from pymargo.core import Engine
 import mochi.mofka.client as mofka
 from mochi.mofka.client import ThreadPool, AdaptiveBatchSize, DataDescriptor
 
-import tensorflow as tf
+import keras
 import argparse
 import matplotlib.pyplot as plt
 
@@ -84,12 +83,11 @@ def process_directory(model, directory_path):
                 file_path = os.path.join(root, file)
                 process_file(model, file_path)
 
-def main(input_path, model_path, protocol, group_file):
+def main(input_path, model_path, protocol, group_file, batchsize, nproc_sirt):
     # Load the saved model
-    model = tf.keras.models.load_model(model_path)
-    engine = Engine(protocol)
-    driver = mofka.MofkaDriver(group_file, engine)
-    batch_size = AdaptiveBatchSize
+    model = keras.models.load_model(model_path)
+    driver = mofka.MofkaDriver(group_file, use_progress_thread=True)
+    batch_size = batchsize # AdaptiveBatchSize
     thread_pool = ThreadPool(0)
     # create a topic
     topic_name = "sirt_den"
@@ -102,17 +100,21 @@ def main(input_path, model_path, protocol, group_file):
         topic = driver.open_topic(topic_name)
 
     consumer_name = "denoiser"
-    consumer = topic.consumer(name=consumer_name, thread_pool=thread_pool,
-        batch_size=batch_size,
-        data_selector=data_selector,
-        data_broker=data_broker)
+    consumer = topic.consumer(name=consumer_name,
+                              thread_pool=thread_pool,
+                              batch_size=batch_size,
+                              data_selector=data_selector,
+                              data_broker=data_broker)
 
     while True:
         data = []
         metadata = []
-        for i in range(2):
+        for i in range(nproc_sirt*batchsize):
+            print("loop range i", i, flush=True)
             f = consumer.pull()
+            print("avant f.wait ", flush=True)
             event = f.wait()
+            print("apres wait", flush=True)
             metadata.append(json.loads(event.metadata))
             if metadata[i]["Type"] == "FIN": break
             else:
@@ -121,10 +123,27 @@ def main(input_path, model_path, protocol, group_file):
                 dd = dd.reshape(metadata[i]["rank_dims"])
                 data.append(dd)
         else:
-            print(metadata)
-            correct_order = [d for _,d in sorted(zip([m["rank"] for m in metadata], data), key=lambda d: d[0])]
-            data = np.concatenate(correct_order, axis=0)
-            process_stream(model, data, metadata)
+            correct_order_meta = [
+                d for _, d in sorted(
+                    zip([(m["iteration_stream"], m["rank"]) for m in metadata], metadata),
+                    key=lambda d: (d[0][0], d[0][1])  # Sort by iteration_stream first, then by rank
+                )
+            ]
+            correct_order = [
+                d for _, d in sorted(
+                    zip([(m["iteration_stream"], m["rank"]) for m in metadata], data),
+                    key=lambda d: (d[0][0], d[0][1])  # Sort by iteration_stream first, then by rank
+                )
+            ]
+            for i in range(batchsize):
+                batch_data = correct_order[i*batchsize:batchsize+i*batchsize]
+                batch_meta = correct_order_meta[i*batchsize:batchsize+i*batchsize]
+                print(batch_meta)
+                data = np.concatenate(batch_data, axis=0)
+                process_stream(model, data, metadata)
+                # output_path = batch_meta[0]["iteration_stream"]+'-denoised.h5'
+                # with h5py.File(output_path, 'w') as h5_output:
+                #     h5_output.create_dataset('/data', data=data)
             continue
         break
 
@@ -142,7 +161,10 @@ if __name__ == "__main__":
     parser.add_argument('--model', type=str, required=True, help='Path to the saved model.')
     parser.add_argument('--protocol', type=str, required=True, help='Mofka protocol')
     parser.add_argument('--group_file', type=str, required=True, help='Path to group file')
+    parser.add_argument("--batchsize", type=int, required=True, help="Mofka batchsize")
+    parser.add_argument("--nproc_sirt", type=int, required=True, help="Number of Sirt Processes")
+
 
     args = parser.parse_args()
-    main(args.input, args.model, args.protocol, args.group_file)
+    main(args.input, args.model, args.protocol, args.group_file, args.batchsize, args.nproc_sirt)
 
