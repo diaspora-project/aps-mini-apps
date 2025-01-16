@@ -7,7 +7,7 @@ import h5py
 import mochi.mofka.client as mofka
 from mochi.mofka.client import ThreadPool, AdaptiveBatchSize, DataDescriptor
 
-import keras
+#import keras
 import argparse
 import matplotlib.pyplot as plt
 
@@ -85,7 +85,7 @@ def process_directory(model, directory_path):
 
 def main(input_path, model_path, protocol, group_file, batchsize, nproc_sirt):
     # Load the saved model
-    model = keras.models.load_model(model_path)
+    # model = keras.models.load_model(model_path)
     driver = mofka.MofkaDriver(group_file, use_progress_thread=True)
     batch_size = batchsize # AdaptiveBatchSize
     thread_pool = ThreadPool(0)
@@ -136,14 +136,14 @@ def main(input_path, model_path, protocol, group_file, batchsize, nproc_sirt):
                 )
             ]
             for i in range(batchsize):
-                batch_data = correct_order[i*batchsize:batchsize+i*batchsize]
-                batch_meta = correct_order_meta[i*batchsize:batchsize+i*batchsize]
+                batch_data = correct_order[i*nproc_sirt:nproc_sirt+i*nproc_sirt]
+                batch_meta = correct_order_meta[i*nproc_sirt:nproc_sirt+i*nproc_sirt]
                 print(batch_meta)
                 data = np.concatenate(batch_data, axis=0)
-                process_stream(model, data, metadata)
-                # output_path = batch_meta[0]["iteration_stream"]+'-denoised.h5'
-                # with h5py.File(output_path, 'w') as h5_output:
-                #     h5_output.create_dataset('/data', data=data)
+                #process_stream(model, data, metadata)
+                output_path = batch_meta[0]["iteration_stream"]+'-denoised.h5'
+                with h5py.File(output_path, 'w') as h5_output:
+                    h5_output.create_dataset('/data', data=data)
             continue
         break
 
