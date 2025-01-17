@@ -26,7 +26,7 @@ set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
 set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 find_package(Threads REQUIRED)
 
-#find_package(ZeroMQ)
+# find_package(ZeroMQ)
 find_package(HDF5)
 
 if(NOT HDF5_FOUND OR NOT HDF5_IS_PARALLEL)
@@ -47,5 +47,5 @@ add_library(sirt ${CMAKE_CURRENT_LIST_DIR}/sirt.cc)
 
 
 add_executable(sirt_stream sirt_stream_main.cc)
-target_link_libraries(sirt_stream  sirt trace_utils trace_h5io zmq MPI::MPI_CXX hdf5::hdf5 Threads::Threads mofka::client)
+target_link_libraries(sirt_stream  sirt trace_utils trace_h5io MPI::MPI_CXX hdf5::hdf5 Threads::Threads mofka::client)
 #target_include_directories(sirt_stream PRIVATE ${HDF5_INCLUDE_DIRS})

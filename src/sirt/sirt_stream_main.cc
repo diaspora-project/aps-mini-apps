@@ -52,7 +52,7 @@ class MofkaStream
       getInfo()["n_sinograms"].get<int64_t>() *
       getInfo()["n_rays_per_proj_row"].get<int64_t>();
       size_t ptr_size = data.segments()[0].size / sizeof(float); // 4 bytes
-      assert(n_rays_per_proj == ptr_size && void("Pointer size does not match n_rays_per_projection"));
+      assert(n_rays_per_proj == ptr_size && bool("Pointer size does not match n_rays_per_projection"));
       float* start = static_cast<float*>(data.segments()[0].ptr);
       float* end = static_cast<float*>(data.segments()[0].ptr)+ n_rays_per_proj;
       if (start == nullptr || end == nullptr) {
