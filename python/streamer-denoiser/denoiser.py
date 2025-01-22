@@ -1,14 +1,12 @@
 import os
 import sys
-import json
 import time
+import json
 import numpy as np
 import h5py
-from pymargo.core import Engine
 import mochi.mofka.client as mofka
-from mochi.mofka.client import ThreadPool, AdaptiveBatchSize, DataDescriptor
-
-import tensorflow as tf
+import csv
+#import keras
 import argparse
 import matplotlib.pyplot as plt
 
@@ -84,65 +82,82 @@ def process_directory(model, directory_path):
                 file_path = os.path.join(root, file)
                 process_file(model, file_path)
 
-def main(input_path, model_path, protocol, group_file):
+def main(input_path, model_path, protocol, group_file, batchsize, nproc_sirt):
     # Load the saved model
-    model = tf.keras.models.load_model(model_path)
-    engine = Engine(protocol)
-    driver = mofka.MofkaDriver(group_file, engine)
-    batch_size = AdaptiveBatchSize
-    thread_pool = ThreadPool(0)
+    # model = keras.models.load_model(model_path)
+    driver = mofka.MofkaDriver(group_file, use_progress_thread=True)
+    batch_size = batchsize # AdaptiveBatchSize
+    thread_pool = mofka.ThreadPool(0)
     # create a topic
     topic_name = "sirt_den"
-
-    while not driver.topic_exists(topic_name):
-        pass
-
     topic = driver.open_topic(topic_name)
-    while len(topic.partitions) < 1:
-        topic = driver.open_topic(topic_name)
-
     consumer_name = "denoiser"
-    consumer = topic.consumer(name=consumer_name, thread_pool=thread_pool,
-        batch_size=batch_size,
-        data_selector=data_selector,
-        data_broker=data_broker)
-
-    while True:
+    consumer = topic.consumer(name=consumer_name,
+                              thread_pool=thread_pool,
+                              batch_size=batch_size,
+                              data_selector=data_selector,
+                              data_broker=data_broker)
+    more_data = True
+    mofka_times = []
+    while more_data:
         data = []
         metadata = []
-        for i in range(2):
+        for i in range(nproc_sirt*batchsize):
+            ts = time.perf_counter()
             f = consumer.pull()
             event = f.wait()
-            metadata.append(json.loads(event.metadata))
-            if metadata[i]["Type"] == "FIN": break
+            t_wait = time.perf_counter()
+            m = event.metadata
+            t_meta = time.perf_counter()
+            m = json.loads(m)
+            if m["Type"] == "FIN":
+                more_data = False
+                break
             else:
+                metadata.append(m)
+                t_data = time.perf_counter()
                 dd = event.data[0]
+                mofka_times.append([t_wait - ts, t_meta - t_wait, sys.getsizeof(m), time.perf_counter() - t_data, len(dd)])
                 dd = np.frombuffer(dd, dtype=np.float32)
                 dd = dd.reshape(metadata[i]["rank_dims"])
                 data.append(dd)
-        else:
-            print(metadata)
-            correct_order = [d for _,d in sorted(zip([m["rank"] for m in metadata], data), key=lambda d: d[0])]
-            data = np.concatenate(correct_order, axis=0)
-            process_stream(model, data, metadata)
-            continue
-        break
-
-    if input_path is not None:
-        if os.path.isdir(input_path):
-            process_directory(model, input_path)
-        elif os.path.isfile(input_path) and input_path.endswith('.h5'):
-            process_file(model, input_path)
-        else:
-            print(f"Invalid input path: {input_path}")
-
+        if len(metadata) > 0:
+            correct_order_meta = [
+                d for _, d in sorted(
+                    zip([(m["iteration_stream"], m["rank"]) for m in metadata], metadata),
+                    key=lambda d: (d[0][0], d[0][1])  # Sort by iteration_stream first, then by rank
+                )
+            ]
+            correct_order = [
+                d for _, d in sorted(
+                    zip([(m["iteration_stream"], m["rank"]) for m in metadata], data),
+                    key=lambda d: (d[0][0], d[0][1])  # Sort by iteration_stream first, then by rank
+                )
+            ]
+            for j in range(len(correct_order_meta)//nproc_sirt):
+                batch_data = correct_order[j*nproc_sirt:nproc_sirt+j*nproc_sirt]
+                batch_meta = correct_order_meta[j*nproc_sirt:nproc_sirt+j*nproc_sirt]
+                print(batch_meta)
+                data = np.concatenate(batch_data, axis=0)
+                #process_stream(model, data, metadata)
+                output_path = batch_meta[0]["iteration_stream"]+'-denoised.h5'
+                with h5py.File(output_path, 'w') as h5_output:
+                    h5_output.create_dataset('/data', data=data)
+    fields = ["t_wait", "t_metadata", "metadata_size" ,"t_data", "data_size"]
+    with open('Den_pull.csv', 'w') as f:
+        write = csv.writer(f)
+        write.writerow(fields)
+        write.writerows(mofka_times)
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Denoise HDF5 files using a trained model.')
     parser.add_argument('--input', type=str, required=False, help='Input file or directory path.')
     parser.add_argument('--model', type=str, required=True, help='Path to the saved model.')
     parser.add_argument('--protocol', type=str, required=True, help='Mofka protocol')
     parser.add_argument('--group_file', type=str, required=True, help='Path to group file')
+    parser.add_argument("--batchsize", type=int, required=True, help="Mofka batchsize")
+    parser.add_argument("--nproc_sirt", type=int, required=True, help="Number of Sirt Processes")
+
 
     args = parser.parse_args()
-    main(args.input, args.model, args.protocol, args.group_file)
+    main(args.input, args.model, args.protocol, args.group_file, args.batchsize, args.nproc_sirt)
 

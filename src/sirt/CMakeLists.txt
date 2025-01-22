@@ -10,9 +10,14 @@ if (NOT CMAKE_BUILD_TYPE)
 endif ()
 set (CMAKE_PREFIX_PATH "" CACHE STRING "External dependencies path")
 set (BUILD_SHARED_LIBS "ON" CACHE BOOL "Build a shared library")
+# Enable debugging symbols and disable optimization
+set(CMAKE_BUILD_TYPE Debug)
+
+# Optionally, add more flags for warnings and debugging:
+set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -Wall -Wextra")
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror -Wno-unused-but-set-variable -Wno-unused-variable")
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG")
+#set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 add_definitions(-DTIMERON)
 
@@ -40,12 +45,16 @@ include_directories(${Trace_SOURCE_DIR}/include)
 include_directories(${Trace_SOURCE_DIR}/include/tracelib)
 include_directories(${HDF5_INCLUDE_DIRS})
 
+include_directories(${Trace_SOURCE_DIR}/include)
+include_directories(${Trace_SOURCE_DIR}/include/mofka_sirt)
 
 add_library(trace_utils ${Trace_SOURCE_DIR}/src/tracelib/trace_utils.cc)
 add_library(trace_h5io ${Trace_SOURCE_DIR}/src/tracelib/trace_h5io.cc)
+
+add_library(mofka_stream ${Trace_SOURCE_DIR}/src/mofka_sirt/mofka_stream.cc)
+target_link_libraries(mofka_stream PRIVATE mofka::client)
 add_library(sirt ${CMAKE_CURRENT_LIST_DIR}/sirt.cc)
 
-
 add_executable(sirt_stream sirt_stream_main.cc)
-target_link_libraries(sirt_stream  sirt trace_utils trace_h5io zmq MPI::MPI_CXX hdf5::hdf5 Threads::Threads mofka::client)
+target_link_libraries(sirt_stream mofka_stream sirt trace_utils trace_h5io MPI::MPI_CXX hdf5::hdf5 Threads::Threads mofka::client)
 #target_include_directories(sirt_stream PRIVATE ${HDF5_INCLUDE_DIRS})

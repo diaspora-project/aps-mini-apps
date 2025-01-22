@@ -7,6 +7,7 @@ float SIRTReconSpace::CalculateSimdata(
     int *indi,
     float *leng)
 {
+
   float simdata = 0.;
 #ifdef PREFETCHON
   int prefetch_count = 64 / sizeof(float); // for 64 bit cache line
@@ -14,10 +15,11 @@ float SIRTReconSpace::CalculateSimdata(
   for (int i=0; i<len-1; ++i) {
 #ifdef PREFETCHON
     if (i+prefetch_count < len) {
-      size_t index = indi[i+prefetch_count]; 
+      size_t index = indi[i+prefetch_count];
       __builtin_prefetch(&(recon[index]), 0, 0); // TODO: this needs to be profiled
     }
 #endif
+    // segfault here
     simdata += recon[indi[i]]*leng[i];
   }
   return simdata;
@@ -35,9 +37,9 @@ void SIRTReconSpace::UpdateRecon(
     for(size_t j=0; j<cols; ++j){
       float upd = replica[j*2] / replica[j*2+1];
       if(std::isnan(upd)) {
-        nans++; 
+        nans++;
         //std::cout << "NaN value: replica[" << j*2 << "]=" << replica[j*2] <<
-        //  " / replica[" << j*2+1 << "]=" << replica[j*2+1]  << 
+        //  " / replica[" << j*2+1 << "]=" << replica[j*2+1]  <<
         //  " = " << replica[j*2]/replica[j*2+1] << std::endl;
         continue;
       }
@@ -53,7 +55,7 @@ void SIRTReconSpace::UpdateReconReplica(
     int curr_slice,
     int const * const indi,
     float *leng2,
-    float *leng, 
+    float *leng,
     int len)
 {
   float upd=0., a2=0.;
@@ -73,16 +75,17 @@ void SIRTReconSpace::UpdateReconReplica(
     __builtin_prefetch(slice+index2,1,0);
 #endif
     size_t index = indi[i]*2;
-    slice[index] += leng[i]*upd; 
+    // segfault in this line
+    slice[index] += leng[i]*upd;
     slice[index+1] += leng[i];
   }
 }
 
 
 void SIRTReconSpace::Initialize(int n_grids){
-  num_grids = n_grids; 
+  num_grids = n_grids;
 
-  coordx = new float[num_grids+1]; 
+  coordx = new float[num_grids+1];
   coordy = new float[num_grids+1];
   ax = new float[num_grids+1];
   ay = new float[num_grids+1];
@@ -124,7 +127,7 @@ void SIRTReconSpace::Reduce(MirroredRegionBareBase<float> &input)
   int num_grids = metadata.num_cols();
 
   int curr_proj = metadata.RayProjection(rays.index());
-  int count_projs = 
+  int count_projs =
     metadata.RayProjection(rays.index()+rays.count()-1) - curr_proj;
 
   /* Reconstruction start */
@@ -145,19 +148,19 @@ void SIRTReconSpace::Reduce(MirroredRegionBareBase<float> &input)
       float xi = -1e6;
       float yi = (1-num_cols)/2. + curr_col+mov;
       trace_utils::CalculateCoordinates(
-          num_grids, 
-          xi, yi, sinq, cosq, 
-          gridx, gridy, 
+          num_grids,
+          xi, yi, sinq, cosq,
+          gridx, gridy,
           coordx, coordy);  /// Outputs coordx and coordy
 
       /// Merge the (coordx, gridy) and (gridx, coordy)
       /// Output alen and after
       int alen, blen;
       trace_utils::MergeTrimCoordinates(
-          num_grids, 
-          coordx, coordy, 
-          gridx, gridy, 
-          &alen, &blen, 
+          num_grids,
+          coordx, coordy,
+          gridx, gridy,
+          &alen, &blen,
           ax, ay, bx, by);
 
       /// Sort the array of intersection points (ax, ay)
@@ -165,9 +168,9 @@ void SIRTReconSpace::Reduce(MirroredRegionBareBase<float> &input)
       /// stored in (coorx, coory).
       /// if quadrant=1 then a_ind = i; if 0 then a_ind = (alen-1-i)
       trace_utils::SortIntersectionPoints(
-          quadrant, 
-          alen, blen, 
-          ax, ay, bx, by, 
+          quadrant,
+          alen, blen,
+          ax, ay, bx, by,
           coorx, coory);
 
       /// Calculate the distances (leng) between the
@@ -176,10 +179,10 @@ void SIRTReconSpace::Reduce(MirroredRegionBareBase<float> &input)
       /// reconstruction grid (ind_recon).
       int len = alen + blen;
       trace_utils::CalculateDistanceLengths(
-          len, 
-          num_grids, 
-          coorx, coory, 
-          leng, leng2, 
+          len,
+          num_grids,
+          coorx, coory,
+          leng, leng2,
           indi);
 
       /*******************************************************/
@@ -189,12 +192,12 @@ void SIRTReconSpace::Reduce(MirroredRegionBareBase<float> &input)
       /// Forward projection
       float simdata = CalculateSimdata(recon, len, indi, leng);
 
-      /// Update recon 
+      /// Update recon
       UpdateReconReplica(
-          simdata, 
-          rays[curr_col], 
-          curr_slice, 
-          indi, 
+          simdata,
+          rays[curr_col],
+          curr_slice,
+          indi,
           leng2, leng,
           len);
       /*******************************************************/

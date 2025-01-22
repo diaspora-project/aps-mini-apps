@@ -11,7 +11,7 @@ class DISPEngineReduction : public DISPEngineBase<RST, DT>{
   protected:
     std::mutex work_queue_mutex;
 
-    virtual MirroredRegionBareBase<DT>* Partitioner(ADataRegion<DT> &input_data, 
+    virtual MirroredRegionBareBase<DT>* Partitioner(ADataRegion<DT> &input_data,
         int req_units)
     {
       return input_data.NextMirroredRegion(req_units);
@@ -34,7 +34,7 @@ class DISPEngineReduction : public DISPEngineBase<RST, DT>{
      */
     virtual void ReductionWrapper(
         AReductionSpaceBase<RST, DT> &reduction_space,
-        ADataRegion<DT> &input_data, 
+        ADataRegion<DT> &input_data,
         int &req_units)
     {
       auto output_data = PartitionWrapper(input_data, req_units);
@@ -56,7 +56,7 @@ class DISPEngineReduction : public DISPEngineBase<RST, DT>{
     }
 
     virtual void ResetAllReductionObjects(
-        AReductionSpaceBase<RST, DT> &reduction_space, 
+        AReductionSpaceBase<RST, DT> &reduction_space,
         DT &val)
     {
       reduction_space.reduction_objects().ResetAllItems(val);
@@ -66,7 +66,7 @@ class DISPEngineReduction : public DISPEngineBase<RST, DT>{
 
   public:
     virtual void GlobalInPlaceSynch(
-        DataRegion2DBareBase<DT> &dr, 
+        DataRegion2DBareBase<DT> &dr,
         DISPCommBase<DT> &comm)
     {
       comm.GlobalInPlaceCombination(dr);
@@ -75,7 +75,7 @@ class DISPEngineReduction : public DISPEngineBase<RST, DT>{
     virtual void DistInPlaceGlobalSynchWrapper(){
      AReductionSpaceBase<RST, DT> &head_rs = *(this->reduction_spaces_)[0];
      DataRegion2DBareBase<DT> &dr = head_rs.reduction_objects();
-     GlobalInPlaceSynch(dr, *(this->comm_)); 
+     GlobalInPlaceSynch(dr, *(this->comm_));
     };
 
     virtual void SeqInPlaceLocalSynchWrapper(){
@@ -148,7 +148,7 @@ class DISPEngineReduction : public DISPEngineBase<RST, DT>{
         std::vector<std::thread> worker_threads;
         for(int i=0; i<num_threads; i++){
           worker_threads.push_back(
-            std::thread( 
+            std::thread(
               &DISPEngineReduction::ParInPlaceLocalSynchHelper,
               this,
               std::ref(work_queue)));
@@ -172,10 +172,10 @@ class DISPEngineReduction : public DISPEngineBase<RST, DT>{
       std::vector<std::thread> reduction_threads;
       for(int i=0; i<this->num_reduction_threads_; i++){
         reduction_threads.push_back(std::thread(
-              &DISPEngineReduction::ReductionWrapper, 
+              &DISPEngineReduction::ReductionWrapper,
               this,
-              std::ref(*(this->reduction_spaces_)[i]), 
-              std::ref(input_data), 
+              std::ref(*(this->reduction_spaces_)[i]),
+              std::ref(input_data),
               std::ref(req_units)));
       }
 
@@ -190,7 +190,7 @@ class DISPEngineReduction : public DISPEngineBase<RST, DT>{
       std::vector<std::thread> reduction_threads;
       for(int i=0; i<this->num_reduction_threads_; i++){
         reduction_threads.push_back(std::thread(
-              &DISPEngineReduction::ResetAllReductionObjects, 
+              &DISPEngineReduction::ResetAllReductionObjects,
               this,
               std::ref(*(this->reduction_spaces_)[i]),
               std::ref(val)));
@@ -204,10 +204,10 @@ class DISPEngineReduction : public DISPEngineBase<RST, DT>{
     DISPEngineReduction(
         DISPCommBase<DT> *comm,
         AReductionSpaceBase<RST, DT> *conf_reduction_space_i,
-        int num_reduction_threads) : 
+        int num_reduction_threads) :
       DISPEngineBase<RST, DT>(
           comm,
-          conf_reduction_space_i, 
+          conf_reduction_space_i,
           num_reduction_threads){};
 };
 

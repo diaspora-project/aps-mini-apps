@@ -1,7 +1,8 @@
+import sys
 import numpy as np
 import json
-from pymargo.core import Engine
 import mochi.mofka.client as mofka
+import time
 
 def generate_worker_msgs(data: np.ndarray, dims: list, projection_id: int, theta: float,
                          n_ranks: int, center: float, seq: int) -> list:
@@ -16,7 +17,8 @@ def generate_worker_msgs(data: np.ndarray, dims: list, projection_id: int, theta
         # Prepare the message for the worker
         msg = prepare_data_rep_msg(seq,
                                    projection_id,
-                                   theta, center,
+                                   theta,
+                                   center,
                                    data_size,
                                    data[curr_sinogram_id*dims[1]:(curr_sinogram_id+(nsin+r))*dims[1]]
         )
@@ -67,20 +69,18 @@ def data_broker(metadata, descriptor):
 
 class MofkaDist:
 
-    def __init__(self, mofka_protocol: str, group_file: str):
+    def __init__(self, group_file: str, batchsize: int = 16):
         # setup mofka
-        self.engine = Engine(mofka_protocol)
-        self.driver = mofka.MofkaDriver(group_file, self.engine)
+        self.driver = mofka.MofkaDriver(group_file, use_progress_thread=True)
         self.seq = 0
         self.nranks = 1
+        self.buffer = []
+        self.counter = 0
+        self.batch = batchsize
 
     def producer(self, topic_name: str, producer_name: str) -> mofka.Producer:
-        if not self.driver.topic_exists(topic_name):
-            self.driver.create_topic(topic_name)
-        for p in range(self.nranks):
-            self.driver.add_memory_partition(topic_name, 0)
         topic = self.driver.open_topic(topic_name)
-        batchsize = mofka.AdaptiveBatchSize
+        batchsize = 1000 #self.batch #mofka.AdaptiveBatchSize
         thread_pool = mofka.ThreadPool(1)
         ordering = mofka.Ordering.Strict
         producer = topic.producer(producer_name,
@@ -90,11 +90,8 @@ class MofkaDist:
         return producer
 
     def consumer(self, topic_name: str, consumer_name: str) -> mofka.Consumer:
-        batch_size = mofka.AdaptiveBatchSize
+        batch_size = self.batch #mofka.AdaptiveBatchSize
         thread_pool = mofka.ThreadPool(0)
-        if not self.driver.topic_exists(topic_name):
-            self.driver.create_topic(topic_name)
-            self.driver.add_memory_partition(topic_name, 0)
         topic = self.driver.open_topic(topic_name)
         consumer = topic.consumer(name=consumer_name,
                                   thread_pool=thread_pool,
@@ -106,15 +103,17 @@ class MofkaDist:
 
     def handshake(self,  row: int , col: int) -> str :
         # Figure out how many ranks are there at the remote location
-        topic = "handshake_s_d"
-        consumer = self.consumer(topic, "handshaker")
+        topic_name = "handshake_s_d"
+        topic = self.driver.open_topic(topic_name)
+        consumer = topic.consumer(name="handshaker",
+                                  thread_pool=mofka.ThreadPool(0),
+                                  batch_size=self.batch)
         f = consumer.pull()
         event = f.wait()
-
         self.nranks = json.loads(event.metadata)["comm_size"]
         self.seq += 1
-        topic = "handshake_d_s"
-        producer = self.producer(topic, "handshaker")
+        topic_name = "handshake_d_s"
+        producer = self.producer(topic_name, "handshaker")
         # distribute data info
         for p in range(self.nranks):
             info = assign_data(p, self.nranks, row, col)
@@ -127,6 +126,17 @@ class MofkaDist:
         del topic
         return "Done"
 
+    def pull_image(self, consumer: mofka.Consumer):
+        ts = time.perf_counter()
+        f = consumer.pull()
+        event = f.wait()
+        t_wait = time.perf_counter()
+        mofka_metadata = event.metadata
+        t_meta = time.perf_counter()
+        mofka_data = event.data[0]
+        t_data = time.perf_counter()
+        return json.loads(mofka_metadata), mofka_data, [t_wait - ts, t_meta- t_wait, sys.getsizeof(mofka_metadata), t_data - t_meta, len(mofka_data)]
+
     def push_image(self, data: np.ndarray, row :int, col: int,
                    theta: float, projection_id: int, center: float,
                    producer: mofka.Producer) -> int :
@@ -136,34 +146,50 @@ class MofkaDist:
         print(f"Sending proj: id={projection_id}; center={center}; dims[0]={dims[0]}; dims[1]={dims[1]}; theta={theta}")
 
         # Generate worker messages
-        worker_msgs = generate_worker_msgs(data, dims, projection_id, theta,
-                                           self.nranks, center, self.seq)
-
+        msgs = generate_worker_msgs(data,
+                                    dims,
+                                    projection_id,
+                                    theta,
+                                    self.nranks,
+                                    center,
+                                    self.seq)
+        self.buffer.append(msgs)
+        mofka_t = []
         # Send data to workers
         for i in range(self.nranks):
-            f = producer.push(worker_msgs[i][0], worker_msgs[i][1])
-            f.wait()
+            ts = time.perf_counter()
+            f = producer.push(self.buffer[self.counter][i][0], self.buffer[self.counter][i][1])
+            #f.wait()
+            mofka_t.append(["push", projection_id, ts, time.perf_counter(), time.perf_counter() - ts, sys.getsizeof(self.buffer[self.counter][i][0]) ,len(self.buffer[self.counter][i][1])])
 
         self.seq += 1
-        return 0
+        self.counter += 1
+        if self.counter == self.batch:
+            ts = time.perf_counter()
+            producer.flush()
+            mofka_t.append(["flush_after", projection_id, ts, time.perf_counter(), time.perf_counter() - ts, self.nranks*len(self.buffer)* sys.getsizeof(self.buffer[self.counter-1][0][0]), self.nranks*len(self.buffer)*len(self.buffer[self.counter-1][0][1])])
+            self.buffer = []
+            self.counter = 0
 
+        return mofka_t
+
+    def last_flush(self, producer):
+        if len(self.buffer)> 0:
+            ts = time.perf_counter()
+            producer.flush()
+            self.seq += 1
+            return ["last_flush","" , ts, time.perf_counter(), time.perf_counter() - ts, self.nranks*len(self.buffer)* sys.getsizeof(self.buffer[self.counter-1][0][0]), self.nranks*len(self.buffer)*len(self.buffer[self.counter-1][0][1])]
+        return None
 
     def done_image(self, producer) -> int:
         msg_metadata = {"Type": "FIN" }
         # Send Fin message to workers
-        for p in range(self.nranks):
-            producer.push(msg_metadata)
+        for _ in range(self.nranks):
+            producer.push(msg_metadata, bytearray(1))
         producer.flush()
         self.seq += 1
         return 0
 
-    def init(self, mofka_protocol: str, group_file: str) -> mofka.MofkaDriver:
-        self.__init__(mofka_protocol, group_file)
-        return self.driver
-
     def finalize(self):
         del self.driver
-        del self.client
-        self.engine.finalize()
-        del self.engine
-
+        del self.buffer

@@ -10,6 +10,8 @@ import TraceSerializer
 import tomopy as tp
 import json
 from mofka_dist import MofkaDist
+import csv
+#from memory_profiler import profile
 
 def parse_arguments():
   parser = argparse.ArgumentParser( description='Data Distributor Process')
@@ -17,6 +19,9 @@ def parse_arguments():
 
   parser.add_argument('--group_file', type=str, default="mofka.json",
                       help='Group file for the mofka server')
+
+  parser.add_argument('--batchsize', type=int, default=16,
+                      help='mofka batch size')
   # TQ communication
   parser.add_argument('--beg_sinogram', type=int,
                           help='Starting sinogram for reconstruction')
@@ -51,17 +56,18 @@ def parse_arguments():
 
 
   return parser.parse_args()
-
+#@profile
 def main():
   args = parse_arguments()
   # Setup mofka
-  mofka = MofkaDist(mofka_protocol=args.protocol, group_file=args.group_file)
+  mofka_dist = MofkaDist(group_file=args.group_file, batchsize=args.batchsize)
   # Handshake with Sirt
-  mofka.handshake(args.num_sinograms, args.num_columns)
+  mofka_dist.handshake(args.num_sinograms, args.num_columns)
 
-  consumer = mofka.consumer(topic_name="daq_dist", consumer_name="dist")
-  producer = mofka.producer(topic_name="dist_sirt", producer_name="producer_dist")
-
+  consumer = mofka_dist.consumer(topic_name="daq_dist", consumer_name="dist")
+  producer = mofka_dist.producer(topic_name="dist_sirt", producer_name="producer_dist")
+  mofka_producing_time = []
+  mofka_consuming_time = []
   # Setup serializer
   serializer = TraceSerializer.ImageSerializer()
 
@@ -76,16 +82,13 @@ def main():
   total_size=0
   seq=0
   time0 = time.time()
-
   while True:
-    total_received += 1
-    f = consumer.pull()
-    event = f.wait()
-    mofka_data = event.data[0]
-    total_size += len(mofka_data)
-    mofka_metadata = json.loads(event.metadata)
-    if mofka_metadata["Type"] == "FIN": break
 
+    mofka_metadata, mofka_data, pull_times = mofka_dist.pull_image(consumer)
+    if mofka_metadata["Type"] == "FIN": break
+    total_received += 1
+    total_size += len(mofka_data)
+    mofka_consuming_time.append(pull_times)
     # This is mostly for data rate tests
     if args.skip_serialize:
       print("Skipping rest. Received msg: {}".format(total_received))
@@ -142,10 +145,9 @@ def main():
       #to send from mofka:
       mofka_sub = sub.flatten()
       ncols = sub.shape[2]
-
-      mofka.push_image(mofka_sub, args.num_sinograms, ncols, rotation,
+      t = mofka_dist.push_image(mofka_sub, args.num_sinograms, ncols, rotation,
                       mofka_read_image.UniqueId(), mofka_read_image.Center(), producer=producer)
-
+      mofka_producing_time.extend(t)
     # If incoming data is white field
     if mofka_read_image.Itype() is serializer.ITypes.White:
       #print("White field data is received: {}".format(read_image.UniqueId()))
@@ -171,7 +173,11 @@ def main():
       dark_imgs=[]
       dark_imgs.extend(sub)
       tot_dark_imgs += 1
+    seq+=1
 
+  t = mofka_dist.last_flush(producer)
+  if t is not None:
+    mofka_producing_time.extend(t)
   time1 = time.time()
 
   # Profile information
@@ -181,10 +187,20 @@ def main():
   print("Rate (MiB/s): {:.2f}; (msg/s): {:.2f}".format(
             tot_MiBs/elapsed_time, total_received/elapsed_time))
 
-
-  mofka.done_image(producer)
+  mofka_dist.done_image(producer)
+  fields = ["push", "projection_id", "start", "stop", "duration", "metadata_size" ,"data_size"]
+  with open('Dist_push.csv', 'w') as f:
+    write = csv.writer(f)
+    write.writerow(fields)
+    write.writerows(mofka_producing_time)
+  fields = ["t_wait", "t_metadata", "metadata_size" ,"t_data", "data_size"]
+  with open('Dist_pull.csv', 'w') as f:
+    write = csv.writer(f)
+    write.writerow(fields)
+    write.writerows(mofka_consuming_time)
   del producer
   del consumer
+  print("Exiting ...")
 
 if __name__ == '__main__':
   main()

@@ -1,0 +1,7 @@
+set write on
+set pagination off
+set backtrace limit 0
+set print elements 0
+run
+backtrace full
+quit
