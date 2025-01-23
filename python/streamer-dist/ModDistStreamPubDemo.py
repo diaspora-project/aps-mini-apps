@@ -147,7 +147,7 @@ def main():
       ncols = sub.shape[2]
       t = mofka_dist.push_image(mofka_sub, args.num_sinograms, ncols, rotation,
                       mofka_read_image.UniqueId(), mofka_read_image.Center(), producer=producer)
-      mofka_producing_time.extend(t)
+      mofka_producing_time.append(t)
     # If incoming data is white field
     if mofka_read_image.Itype() is serializer.ITypes.White:
       #print("White field data is received: {}".format(read_image.UniqueId()))
@@ -177,7 +177,7 @@ def main():
 
   t = mofka_dist.last_flush(producer)
   if t is not None:
-    mofka_producing_time.extend(t)
+    mofka_producing_time.append(t)
   time1 = time.time()
 
   # Profile information
