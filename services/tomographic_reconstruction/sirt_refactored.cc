@@ -7,7 +7,7 @@
 struct PData {
         std::vector<float> data;
         std::vector<float> theta;
-        std::vector<unsigned long> dims;
+        std::vector<hsize_t> dims;
 
         void print_info() const {
             std::cout << "Size of the dims: ";
@@ -21,7 +21,7 @@ struct PData {
 std::unique_ptr<PData> prepare_data() {
     herr_t err; 
     // set the file name and path
-    const char *file_name = "../../data/tomo_00058_all_subsampled1p_s1079s1081.h5";
+    const char *file_name = "/workspaces/aps-mini-apps/data/tomo_00058_all_subsampled1p_s1079s1081.h5";
 
     // open hdff5 file
     hid_t file_id = H5Fopen(file_name, H5F_ACC_RDONLY, H5P_DEFAULT);
@@ -470,6 +470,26 @@ class SIRTReconSpace{
     
 };
 
+void write_recon(const std::vector<float> &recon, std::vector<hsize_t> mdims, const std::string &filename) 
+{
+    hid_t file_id = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+    if (file_id < 0) std::cerr << "Error creating file" << std::endl;
+
+    hsize_t dims[3] = {mdims[0], mdims[1], mdims[2]};
+    hid_t dataspace_id = H5Screate_simple(3, dims, NULL);
+    if (dataspace_id < 0) std::cerr << "Error creating dataspace" << std::endl;
+
+    hid_t dataset_id = H5Dcreate(file_id, "/recon", H5T_NATIVE_FLOAT, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    if (dataset_id < 0) std::cerr << "Error creating dataset" << std::endl;
+
+    herr_t err = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, recon.data());
+    if (err < 0) std::cerr << "Error writing dataset" << std::endl;
+
+    H5Dclose(dataset_id);
+    H5Sclose(dataspace_id);
+    H5Fclose(file_id);
+}
+
 int main() {
     std::cout << "Hello" << std::endl;
     std::unique_ptr<PData> pdata_ptr = prepare_data();
@@ -494,6 +514,10 @@ int main() {
     }
 
     tmetadata.print_info();
+
+    // Write recon to file
+    write_recon(tmetadata.recon,{pdata.dims[1], tmetadata.num_grids, tmetadata.num_grids}, "recon.h5");
+
 
     return 0;
 }
