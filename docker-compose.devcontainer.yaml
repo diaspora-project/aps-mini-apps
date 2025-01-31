@@ -1,0 +1,18 @@
+services:
+    streamer-daq:
+        build:
+            context: ./python/streamer-daq
+            dockerfile: Dockerfile.devcontainer
+            target: daq
+        networks:
+            aps-mini-app-network:
+                ipv4_address: 172.16.238.10
+        volumes:
+            - .:/aps-mini-apps
+networks:
+    aps-mini-app-network:
+        driver: bridge #for the docker instances on the same host
+        ipam:
+            driver: default
+            config:
+                - subnet: 172.16.238.0/24

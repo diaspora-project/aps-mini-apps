@@ -1,0 +1,6 @@
+{
+    "name": "DAQ Container",
+    "dockerComposeFile": "../../docker-compose.devcontainer.yaml",
+    "service": "streamer-daq",
+    "workspaceFolder": "/aps-mini-apps/python/streamer-daq"
+}
