@@ -8,6 +8,7 @@ float SIRTReconSpace::CalculateSimdata(
     float *leng)
 {
   float simdata = 0.;
+  size_t nout_bound = 0;
 #ifdef PREFETCHON
   int prefetch_count = 64 / sizeof(float); // for 64 bit cache line
 #endif
@@ -18,8 +19,14 @@ float SIRTReconSpace::CalculateSimdata(
       __builtin_prefetch(&(recon[index]), 0, 0); // TODO: this needs to be profiled
     }
 #endif
+    if(indi[i]>=num_grids) {
+      std::cout << "CalculateSimdata: Index out of bound=" << indi[i] << "; num_grids=" << num_grids << std::endl;
+      nout_bound++;
+      continue;
+    }
     simdata += recon[indi[i]]*leng[i];
   }
+  if(nout_bound>num_grids) std::cout << "CalculateSimdata: # out of bound=" << nout_bound << std::endl;
   return simdata;
 }
 
@@ -67,15 +74,22 @@ void SIRTReconSpace::UpdateReconReplica(
   upd = (ray-simdata) / a2;
 
   int i=0;
+  size_t nout_bound = 0;
   for (; i<(len-1); ++i) {
 #ifdef PREFETCHON
     size_t index2 = indi[i+32]*2;
     __builtin_prefetch(slice+index2,1,0);
 #endif
     size_t index = indi[i]*2;
+    if (index>=slice_t.count()) {
+      std::cout << "Index out of bound=" << index << "; curr_slice=" << curr_slice << std::endl;
+      nout_bound++;
+      continue;
+    }
     slice[index] += leng[i]*upd; 
     slice[index+1] += leng[i];
   }
+  if(nout_bound>0) std::cout << "# out of bound=" << nout_bound << std::endl;
 }
 
 
