@@ -282,8 +282,8 @@ int main(int argc, char **argv)
   //delete curr_slices;
   std::cout << "Deleting comm" << std::endl;
   delete comm;
-  std::cout << "Deleting engine" << std::endl;
-  delete engine;
+  //std::cout << "Deleting engine" << std::endl;
+  //delete engine;
   std::cout << "Exiting" << std::endl;
 }
 
