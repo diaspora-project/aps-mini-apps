@@ -80,7 +80,7 @@ class MofkaDist:
 
     def producer(self, topic_name: str, producer_name: str) -> mofka.Producer:
         topic = self.driver.open_topic(topic_name)
-        batchsize = 10000 #self.batch #mofka.AdaptiveBatchSize
+        batchsize = self.batch #self.batch #mofka.AdaptiveBatchSize
         thread_pool = mofka.ThreadPool(1)
         ordering = mofka.Ordering.Strict
         producer = topic.producer(producer_name,

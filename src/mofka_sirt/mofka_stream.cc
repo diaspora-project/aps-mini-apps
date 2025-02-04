@@ -168,7 +168,7 @@ mofka::Producer MofkaStream::getProducer(std::string topic_name,
                                          std::string producer_name="streamer_sirt"){
   auto topic = driver.openTopic(topic_name);
   mofka::Producer producer = topic.producer(producer_name,
-                                            batchSize, //large number, we use batchsize to control the flush
+                                            batchSize,
                                             threadCount,
                                             ordering);
   return producer;
@@ -186,7 +186,7 @@ mofka::Consumer MofkaStream::getConsumer(std::string topic_name,
                                          std::vector<size_t> targets={0}){
   mofka::TopicHandle topic = driver.openTopic(topic_name);
   mofka::Consumer consumer = topic.consumer(consumer_name,
-                                            threadCount, //mofka::ThreadCount{0},
+                                            threadCount,
                                             batchSize,
                                             data_selector,
                                             data_broker,

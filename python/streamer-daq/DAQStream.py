@@ -400,7 +400,7 @@ def main():
   topic_name = "daq_dist"
   topic = driver.open_topic(topic_name)
   producer_name = "daq_producer"
-  batchsize = 1000 #mofka.AdaptiveBatchSize
+  batchsize = args.batchsize #mofka.AdaptiveBatchSize
   thread_pool = mofka.ThreadPool(1)
   ordering = mofka.Ordering.Strict
   producer = topic.producer(producer_name, batchsize, thread_pool, ordering)
