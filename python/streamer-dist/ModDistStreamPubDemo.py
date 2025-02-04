@@ -22,6 +22,9 @@ def parse_arguments():
 
   parser.add_argument('--batchsize', type=int, default=16,
                       help='mofka batch size')
+
+  parser.add_argument('--nproc_sirt', type=int, default=0,
+                      help='number of reconstruction processes')
   # TQ communication
   parser.add_argument('--beg_sinogram', type=int,
                           help='Starting sinogram for reconstruction')
@@ -62,7 +65,7 @@ def main():
   # Setup mofka
   mofka_dist = MofkaDist(group_file=args.group_file, batchsize=args.batchsize)
   # Handshake with Sirt
-  mofka_dist.handshake(args.num_sinograms, args.num_columns)
+  mofka_dist.handshake(args.nproc_sirt, args.num_sinograms, args.num_columns)
 
   consumer = mofka_dist.consumer(topic_name="daq_dist", consumer_name="dist")
   producer = mofka_dist.producer(topic_name="dist_sirt", producer_name="producer_dist")
@@ -145,9 +148,14 @@ def main():
       #to send from mofka:
       mofka_sub = sub.flatten()
       ncols = sub.shape[2]
-      t = mofka_dist.push_image(mofka_sub, args.num_sinograms, ncols, rotation,
+      tt = mofka_dist.push_image(mofka_sub, args.num_sinograms, ncols, rotation,
                       mofka_read_image.UniqueId(), mofka_read_image.Center(), producer=producer)
-      mofka_producing_time.append(t)
+
+      if all(isinstance(item, list) for item in tt):
+        mofka_producing_time.extend(tt)
+      else:
+        mofka_producing_time.append(tt)
+
     # If incoming data is white field
     if mofka_read_image.Itype() is serializer.ITypes.White:
       #print("White field data is received: {}".format(read_image.UniqueId()))
@@ -188,7 +196,7 @@ def main():
             tot_MiBs/elapsed_time, total_received/elapsed_time))
 
   mofka_dist.done_image(producer)
-  fields = ["push", "projection_id", "start", "stop", "duration", "metadata_size" ,"data_size"]
+  fields = ["type", "projection_id", "start", "stop", "duration", "metadata_size" ,"data_size"]
   with open('Dist_push.csv', 'w') as f:
     write = csv.writer(f)
     write.writerow(fields)

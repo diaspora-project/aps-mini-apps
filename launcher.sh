@@ -3,10 +3,10 @@ echo $DIR
 
 RUNS=10
 
-for R in $(seq 1 $RUNS)
+for R in  1 #$(seq 1 $RUNS)
 do
     DATE=$(date +"%Y-%m-%d_%T")
-    WORKSPACE=/eagle/radix-io/agueroudji/RUNS/2/D${DATE}/
+    WORKSPACE=/eagle/radix-io/agueroudji/FULL_ASYNC_1/64/D${DATE}/
     mkdir  -p $WORKSPACE
     cd $WORKSPACE
     cp -r  $DIR/* .

@@ -1,6 +1,6 @@
 #!/bin/bash
 #PBS -l select=5:system=polaris
-#PBS -l walltime=00:30:00
+#PBS -l walltime=03:00:00
 #PBS -N APS
 #PBS -q run_next
 
@@ -19,6 +19,10 @@ export MARGO_ENABLE_MONITORING=1
 export MARGO_MONITORING_FILENAME_PREFIX=mofka
 export MARGO_MONITORING_DISABLE_TIME_SERIES=true
 
+export HG_LOG_LEVEL=error
+export FI_LOG_LEVEL=Trace
+
+
 set -euo pipefail
 cd $PBS_O_WORKDIR
 
@@ -31,19 +35,19 @@ node_dist=${nodes_array[1]}
 node_sirt=${nodes_array[2]}
 node_den=${nodes_array[3]}
 node_mofka=${nodes_array[4]}
-sirt_ranks=2
+sirt_ranks=1
 
 rm -rf mofka.json
 
 #LD_PRELOAD=/home/agueroudji/spack/var/spack/environments/APS_VAL/.spack-env/view/lib/libasan.so.8  \
-mpiexec -n 1 -ppn 1 -d 16 --hosts $node_mofka  bedrock cxi -v trace -c config.json 1> bedrock.out 2> bedrock.err &
+mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_mofka  bedrock cxi -v trace -c config.json 1> bedrock.out 2> bedrock.err &
 BEDROCK_PID=$!
 
 echo "Waiting for mofka file to be created"
 while [ ! -f "mofka.json" ]; do
     sleep 1  # Wait for 1 second before checking again
 done
-sleep 5 # Sleep one more second, for good measure
+sleep 5 # Sleep 5 more second, for good measure
 
 #DAQ topic
 mofkactl topic create daq_dist \
@@ -104,10 +108,10 @@ EOF
 #mpiexec -n 1 -ppn 1 -d 16 --hosts $node_daq gdb -batch -x gdb_commands.txt --args python ./build/python/streamer-daq/DAQStream.py --mode 1 --simulation_file \
 # valgrind --leak-check=full --track-origins=yes --show-leak-kinds=all --verbose  \
 #          --tool=memcheck  --track-fds=yes --num-callers=50 \
-mpiexec -n 1 -ppn 1 -d 16 --hosts $node_daq python ./build/python/streamer-daq/DAQStream.py --mode 1 --simulation_file \
-./data/tomo_00058_all_subsampled1p_s1079s1081.h5 --d_iteration 1  --batchsize 2 \
+mpiexec  --no-vni -n 1 -ppn 1 -d 16 --hosts $node_daq python ./build/python/streamer-daq/DAQStream.py --mode 1 --simulation_file \
+./data/tomo_00058_all_subsampled1p_s1079s1081.h5 --d_iteration 1  --batchsize  64  \
 --publisher_addr tcp://0.0.0.0:50000 --iteration_sleep 1 --synch_addr tcp://0.0.0.0:50001 \
---synch_count 1 --protocol cxi --group_file mofka.json 1> daq.out 2> daq.err &
+--synch_count 1 --protocol cxi --group_file mofka.json 1> daq.out 2> daq.err
 
 
 echo "streamer-daq started"
@@ -120,9 +124,10 @@ echo "streamer-daq started"
 #mpiexec -n 1 -ppn 1 -d 16 --hosts $node_dist gdb -batch -x gdb_commands.txt --args python ./build/python/streamer-dist/ModDistStreamPubDemo.py  --cast_to_float32 \
 # valgrind --leak-check=full --track-origins=yes --show-leak-kinds=all --verbose  \
 #          --tool=memcheck  --track-fds=yes --num-callers=50 \
-mpiexec -n 1 -ppn 1 -d 16 --hosts $node_dist  python ./build/python/streamer-dist/ModDistStreamPubDemo.py  --cast_to_float32 \
---normalize --beg_sinogram 1000 --num_sinograms 2 --num_columns 2560  --batchsize 2 \
---protocol cxi --group_file mofka.json 1> dist.out 2> dist.err &
+
+mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_dist python ./build/python/streamer-dist/ModDistStreamPubDemo.py  --cast_to_float32 \
+--normalize --beg_sinogram 1000 --num_sinograms 2 --num_columns 2560  --batchsize  64  \
+--protocol cxi --group_file mofka.json  --nproc_sirt $sirt_ranks 1> dist.out 2> dist.err
 
 # Wait for streamer-dist to be ready (use a sleep to ensure it starts properly)
 #sleep 10
@@ -133,18 +138,18 @@ echo "streamer-dist started"
 #mpiexec -n $sirt_ranks -ppn $sirt_ranks -d 16 --hosts $node_sirt ./build/bin/sirt_stream  --write-freq 4  \
 # valgrind --leak-check=full --track-origins=yes --show-leak-kinds=all --verbose  \
 #          --tool=memcheck  --track-fds=yes --num-callers=50 \
-mpiexec -n $sirt_ranks -ppn $sirt_ranks -d 16 --hosts $node_sirt ./build/bin/sirt_stream  --write-freq 4  \
---window-iter 1 --window-step 4 --window-length 4 -t 4 -c 1427 --protocol cxi --group-file mofka.json --batchsize 2 \
-1> sirt.out 2> sirt.err &
+mpiexec --no-vni -n $sirt_ranks -ppn $sirt_ranks -d 16 --hosts $node_sirt gdb -batch -x gdb_commands.txt --args ./build/bin/sirt_stream  --write-freq 4  \
+--window-iter 1 --window-step 4 --window-length 4 -t 4 -c 1427 --protocol cxi --group-file mofka.json --batchsize  64  \
+1> sirt.out 2> sirt.err
 echo "streamer-sirt started"
 
 echo "starting streamer-den"
 #LD_PRELOAD=/home/agueroudji/spack/var/spack/environments/APS_VAL/.spack-env/view/lib/libasan.so.8 \
 # valgrind --leak-check=full --track-origins=yes --show-leak-kinds=all --verbose  \
 #          --tool=memcheck  --track-fds=yes --num-callers=50 \
-mpiexec -n 1 -ppn 1 -d 16 --hosts $node_den  python ./build/python/streamer-denoiser/denoiser.py \
+mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_den  python ./build/python/streamer-denoiser/denoiser.py \
 --model ./build/python/streamer-denoiser/testA40GPU-it07500.h5 \
---protocol cxi --group_file mofka.json --batchsize 2 --nproc_sirt 2 1> den.out 2> den.err
+--protocol cxi --group_file mofka.json --batchsize  64 --nproc_sirt $sirt_ranks 1> den.out 2> den.err
 
 echo "streamer-den finished"
 

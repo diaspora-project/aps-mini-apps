@@ -168,7 +168,7 @@ mofka::Producer MofkaStream::getProducer(std::string topic_name,
                                          std::string producer_name="streamer_sirt"){
   auto topic = driver.openTopic(topic_name);
   mofka::Producer producer = topic.producer(producer_name,
-                                            mofka::BatchSize{1000}, //large number, we use batchsize to control the flush
+                                            batchSize, //large number, we use batchsize to control the flush
                                             threadCount,
                                             ordering);
   return producer;
@@ -186,7 +186,7 @@ mofka::Consumer MofkaStream::getConsumer(std::string topic_name,
                                          std::vector<size_t> targets={0}){
   mofka::TopicHandle topic = driver.openTopic(topic_name);
   mofka::Consumer consumer = topic.consumer(consumer_name,
-                                            threadCount,
+                                            threadCount, //mofka::ThreadCount{0},
                                             batchSize,
                                             data_selector,
                                             data_broker,
@@ -208,7 +208,6 @@ DataRegionBase<float, TraceMetadata>* MofkaStream::readSlidingWindow(
   DataRegionBareBase<float> &recon_image,
   int step,
   mofka::Consumer consumer){
-
   // Dynamically meet sizes
   while(vtheta.size()> window_len)
     eraseBegTraceMsg();
@@ -290,15 +289,15 @@ void MofkaStream::setInfo(json &j) {info = j;}
 
 void MofkaStream::windowLength(uint32_t wlen){ window_len = wlen;}
 
-std::vector<std::tuple<std::string, int, float>> MofkaStream::getConsumerTimes(){return consumer_times;}
+std::vector<std::tuple<std::string, uint64_t, float>> MofkaStream::getConsumerTimes(){return consumer_times;}
 
-void MofkaStream::setConsumerTimes(std::string op, int size, float time){
+void MofkaStream::setConsumerTimes(std::string op, uint64_t size, float time){
   consumer_times.emplace_back(op, size, time);
 }
 
-std::vector<std::tuple<std::string, int, float>> MofkaStream::getProducerTimes(){return producer_times;}
+std::vector<std::tuple<std::string, uint64_t, float>> MofkaStream::getProducerTimes(){return producer_times;}
 
-void MofkaStream::setProducerTimes(std::string op, int size, float time){
+void MofkaStream::setProducerTimes(std::string op, uint64_t size, float time){
   producer_times.emplace_back(op, size, time);
 }
 
@@ -309,18 +308,16 @@ int MofkaStream::writeTimes(std::string type){
       std::cerr << "Failed to open file for writing." << std::endl;
       return -1;
   }
-  std::vector<std::tuple<std::string, int, float>> data;
+  std::vector<std::tuple<std::string, uint64_t, float>> data;
   if (type == "producer"){
     data = getProducerTimes() ;
-    std::cout << "Producer size data " << data.size() << std::endl ;
   } else if (type == "consumer") {
     data = getConsumerTimes() ;
-    std::cout << "Consumer size data " << data.size() << std::endl ;
   } else{
-    std::cerr << type <<" data does not exist, 'producer' and 'consumer' are the obly supported types" << std::endl;
+    std::cerr << type <<" data does not exist, 'producer' and 'consumer' are the only supported types" << std::endl;
     return -1;
-  }
-  file << "Type,Size,Duration\n";
+  }    std::cout << "Consumer size data " << data.size() << std::endl ;
+  file << "type,size,duration\n";
   for (const auto& entry : data) {
       file << std::get<0>(entry) << ","
             << std::get<1>(entry) << ","

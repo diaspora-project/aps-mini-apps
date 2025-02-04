@@ -461,7 +461,6 @@ def main():
   del topic
   print("del driver")
   del driver
-  time.sleep(10)
   print("Exiting ...")
 if __name__ == '__main__':
     main()

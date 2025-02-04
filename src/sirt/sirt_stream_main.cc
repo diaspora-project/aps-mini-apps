@@ -133,25 +133,21 @@ int main(int argc, char **argv)
   DISPCommBase<float> *comm =
         new DISPCommMPI<float>(&argc, &argv);
   TraceRuntimeConfig config(argc, argv, comm->rank(), comm->size());
-
   MofkaStream ms = MofkaStream{ config.group_file,
                                 config.batchsize,
                                 static_cast<uint32_t>(config.window_len),
                                 comm->rank(),
                                 comm->size()};
-
   ms.handshake(comm->rank(), comm->size());
   std::string consuming_topic = "dist_sirt";
   std::string producing_topic = "sirt_den";
   std::vector<size_t> targets = {static_cast<size_t>(comm->rank())};
   mofka::Producer  producer = ms.getProducer(producing_topic, "sirt");
   mofka::Consumer consumer = ms.getConsumer(consuming_topic, "sirt", targets);
-
   /* Get metadata structure */
   json tmetadata = ms.getInfo();
   auto n_blocks = tmetadata["n_sinograms"].get<int64_t>();
   auto num_cols = tmetadata["n_rays_per_proj_row"].get<int64_t>();
-
   /***********************/
   /* Initiate middleware */
   /* Prepare main reduction space and its objects */
@@ -164,7 +160,6 @@ int main(int argc, char **argv)
   auto &main_recon_replica = main_recon_space->reduction_objects();
   float init_val=0.;
   main_recon_replica.ResetAllItems(init_val);
-
   /* Prepare processing engine and main reduction space for other threads */
   DISPEngineBase<SIRTReconSpace, float> *engine =
     new DISPEngineReduction<SIRTReconSpace, float>(

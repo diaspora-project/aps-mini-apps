@@ -80,7 +80,7 @@ class MofkaDist:
 
     def producer(self, topic_name: str, producer_name: str) -> mofka.Producer:
         topic = self.driver.open_topic(topic_name)
-        batchsize = 1000 #self.batch #mofka.AdaptiveBatchSize
+        batchsize = 10000 #self.batch #mofka.AdaptiveBatchSize
         thread_pool = mofka.ThreadPool(1)
         ordering = mofka.Ordering.Strict
         producer = topic.producer(producer_name,
@@ -101,17 +101,25 @@ class MofkaDist:
         return consumer
 
 
-    def handshake(self,  row: int , col: int) -> str :
+    def handshake(self, nproc_sirt: int,  row: int, col: int) -> str :
         # Figure out how many ranks are there at the remote location
-        topic_name = "handshake_s_d"
-        topic = self.driver.open_topic(topic_name)
-        consumer = topic.consumer(name="handshaker",
-                                  thread_pool=mofka.ThreadPool(0),
-                                  batch_size=self.batch)
-        f = consumer.pull()
-        event = f.wait()
-        self.nranks = json.loads(event.metadata)["comm_size"]
-        self.seq += 1
+        if nproc_sirt == 0:
+            topic_name = "handshake_s_d"
+            topic = self.driver.open_topic(topic_name)
+            consumer = topic.consumer(name="handshaker",
+                                    thread_pool=mofka.ThreadPool(0),
+                                    batch_size=self.batch)
+            f = consumer.pull()
+            event = f.wait()
+            self.nranks = json.loads(event.metadata)["comm_size"]
+            self.seq += 1
+            del event
+            del consumer
+            del topic
+        elif nproc_sirt< 0:
+            raise ValueError('Number of reconstruction processes cannot be negative')
+        else:
+            self.nranks = nproc_sirt
         topic_name = "handshake_d_s"
         producer = self.producer(topic_name, "handshaker")
         # distribute data info
@@ -120,10 +128,7 @@ class MofkaDist:
             f = producer.push(info)
         producer.flush()
         self.seq += 1
-        del event
-        del consumer
         del producer
-        del topic
         return "Done"
 
     def pull_image(self, consumer: mofka.Consumer):

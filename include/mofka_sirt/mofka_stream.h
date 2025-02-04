@@ -40,8 +40,8 @@ class MofkaStream
     mofka::MofkaDriver driver;
     size_t batch = 0;
     std::vector<float*> buffer;
-    std::vector<std::tuple<std::string, int, float>> producer_times; // type, size, duration
-    std::vector<std::tuple<std::string, int, float>> consumer_times; // type, size, duration
+    std::vector<std::tuple<std::string, uint64_t, float>> producer_times; // type, size, duration
+    std::vector<std::tuple<std::string, uint64_t, float>> consumer_times; // type, size, duration
 
     mofka::BatchSize   batchSize   = mofka::BatchSize{batchsize};
     mofka::ThreadCount threadCount = mofka::ThreadCount{1};
@@ -158,13 +158,13 @@ class MofkaStream
 
     void windowLength(uint32_t wlen);
 
-    std::vector<std::tuple<std::string, int, float>> getConsumerTimes();
+    std::vector<std::tuple<std::string, uint64_t, float>> getConsumerTimes();
 
-    void setConsumerTimes(std::string op, int size, float time);
+    void setConsumerTimes(std::string op, uint64_t size, float time);
 
-    std::vector<std::tuple<std::string, int, float>> getProducerTimes();
+    std::vector<std::tuple<std::string, uint64_t, float>> getProducerTimes();
 
-    void setProducerTimes(std::string op, int size, float time);
+    void setProducerTimes(std::string op, uint64_t size, float time);
 
     int writeTimes(std::string type);
 
