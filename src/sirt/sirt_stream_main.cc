@@ -15,6 +15,7 @@
 #include <mofka_stream.h>
 #include "trace_data.h"
 #include <vector>
+#include <unistd.h>
 
 class TraceRuntimeConfig {
   public:
@@ -102,7 +103,7 @@ class TraceRuntimeConfig {
         batchsize = argBatchSize.getValue();
         group_file = argGroupFile.getValue();
 
-        std::cout << "MPI rank:"<< rank << "; MPI size:" << size << std::endl;
+        std::cout << "MPI rank:"<< rank << "; MPI size:" << size << "; PID:" << getpid() << std::endl;
         if(rank==0)
         {
           std::cout << "Output file path=" << kReconOutputPath << std::endl;
@@ -138,6 +139,7 @@ int main(int argc, char **argv)
                                 static_cast<uint32_t>(config.window_len),
                                 comm->rank(),
                                 comm->size()};
+
   ms.handshake(comm->rank(), comm->size());
   std::string consuming_topic = "dist_sirt";
   std::string producing_topic = "sirt_den";
