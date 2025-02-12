@@ -17,8 +17,6 @@
 #include <vector>
 #include <unistd.h>
 
-#define TIMERON 1
-
 class TraceRuntimeConfig {
   public:
     std::string kReconOutputPath;
