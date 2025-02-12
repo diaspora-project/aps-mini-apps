@@ -1,6 +1,6 @@
 {
     "name": "DIST Container",
-    "dockerComposeFile": "../../docker-compose.yaml",
+    "dockerComposeFile": "../../docker-compose.devcontainer.yaml",
     "service": "streamer-dist",
-    "workspaceFolder": "/workspace/python/streamer-dist"
+    "workspaceFolder": "/workspace/services/data_distributor"
 }

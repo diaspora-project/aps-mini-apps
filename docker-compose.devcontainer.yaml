@@ -1,14 +1,37 @@
 services:
     streamer-daq:
         build:
-            context: ./python/streamer-daq
+            context: ./services/data_acquisition
             dockerfile: Dockerfile.devcontainer
-            target: daq
+            target: base
+        volumes:
+            - .:/workspace:cached
+        command: sleep infinity
         networks:
             aps-mini-app-network:
                 ipv4_address: 172.16.238.10
+    streamer-dist:
+        build:
+            context: ./services/data_distributor
+            dockerfile: Dockerfile.devcontainer
+            target: base
         volumes:
-            - .:/aps-mini-apps
+            - .:/workspace:cached
+        command: sleep infinity
+        networks:
+            aps-mini-app-network:
+                ipv4_address: 172.16.238.11
+    streamer-sirt:
+        build:
+            context: ./services/recon_sirt
+            dockerfile: Dockerfile.devcontainer
+            target: base
+        volumes:
+            - .:/workspace:cached
+        command: sleep infinity
+        networks:
+            aps-mini-app-network:
+                ipv4_address: 172.16.238.12
 networks:
     aps-mini-app-network:
         driver: bridge #for the docker instances on the same host

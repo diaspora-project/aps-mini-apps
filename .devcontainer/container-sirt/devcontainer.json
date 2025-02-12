@@ -1,6 +1,6 @@
 {
     "name": "SIRT Container",
-    "dockerComposeFile": "../../docker-compose.yaml",
+    "dockerComposeFile": "../../docker-compose.devcontainer.yaml",
     "service": "streamer-sirt",
-    "workspaceFolder": "${workspaceFolder}/src/sirt"
+    "workspaceFolder": "/workspace/services/recon_sirt"
 }

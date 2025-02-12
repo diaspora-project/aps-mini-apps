@@ -1,0 +1,9 @@
+FROM mcr.microsoft.com/devcontainers/cpp:debian AS base
+
+RUN apt-get update --fix-missing && apt-get install -y \
+    build-essential \
+    iproute2 \
+    iputils-ping \
+    traceroute \
+    python3 \
+    pipx
