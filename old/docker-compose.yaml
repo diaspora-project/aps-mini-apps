@@ -1,0 +1,42 @@
+version: '3'
+services:
+    streamer-daq:
+        build:
+            context: ./python/streamer-daq
+            dockerfile: Dockerfile.daq
+            target: daq
+        ports:
+            - "50000-50001:50000-50001"
+        command: python /aps-mini-apps/build/python/streamer-daq/DAQStream.py --mode 1 --simulation_file /aps-mini-apps/data/tomo_00058_all_subsampled1p_s1079s1081.h5 --d_iteration 1 --publisher_addr tcp://*:50000 --iteration_sleep 1 --synch_addr tcp://*:50001 --synch_count 1
+    
+    streamer-dist:
+        depends_on:
+            - streamer-daq
+        build:
+            context: ./python/streamer-dist
+            dockerfile: Dockerfile.dist
+            target: dist
+        ports:
+            - 50010:50010
+        command: python /aps-mini-apps/build/python/streamer-dist/ModDistStreamPubDemo.py --data_source_addr tcp://host.docker.internal:50000 --data_source_synch_addr tcp://host.docker.internal:50001 --cast_to_float32 --normalize --my_distributor_addr tcp://*:50010 --beg_sinogram 1000 --num_sinograms 2 --num_columns 2560
+
+    streamer-quality:
+        build:
+            context: ./python/quality
+            dockerfile: Dockerfile.quality
+        #volumes:
+        #    - /Users/tbicer/Projects/data/output:/mnt/output
+        #command: python /aps-mini-apps/build/python/quality/iqcheck.py ${INPUT0} ${INPUT1}
+
+    streamer-sirt:
+        depends_on:
+            - streamer-dist
+        build:
+            context: ./src/sirt
+            dockerfile: Dockerfile.sirt
+            target: sirt
+        #volumes:
+        #    - /Users/tbicer/Projects/data/output:/mnt/output
+        ports:
+            - 52000:52000
+        command: /aps-mini-apps/build/bin/sirt_stream --write-freq 4 --dest-host host.docker.internal --dest-port 50010 --window-iter 1 --window-step 4 --window-length 4 -t 2 -c 1427 --pub-addr tcp://*:52000 #--recon-output-dir /mnt/output

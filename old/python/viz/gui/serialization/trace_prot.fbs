@@ -1,0 +1,18 @@
+namespace MONA.TraceDS;
+
+struct Dim2 {
+  y:int;
+  x:int;
+}
+
+table TImage{
+  seq:int;
+  dims:Dim2;
+  rotation:float;
+  center:float;
+  uniqueId:int;
+  tdata:[ubyte];
+}
+
+root_type TImage;
+

@@ -193,4 +193,3 @@ python/streamer-dist/.devcontainer/devcontainer.json
 python/streamer-dist/.github/dependabot.yml
 src/sirt/.devcontainer/devcontainer.json
 src/sirt/.github/dependabot.yml
-old/
