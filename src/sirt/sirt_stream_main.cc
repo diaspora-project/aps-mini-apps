@@ -7,6 +7,7 @@
 #include "disp_engine_reduction.h"
 #include "sirt.h"
 #include "trace_stream.h"
+#include <unistd.h>
 
 class TraceRuntimeConfig {
   public:
@@ -97,7 +98,7 @@ class TraceRuntimeConfig {
         pub_addr= argPubAddr.getValue();
         pub_freq= argPubFreq.getValue();
 
-        std::cout << "MPI rank:"<< rank << "; MPI size:" << size << std::endl;
+        std::cout << "MPI rank:"<< rank << "; MPI size:" << size << "; PID:" << getpid() << std::endl;
         if(rank==0)
         {
           std::cout << "Output file path=" << kReconOutputPath << std::endl;
@@ -168,6 +169,7 @@ int main(int argc, char **argv)
   std::chrono::duration<double> recon_tot(0.), inplace_tot(0.), update_tot(0.), 
     datagen_tot(0.);
   std::chrono::duration<double> write_tot(0.);
+  std::chrono::duration<double> e2e_tot(0.);
   #endif
 
   //DataRegionBase<float, TraceMetadata> *curr_slices = nullptr;
@@ -185,7 +187,12 @@ int main(int argc, char **argv)
   h5md.dims= new hsize_t[3];
   h5md.dims[1] = tmetadata.tn_sinograms; 
   h5md.dims[0] = 0;   /// Number of projections is unknown
-  h5md.dims[2] = tmetadata.n_rays_per_proj_row; 
+  h5md.dims[2] = tmetadata.n_rays_per_proj_row;
+
+  #ifdef TIMERON
+  auto e2e_beg = std::chrono::system_clock::now();
+  #endif
+
   for(int passes=0; ; ++passes){
       #ifdef TIMERON
       auto datagen_beg = std::chrono::system_clock::now();
@@ -263,6 +270,9 @@ int main(int argc, char **argv)
   /**************************/
   #ifdef TIMERON
   if(comm->rank()==0){
+    e2e_tot += (std::chrono::system_clock::now()-e2e_beg);
+    std::cout << "End-to-End Reconstruction time=" << e2e_tot.count() << std::endl;
+
     std::cout << "Reconstruction time=" << recon_tot.count() << std::endl;
     std::cout << "Local combination time=" << inplace_tot.count() << std::endl;
     std::cout << "Update time=" << update_tot.count() << std::endl;
@@ -285,5 +295,6 @@ int main(int argc, char **argv)
   //std::cout << "Deleting engine" << std::endl;
   //delete engine;
   std::cout << "Exiting" << std::endl;
+  exit(0);
 }
 
