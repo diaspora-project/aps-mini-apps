@@ -13,6 +13,7 @@ import signal
 from pymargo.core import Engine
 import mochi.mofka.client as mofka
 import csv
+import math
 #from memory_profiler import profile
 
 
@@ -85,6 +86,17 @@ def setup_simulation_data(input_f, beg_sinogram=0, num_sinograms=0):
   t0=time.time()
   idata, flat, dark, itheta = dxchange.read_aps_32id(input_f)
   idata = np.array(idata, dtype=np.float32) #dtype('uint16'))
+
+  # Make sure # sinograms does not exceed the data size
+  if num_sinograms > 0:
+    if idata.shape[1] < num_sinograms:
+      print("num_sinograms = {} < loaded sinograms = {}. Filling by duplication.".format(num_sinograms, idata.shape[1]))
+      n_copies = math.ceil(num_sinograms / idata.shape[1])
+      duplicated = np.tile(idata, (1, n_copies, 1))
+      if duplicated.shape[1] > num_sinograms:
+        duplicated = duplicated[:, :num_sinograms, :]
+    idata = duplicated
+
   if flat is not None: flat = np.array(flat, dtype=np.float32) #dtype('uint16'))
   if dark is not None: dark = np.array(dark, dtype=np.float32) #dtype('uint16'))
   if itheta is not None: itheta = np.array(itheta, dtype=np.float32) #dtype('float32'))
