@@ -5,7 +5,7 @@ def simulate_random(publisher_socket,
               rotation_step=0.25, num_sinograms=0, 
               num_sinogram_columns=2048, seq=0,
               num_sinogram_projections=1440, slp=0):
-  print("Sending projections")
+  logger.info(f"Simulating random data acquisition; number of sinograms: {num_sinograms}; iteration: {seq}")
   if num_sinograms<1: num_sinograms=2048
   # Randomly generate image data
   dims=(num_sinograms, num_sinogram_columns)

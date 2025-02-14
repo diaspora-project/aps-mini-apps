@@ -5,5 +5,4 @@ RUN apt-get update --fix-missing && apt-get install -y \
     iproute2 \
     iputils-ping \
     traceroute \
-    python3 \
-    pipx
+    python3 python3-zmq pipx
