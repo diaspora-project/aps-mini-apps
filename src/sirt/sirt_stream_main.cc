@@ -72,6 +72,8 @@ class TraceRuntimeConfig {
         TCLAP::ValueArg<float> argWindowIter(
           "", "window-iter", "Number of iterations on received window",
           false, 1, "int");
+        TCLAP::ValueArg<int> argCkptFreq(
+          "", "ckpt-freq", "Checkpoint frequency", false, 1, "int");
 
         cmd.add(argMofkaProtocol);
         cmd.add(argGroupFile);
@@ -180,6 +182,7 @@ int main(int argc, char **argv)
     datagen_tot(0.);
   std::chrono::duration<double> write_tot(0.);
   std::chrono::duration<double> e2e_tot(0.);
+  std::chrono::duration<double> ckpt_tot(0.);
   #endif
   DataRegionBase<float, TraceMetadata> *curr_slices = nullptr;
   /// Reconstructed image
@@ -239,6 +242,17 @@ int main(int argc, char **argv)
         engine->ResetReductionSpaces(init_val);
         curr_slices->ResetMirroredRegionIter();
       }
+
+      // Checkpoint
+      #if TIMERON
+      auto ckpt_beg = std::chrono::system_clock::now()
+      if(!(passes%config.ckpt_freq)){
+        
+      }
+      #ifdef TIMERON
+      ckpt_tot += (std::chrono::system_clock::now()-ckpt_beg);
+      #endif
+
 
       /* Emit reconstructed data */
       #ifdef TIMERON
