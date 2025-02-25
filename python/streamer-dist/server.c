@@ -52,6 +52,11 @@ uint64_t seq;
 /// Being set at setup_mock_data()
 dacq_file_t *dacq_file;
 
+int get_num_workers()
+{
+  return n_workers;
+}
+
 
 int setup_mock_data(char *fp, int nsubsets)
 {
@@ -96,12 +101,15 @@ int handshake(char *bindip, int port, int row, int col)
     workers[i] = worker;
     char addr[64];
     snprintf(addr, 64, "tcp://%s:%d", bindip, port++);
+    printf("setting up socker for another worker: id:%d; address: %s\n", i, addr);
     zmq_bind(workers[i], addr);
   }
 
   /// Handshake with other workers
   for(int i=1; i<n_workers; ++i){
+   printf("Waiting handshake message from worker %d\n", i);
    msg = tracemq_recv_msg(workers[i]); assert(seq==msg->seq_n);
+   printf("Received worker %d message\n", i);
    tomo_msg_data_info_req_t* info = tracemq_read_data_info_req(msg);
    worker_ids[i]=info->comm_rank;
    tracemq_free_msg(msg);
@@ -112,6 +120,10 @@ int handshake(char *bindip, int port, int row, int col)
   for(int i=0; i<n_workers; ++i){
    tomo_msg_data_info_rep_t info = assign_data(worker_ids[i], n_workers, 
                                       row, col);
+   printf("Sending data infor to worker (%ds); Total # sinograms=%u; Beginning sinogram id=%u;"
+           "# assigned sinograms=%u; # rays per projection row=%u\n", 
+           i, info.tn_sinograms, info.beg_sinogram, info.n_sinograms, 
+           info.n_rays_per_proj_row);
    tomo_msg_t *msg = tracemq_prepare_data_info_rep_msg(seq, 
                          info.beg_sinogram, info.n_sinograms, 
                          info.n_rays_per_proj_row, info.tn_sinograms);
@@ -122,7 +134,9 @@ int handshake(char *bindip, int port, int row, int col)
 
   /// recieve ready message
   for(int i=0; i<n_workers; ++i){
+   printf("Waiting for ready message from worker %d\n", i);
    msg = tracemq_recv_msg(workers[i]);
+   printf("Received ready message from worker %d\n", i);
    assert(msg->type==TRACEMQ_MSG_DATA_REQ);
    assert(seq==msg->seq_n);
    tracemq_free_msg(msg);

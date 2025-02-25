@@ -23,7 +23,7 @@ TraceMQ::TraceMQ(
   int rc = zmq_connect(server, addr.c_str()); assert(rc==0); 
 
   server_pub = zmq_socket(context, ZMQ_PUB);
-  rc = zmq_bind(server_pub, pub_info_.c_str()); assert(rc==0);
+  rc = zmq_bind(server_pub, pub_info_.c_str()); //assert(rc==0);
 }
 
 void TraceMQ::Initialize() {
