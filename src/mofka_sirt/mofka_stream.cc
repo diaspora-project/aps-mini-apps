@@ -273,7 +273,7 @@ DataRegionBase<float, TraceMetadata>* MofkaStream::readSlidingWindow(
     setupTraceDataRegion(recon_image);
 
   return data_region;
-  }
+}
 
 json MofkaStream::getInfo(){ return info;}
 
