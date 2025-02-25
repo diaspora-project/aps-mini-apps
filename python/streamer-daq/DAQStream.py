@@ -9,10 +9,223 @@ import time
 import sys
 import TraceSerializer
 import h5py as h5
-import dxchange
-import tomopy as tp
 import signal
 import sys
+import math
+import logging
+
+# Configure the logger
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+def empty_shared_array(shape, dtype=np.float32):
+    # create a shared ndarray with the provided shape and type
+    # get ctype from np dtype
+    temp_arr = np.empty((1), dtype)
+    ctype = np.ctypeslib._typecodes[temp_arr.__array_interface__['typestr']]
+    # create shared ctypes object with no lock
+    size = 1
+    for dim in shape:
+        size *= dim
+    shared_obj = mp.RawArray(ctype, size)
+    # create numpy array from shared object
+    arr = np.frombuffer(shared_obj, dtype)
+    arr = arr.reshape(shape)
+    return arr
+
+def _make_slice_object_a_tuple(slc):
+    """
+    Fix up a slc object to be tuple of slices.
+    slc = None returns None
+    slc is container and each element is converted into a slice object
+
+    Parameters
+    ----------
+    slc : None or sequence of tuples
+        Range of values for slicing data in each axis.
+        ((start_1, end_1, step_1), ... , (start_N, end_N, step_N))
+        defines slicing parameters for each axis of the data matrix.
+    """
+    if slc is None:
+        return None  # need arr shape to create slice
+    fixed_slc = list()
+    for s in slc:
+        if not isinstance(s, slice):
+            # create slice object
+            if s is None or isinstance(s, int):
+                # slice(None) is equivalent to np.s_[:]
+                # numpy will return an int when only an int is passed to
+                # np.s_[]
+                s = slice(s)
+            else:
+                s = slice(*s)
+        fixed_slc.append(s)
+    return tuple(fixed_slc)
+
+def _shape_after_slice(shape, slc):
+    """
+    Return the calculated shape of an array after it has been sliced.
+    Only handles basic slicing (not advanced slicing).
+
+    Parameters
+    ----------
+    shape : tuple of ints
+        Tuple of ints defining the ndarray shape
+    slc : tuple of slices
+        Object representing a slice on the array.  Should be one slice per
+        dimension in shape.
+
+    """
+    if slc is None:
+        return shape
+    new_shape = list(shape)
+    slc = _make_slice_object_a_tuple(slc)
+    for m, s in enumerate(slc):
+        # indicies will perform wrapping and such for the shape
+        start, stop, step = s.indices(shape[m])
+        new_shape[m] = int(math.ceil((stop - start) / float(step)))
+        if new_shape[m] < 0:
+            new_shape[m] = 0
+    return tuple(new_shape)
+
+def read_hdf5(fname, dataset, slc=None, dtype=None, shared=False):
+    """
+    Read data from hdf5 file from a specific group.
+
+    Parameters
+    ----------
+    fname : str
+        String defining the path of file or file name.
+    dataset : str
+        Path to the dataset inside hdf5 file where data is located.
+    slc : sequence of tuples, optional
+        Range of values for slicing data in each axis.
+        ((start_1, end_1, step_1), ... , (start_N, end_N, step_N))
+        defines slicing parameters for each axis of the data matrix.
+    dtype : numpy datatype (optional)
+        Convert data to this datatype on read if specified.
+    shared : bool (optional)
+        If True, read data into shared memory location.  Defaults to True.
+
+    Returns
+    -------
+    ndarray
+        Data.
+    """
+    try:
+        #fname = _check_read(fname)
+        with h5.File(fname, "r") as f:
+            try:
+                data = f[dataset]
+            except KeyError:
+                # NOTE: I think it would be better to raise an exception here.
+                logger.error('Unrecognized hdf5 dataset: "%s"' %
+                             (str(dataset)))
+                return None
+            shape = _shape_after_slice(data.shape, slc)
+            if dtype is None:
+                dtype = data.dtype
+            if shared:
+                arr = empty_shared_array(shape, dtype)
+            else:
+                arr = np.empty(shape, dtype)
+            data.read_direct(arr, _make_slice_object_a_tuple(slc))
+    except KeyError:
+        return None
+    logger.debug('Data shape & type: %s %s', arr.shape, arr.dtype)
+    logger.info('Data successfully imported: %s', fname)
+    return arr
+
+def read_aps_tomoscan_hdf5(fname, exchange_rank=0, proj=None, sino=None, dtype=None):
+    """
+    Read APS tomoscan HDF5 format.
+
+    Parameters
+    ----------
+    fname : str
+        Path to hdf5 file.
+
+    exchange_rank : int, optional
+        exchange_rank is added to "exchange" to point tomopy to the data
+        to reconstruct. if rank is not set then the data are raw from the
+        detector and are located under exchange = "exchange/...", to process
+        data that are the result of some intermediate processing step then
+        exchange_rank = 1, 2, ... will direct tomopy to process
+        "exchange1/...",
+
+    proj : {sequence, int}, optional
+        Specify projections to read. (start, end, step)
+
+    sino : {sequence, int}, optional
+        Specify sinograms to read. (start, end, step)
+
+    dtype : numpy datatype, optional
+        Convert data to this datatype on read if specified.
+
+    Returns
+    -------
+    ndarray
+        3D tomographic data.
+
+    ndarray
+        3D flat field data.
+
+    ndarray
+        3D dark field data.
+
+    ndarray
+        1D theta in radian.
+    """
+    if exchange_rank > 0:
+        exchange_base = 'exchange{:d}'.format(int(exchange_rank))
+    else:
+        exchange_base = "exchange"
+
+    tomo_grp = '/'.join([exchange_base, 'data'])
+    flat_grp = '/'.join([exchange_base, 'data_white'])
+    dark_grp = '/'.join([exchange_base, 'data_dark'])
+    theta_grp = '/'.join([exchange_base, 'theta'])
+    tomo = read_hdf5(fname, tomo_grp, slc=(proj, sino), dtype=dtype)
+    flat = read_hdf5(fname, flat_grp, slc=(None, sino), dtype=dtype)
+    dark = read_hdf5(fname, dark_grp, slc=(None, sino), dtype=dtype)
+    theta = read_hdf5(fname, theta_grp, slc=None)
+
+    if (flat is None) or ((flat.shape[0]==1) and (flat.max() == 0)):
+        try:
+            # See if flat_field_value is in the file
+            flat_field_value = read_hdf5(fname,
+                                                  '/process/acquisition/flat_fields/flat_field_value')[0]
+            flat = tomo[0,:,:] * 0 + flat_field_value
+        except:
+            logger.warn('No flat field data or flat_field_value')
+
+    if (dark is None) or ((dark.shape[0]==1) and (dark.max() == 0)):
+        try:
+            # See if dark_field_value is in the file
+            dark_field_value = read_hdf5(fname,
+                                                  '/process/acquisition/dark_fields/dark_field_value')[0]
+            dark = tomo[0,:,:] * 0 + dark_field_value
+        except:
+            logger.warn('No dark field data or dark_field_value')
+
+    if theta is None:
+        try:
+            # See if the rotation start, step, num_angles are in the file
+            rotation_start = read_hdf5(fname,
+                                                '/process/acquisition/rotation/rotation_start')[0]
+            rotation_step = read_hdf5(fname,
+                                               '/process/acquisition/rotation/rotation_step')[0]
+            num_angles = read_hdf5(fname,
+                                            '/process/acquisition/rotation/num_angles')[0]
+            if num_angles != tomo.shape[0]:
+                logger.warn('num_angles(%d) is not the same as tomo.shape[0](%d)', num_angles, tomo.shape[0])
+            theta = rotation_start + rotation_step*range(num_angles)
+        except:
+            theta_size = tomo.shape[0]
+            logger.warn('Generating "%s" [0-180] deg angles for missing "exchange/theta" dataset', str(theta_size))
+            theta = np.linspace(0. , 180, theta_size)
+    theta = np.deg2rad(theta)
+    return tomo, flat, dark, theta
 
 
 def parse_arguments():
@@ -66,7 +279,7 @@ def synchronize_subs(context, subscriber_count, bind_address_rep):
 def setup_simulation_data(input_f, beg_sinogram=0, num_sinograms=0):
   print("Loading tomography data: {}".format(input_f))
   t0=time.time()
-  idata, flat, dark, itheta = dxchange.read_aps_32id(input_f)
+  idata, flat, dark, itheta = read_aps_tomoscan_hdf5(input_f)
   idata = np.array(idata, dtype=np.float32) #dtype('uint16'))
   if flat is not None: flat = np.array(flat, dtype=np.float32) #dtype('uint16'))
   if dark is not None: dark = np.array(dark, dtype=np.float32) #dtype('uint16'))

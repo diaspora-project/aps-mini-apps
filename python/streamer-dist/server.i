@@ -20,4 +20,5 @@ extern int done_image();
 extern int push_image(float *data, int n, int row, int col, float theta, int id, float center);
 extern int handshake(char *bindip, int port, int row, int col);
 extern int setup_mock_data(char *fp, int nsubsets);
+extern int get_num_workers();
 extern int whatsup();

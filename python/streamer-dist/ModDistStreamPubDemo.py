@@ -65,12 +65,16 @@ def parse_arguments():
   return parser.parse_args()
 
 
-def synchronize_subs(context, publisher_rep_address):
+def synchronize_subs(context, publisher_rep_address, num_workers):
   sync_socket = context.socket(zmq.REQ)
   sync_socket.connect(publisher_rep_address)
 
-  sync_socket.send(b'') # Send synchronization signal
-  sync_socket.recv() # Receive reply
+  for i in range(num_workers):
+    print(f"Sending sync message to daq for worker {i}")
+    sync_socket.send(b'') # Send synchronization signal
+    print("Waiting rep sync message from daq..")
+    sync_socket.recv() # Receive reply
+    print("Received sync message from daq..")
 
 
 def main():
@@ -101,8 +105,9 @@ def main():
     publisher_socket.bind(args.my_publisher_addr)
 
   if args.data_source_synch_addr is not None:
-    print("Synchronizing with {}".format(args.data_source_synch_addr))
-    synchronize_subs(context, args.data_source_synch_addr)
+    print(f"Synchronizing with {args.data_source_synch_addr} for {tmq.get_num_workers()}.")
+    synchronize_subs(context, args.data_source_synch_addr, tmq.get_num_workers())
+    print(f"Synchronized subscribers to daq for {tmq.get_num_workers()}.")
 
   # Setup serializer
   serializer = TraceSerializer.ImageSerializer()

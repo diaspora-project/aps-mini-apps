@@ -8,5 +8,6 @@ int done_image();
 int push_image(float *data, int n, int row, int col, float theta, int id, float center);
 int handshake(char *bindip, int port, int row, int col);
 int setup_mock_data(char *fp, int nsubsets);
+int get_num_workers();
 int whatsup();
 #endif
