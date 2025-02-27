@@ -251,6 +251,8 @@ def parse_arguments():
                       help='Number of iteration on simulated data.')
   parser.add_argument('--iteration_sleep', type=float, default=0,
                       help='Delay data publishing for each iteration.')
+  parser.add_argument('--projection_sleep', type=float, default=0.6,
+                      help='Delay data publishing for each projection.')
   parser.add_argument('--beg_sinogram', type=int, default=0,
                       help='Starting sinogram for reconstruction.')
   parser.add_argument('--num_sinograms', type=int, default=0,
@@ -259,6 +261,7 @@ def parse_arguments():
                       help='Number of columns per sinogram.')
   parser.add_argument('--num_sinogram_projections', type=int,
                       help='Number of projections per sinogram.')
+  
 
   return parser.parse_args()
 
@@ -667,7 +670,7 @@ def main():
               input_f=args.simulation_file,
               beg_sinogram=args.beg_sinogram, num_sinograms=args.num_sinograms,
               iteration=args.d_iteration,
-              slp=args.iteration_sleep, prj_slp=0.6)
+              slp=args.iteration_sleep, prj_slp=args.projection_sleep)
   elif args.mode == 2: # Test data acquisition
     test_daq(publisher_socket=publisher_socket,
               num_sinograms=args.num_sinograms,                       # Y

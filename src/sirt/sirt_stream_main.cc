@@ -276,7 +276,7 @@ int main(int argc, char **argv)
     std::cout << "Reconstruction time=" << recon_tot.count() << std::endl;
     std::cout << "Local combination time=" << inplace_tot.count() << std::endl;
     std::cout << "Update time=" << update_tot.count() << std::endl;
-    //std::cout << "Write time=" << write_tot.count() << std::endl;
+    std::cout << "Write time=" << write_tot.count() << std::endl;
     std::cout << "Data gen total time=" << datagen_tot.count() << std::endl;
     std::cout << "Total comp=" << recon_tot.count() + inplace_tot.count() + update_tot.count() << std::endl;
     std::cout << "Sustained proj/sec=" << tstream.counter() / 
