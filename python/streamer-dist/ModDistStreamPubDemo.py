@@ -11,6 +11,7 @@ import math
 import TraceSerializer
 import tomopy as tp
 import tracemq as tmq
+import csv
 
 
 def parse_arguments():
@@ -108,6 +109,9 @@ def main():
     print(f"Synchronizing with {args.data_source_synch_addr} for {tmq.get_num_workers()}.")
     synchronize_subs(context, args.data_source_synch_addr, tmq.get_num_workers())
     print(f"Synchronized subscribers to daq for {tmq.get_num_workers()}.")
+
+  zmq_producing_time = []
+  zmq_consuming_time = []
 
   # Setup serializer
   serializer = TraceSerializer.ImageSerializer()

@@ -13,6 +13,7 @@ import signal
 import sys
 import math
 import logging
+import csv
 
 # Configure the logger
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -284,6 +285,17 @@ def setup_simulation_data(input_f, beg_sinogram=0, num_sinograms=0):
   t0=time.time()
   idata, flat, dark, itheta = read_aps_tomoscan_hdf5(input_f)
   idata = np.array(idata, dtype=np.float32) #dtype('uint16'))
+
+  # Make sure # sinograms does not exceed the data size
+  if num_sinograms > 0:
+    if idata.shape[1] < num_sinograms:
+      print("num_sinograms = {} < loaded sinograms = {}. Filling by duplication.".format(num_sinograms, idata.shape[1]))
+      n_copies = math.ceil(num_sinograms / idata.shape[1])
+      duplicated = np.tile(idata, (1, n_copies, 1))
+      if duplicated.shape[1] > num_sinograms:
+        duplicated = duplicated[:, :num_sinograms, :]
+      idata = duplicated
+
   if flat is not None: flat = np.array(flat, dtype=np.float32) #dtype('uint16'))
   if dark is not None: dark = np.array(dark, dtype=np.float32) #dtype('uint16'))
   if itheta is not None: itheta = np.array(itheta, dtype=np.float32) #dtype('float32'))
@@ -380,6 +392,11 @@ def simulate_daq_serialized(publisher_socket, input_f,
   nelems_per_subset = 16
   indices = ordered_subset(serialized_data.shape[0], 
                               nelems_per_subset)
+  
+  timer_data = []
+  buffer = []
+  i = 0
+                          
   for it in range(iteration): # Simulate data acquisition
     print("Current iteration over dataset: {}/{}".format(it+1, iteration))
     for index in indices:
@@ -400,8 +417,14 @@ def simulate_daq_serialized(publisher_socket, input_f,
       #print("Sending projection {}; sleep time={}".format(index, prj_slp))
       print("Sending projection {}".format(index))
       time.sleep(prj_slp)
+      ts = time.perf_counter()
+      # dchunk = serialized_data[index]
       dchunk = serialized_data[index]
+      buffer.append(dchunk)
       publisher_socket.send(dchunk, copy=False)
+      timer_data.append([["push", index, ts, time.perf_counter(), time.perf_counter() - ts, sys.getsizeof(md) , len(buffer[i])]])
+      seq += 1
+      i += 1
       tot_transfer_size+=len(dchunk)
     time.sleep(slp)
   time1 = time.time()
@@ -411,6 +434,12 @@ def simulate_daq_serialized(publisher_socket, input_f,
   nproj = iteration*len(serialized_data)
   print("Sent number of projections: {}; Total size (MiB): {:.2f}; Elapsed time (s): {:.2f}".format(nproj, tot_MiBs, elapsed_time))
   print("Rate (MiB/s): {:.2f}; (msg/s): {:.2f}".format(tot_MiBs/elapsed_time, nproj/elapsed_time))
+
+  fields = ["type", "index", "start", "stop", "duration", "metadata_size", "data_size"]
+  with open("Daq_push.csv", "w") as f:
+    write = csv.writer(f)
+    write.writerow(fields)
+    write.writerows(timer_data)
 
   return seq
 
