@@ -422,7 +422,7 @@ def simulate_daq_serialized(publisher_socket, input_f,
       dchunk = serialized_data[index]
       buffer.append(dchunk)
       publisher_socket.send(dchunk, copy=False)
-      timer_data.append([["push", index, ts, time.perf_counter(), time.perf_counter() - ts, sys.getsizeof(md) , len(buffer[i])]])
+      timer_data.append([["push", index, ts, time.perf_counter(), time.perf_counter() - ts, 0 , len(buffer[i])]])
       seq += 1
       i += 1
       tot_transfer_size+=len(dchunk)
