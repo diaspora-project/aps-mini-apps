@@ -269,6 +269,8 @@ int main(int argc, char **argv)
 
   /**************************/
   #ifdef TIMERON
+  e2e_tot += (std::chrono::system_clock::now()-e2e_beg);
+    std::cout << "MPI rank: "<< comm->rank() << "; PID: " << getpid() << " ----> End-to-End Reconstruction time=" << e2e_tot.count() << std::endl;
   if(comm->rank()==0){
     e2e_tot += (std::chrono::system_clock::now()-e2e_beg);
     std::cout << "End-to-End Reconstruction time=" << e2e_tot.count() << std::endl;
