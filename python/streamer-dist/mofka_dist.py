@@ -61,12 +61,6 @@ def assign_data(comm_rank: int, comm_size: int, tot_sino: int, tot_cols: int) ->
     }
     return info_rep
 
-def data_selector(metadata, descriptor):
-    return descriptor
-
-def data_broker(metadata, descriptor):
-    return [bytearray(descriptor.size)]
-
 class MofkaDist:
 
     def __init__(self, group_file: str, batchsize: int = 16):
@@ -95,9 +89,7 @@ class MofkaDist:
         topic = self.driver.open_topic(topic_name)
         consumer = topic.consumer(name=consumer_name,
                                   thread_pool=thread_pool,
-                                  batch_size=batch_size,
-                                  data_selector=data_selector,
-                                  data_broker=data_broker)
+                                  batch_size=batch_size)
         return consumer
 
 
@@ -138,9 +130,10 @@ class MofkaDist:
         t_wait = time.perf_counter()
         mofka_metadata = event.metadata
         t_meta = time.perf_counter()
-        mofka_data = event.data[0]
+        print("metadata retreived ", mofka_metadata, flush=True)
+        mofka_data = bytearray(event.data[0])
         t_data = time.perf_counter()
-        return json.loads(mofka_metadata), mofka_data, [t_wait - ts, t_meta- t_wait, sys.getsizeof(mofka_metadata), t_data - t_meta, len(mofka_data)]
+        return json.loads(mofka_metadata), mofka_data, [t_wait - ts, t_meta- t_wait, len(str(mofka_metadata)), t_data - t_meta, len(mofka_data)]
 
     def push_image(self, data: np.ndarray, row :int, col: int,
                    theta: float, projection_id: int, center: float,
@@ -165,14 +158,14 @@ class MofkaDist:
             ts = time.perf_counter()
             f = producer.push(self.buffer[self.counter][i][0], self.buffer[self.counter][i][1])
             #f.wait()
-            mofka_t.append(["push", projection_id, ts, time.perf_counter(), time.perf_counter() - ts, sys.getsizeof(self.buffer[self.counter][i][0]) ,len(self.buffer[self.counter][i][1])])
+            mofka_t.append(["push", projection_id, ts, time.perf_counter(), time.perf_counter() - ts, len(str(self.buffer[self.counter][i][0])) ,len(self.buffer[self.counter][i][1])])
 
         self.seq += 1
         self.counter += 1
         if self.counter == self.batch:
             ts = time.perf_counter()
             producer.flush()
-            mofka_t.append(["flush_after", projection_id, ts, time.perf_counter(), time.perf_counter() - ts, self.nranks*len(self.buffer)* sys.getsizeof(self.buffer[self.counter-1][0][0]), self.nranks*len(self.buffer)*len(self.buffer[self.counter-1][0][1])])
+            mofka_t.append(["flush_after", projection_id, ts, time.perf_counter(), time.perf_counter() - ts, self.nranks*len(self.buffer)* len(str(self.buffer[self.counter-1][0][0])), self.nranks*len(self.buffer)*len(self.buffer[self.counter-1][0][1])])
             self.buffer = []
             self.counter = 0
 
@@ -183,7 +176,7 @@ class MofkaDist:
             ts = time.perf_counter()
             producer.flush()
             self.seq += 1
-            return ["last_flush","" , ts, time.perf_counter(), time.perf_counter() - ts, self.nranks*len(self.buffer)* sys.getsizeof(self.buffer[self.counter-1][0][0]), self.nranks*len(self.buffer)*len(self.buffer[self.counter-1][0][1])]
+            return ["last_flush","" , ts, time.perf_counter(), time.perf_counter() - ts, self.nranks*len(self.buffer)* len(str(self.buffer[self.counter-1][0][0])), self.nranks*len(self.buffer)*len(self.buffer[self.counter-1][0][1])]
         return None
 
     def done_image(self, producer) -> int:

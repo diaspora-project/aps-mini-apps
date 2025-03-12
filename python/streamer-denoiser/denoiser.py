@@ -10,12 +10,6 @@ import csv
 import argparse
 import matplotlib.pyplot as plt
 
-def data_selector(metadata, descriptor):
-    return descriptor
-
-def data_broker(metadata, descriptor):
-    return [ bytearray(descriptor.size) ]
-
 def adjust_contrast(image_data):
     # Flatten the image data to 1D for histogram calculation
     flattened_image = image_data.flatten()
@@ -82,7 +76,7 @@ def process_directory(model, directory_path):
                 file_path = os.path.join(root, file)
                 process_file(model, file_path)
 
-def main(input_path, model_path, protocol, group_file, batchsize, nproc_sirt):
+def main(input_path, model_path, group_file, batchsize, nproc_sirt):
     # Load the saved model
     # model = keras.models.load_model(model_path)
     driver = mofka.MofkaDriver(group_file, use_progress_thread=True)
@@ -94,9 +88,7 @@ def main(input_path, model_path, protocol, group_file, batchsize, nproc_sirt):
     consumer_name = "denoiser"
     consumer = topic.consumer(name=consumer_name,
                               thread_pool=thread_pool,
-                              batch_size=batch_size,
-                              data_selector=data_selector,
-                              data_broker=data_broker)
+                              batch_size=batch_size)
     more_data = True
     mofka_times = []
     while more_data:
@@ -116,8 +108,8 @@ def main(input_path, model_path, protocol, group_file, batchsize, nproc_sirt):
             else:
                 metadata.append(m)
                 t_data = time.perf_counter()
-                dd = event.data[0]
-                mofka_times.append([t_wait - ts, t_meta - t_wait, sys.getsizeof(m), time.perf_counter() - t_data, len(dd)])
+                dd = bytearray(event.data[0])
+                mofka_times.append([t_wait - ts, t_meta - t_wait, len(str(m)), time.perf_counter() - t_data, len(dd)])
                 dd = np.frombuffer(dd, dtype=np.float32)
                 dd = dd.reshape(metadata[i]["rank_dims"])
                 data.append(dd)
@@ -134,10 +126,11 @@ def main(input_path, model_path, protocol, group_file, batchsize, nproc_sirt):
                     key=lambda d: (d[0][0], d[0][1])  # Sort by iteration_stream first, then by rank
                 )
             ]
+
             for j in range(len(correct_order_meta)//nproc_sirt):
-                batch_data = correct_order[j*nproc_sirt:nproc_sirt+j*nproc_sirt]
-                batch_meta = correct_order_meta[j*nproc_sirt:nproc_sirt+j*nproc_sirt]
-                print(batch_meta)
+                batch_data = correct_order[j*nproc_sirt:nproc_sirt*(j+1)]
+                batch_meta = correct_order_meta[j*nproc_sirt:nproc_sirt*(j+1)]
+                print(batch_meta, flush=True)
                 data = np.concatenate(batch_data, axis=0)
                 #process_stream(model, data, metadata)
                 output_path = batch_meta[0]["iteration_stream"]+'-denoised.h5'
@@ -152,12 +145,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Denoise HDF5 files using a trained model.')
     parser.add_argument('--input', type=str, required=False, help='Input file or directory path.')
     parser.add_argument('--model', type=str, required=True, help='Path to the saved model.')
-    parser.add_argument('--protocol', type=str, required=True, help='Mofka protocol')
     parser.add_argument('--group_file', type=str, required=True, help='Path to group file')
     parser.add_argument("--batchsize", type=int, required=True, help="Mofka batchsize")
     parser.add_argument("--nproc_sirt", type=int, required=True, help="Number of Sirt Processes")
 
 
     args = parser.parse_args()
-    main(args.input, args.model, args.protocol, args.group_file, args.batchsize, args.nproc_sirt)
+    main(args.input, args.model, args.group_file, args.batchsize, args.nproc_sirt)
 

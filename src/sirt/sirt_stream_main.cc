@@ -21,7 +21,6 @@ class TraceRuntimeConfig {
     std::string kReconOutputPath;
     std::string kReconDatasetPath;
     std::string kReconOutputDir;
-    std::string protocol;
     std::string group_file;
     size_t batchsize;
     int thread_count;
@@ -39,8 +38,6 @@ class TraceRuntimeConfig {
       try
       {
         TCLAP::CmdLine cmd("SIRT Iterative Image Reconstruction", ' ', "0.01");
-        TCLAP::ValueArg<std::string> argMofkaProtocol(
-          "", "protocol", "Mofka protocol", false, "na+sm", "string");
         TCLAP::ValueArg<std::string> argGroupFile(
           "", "group-file", "Mofka group file", false, "mofka.json", "string");
         TCLAP::ValueArg<size_t> argBatchSize(
@@ -72,7 +69,6 @@ class TraceRuntimeConfig {
           "", "window-iter", "Number of iterations on received window",
           false, 1, "int");
 
-        cmd.add(argMofkaProtocol);
         cmd.add(argGroupFile);
         cmd.add(argBatchSize);
         cmd.add(argReconOutputPath);
@@ -98,7 +94,6 @@ class TraceRuntimeConfig {
         window_len= argWindowLen.getValue();
         window_step= argWindowStep.getValue();
         window_iter= argWindowIter.getValue();
-        protocol = argMofkaProtocol.getValue();
         batchsize = argBatchSize.getValue();
         group_file = argGroupFile.getValue();
 
@@ -115,7 +110,6 @@ class TraceRuntimeConfig {
           std::cout << "Window step=" << window_step << std::endl;
           std::cout << "Window iter=" << window_iter << std::endl;
           std::cout << "Publish frequency=" << pub_freq << std::endl;
-          std::cout << "Mofka Protocol=" << protocol << std::endl;
           std::cout << "Mofka batchsize=" << batchsize << std::endl;
           std::cout << "Group file=" << group_file << std::endl;
         }
@@ -148,6 +142,7 @@ int main(int argc, char **argv)
   json tmetadata = ms.getInfo();
   auto n_blocks = tmetadata["n_sinograms"].get<int64_t>();
   auto num_cols = tmetadata["n_rays_per_proj_row"].get<int64_t>();
+
   /***********************/
   /* Initiate middleware */
   /* Prepare main reduction space and its objects */
@@ -260,6 +255,7 @@ int main(int argc, char **argv)
             static_cast<hsize_t>(rank_metadata.num_cols())};
 
           data_size = rank_dims[0]*rank_dims[1]*rank_dims[2];
+
           hsize_t app_dims[3] = {
             static_cast<hsize_t>(h5md.dims[1]),
             static_cast<hsize_t>(h5md.dims[2]),

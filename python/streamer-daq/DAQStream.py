@@ -25,8 +25,6 @@ def parse_arguments():
 
   parser.add_argument("--image_pv", help="EPICS image PV name.")
 
-  parser.add_argument('--protocol', default="na+sm", help='Mofka protocol')
-
   parser.add_argument('--group_file', type=str, default="mofka.json",
                       help='Group file for the mofka server')
 
@@ -215,14 +213,14 @@ def simulate_daq(producer,
       md = {"index": int(index), "Type" : "DATA"}
       f = producer.push(md, buffer[i])
       #f.wait()
-      mofka_t.append(["push", index, ts, time.perf_counter(), time.perf_counter() - ts, sys.getsizeof(md) , len(buffer[i])])
+      mofka_t.append(["push", index, ts, time.perf_counter(), time.perf_counter() - ts, len(str(md)) , len(buffer[i])])
       tot_transfer_size+=len(buffer[i])
       seq+=1
       i+=1
       if seq % batchsize == 0:
         ts = time.perf_counter()
         producer.flush()
-        mofka_t.append(["flush_after", index, ts, time.perf_counter(), time.perf_counter() - ts, batchsize*sys.getsizeof(md), len(buffer)*len(buffer[i-1])])
+        mofka_t.append(["flush_after", index, ts, time.perf_counter(), time.perf_counter() - ts, batchsize*len(str(md)), len(buffer)*len(buffer[i-1])])
         buffer=[]
         i = 0
     time.sleep(slp)
@@ -230,7 +228,7 @@ def simulate_daq(producer,
   if len(buffer)>0:
     ts = time.perf_counter()
     producer.flush()
-    mofka_t.append(["flush_after", index, ts, time.perf_counter(), time.perf_counter() - ts,len(buffer)*sys.getsizeof(md), len(buffer[i-1])])
+    mofka_t.append(["flush_after", index, ts, time.perf_counter(), time.perf_counter() - ts,len(buffer)*len(str(md)), len(buffer[i-1])])
   time1 = time.time()
 
   elapsed_time = time1-time0
@@ -435,7 +433,7 @@ def main():
                   num_sinograms=args.num_sinograms,
                   iteration=args.d_iteration,
                   slp=args.iteration_sleep,
-                  prj_slp=0.6)
+                  prj_slp=0)
   elif args.mode == 2: # Test data acquisition
     test_daq( producer=producer,
               num_sinograms=args.num_sinograms,                       # Y

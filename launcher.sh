@@ -1,15 +1,17 @@
 DIR=$PWD
-echo $DIR
-
-RUNS=10
-
-for R in  1 #$(seq 1 $RUNS)
+NPROC_PER_NODE=2
+MAX=4
+for NRANKS in  $(seq 4 $MAX)
 do
-    DATE=$(date +"%Y-%m-%d_%T")
-    WORKSPACE=/eagle/radix-io/agueroudji/FULL_ASYNC_1/64/D${DATE}/
-    mkdir  -p $WORKSPACE
-    cd $WORKSPACE
-    cp -r  $DIR/* .
-    echo Running in $WORKSPACE
-    qsub -o $WORKSPACE polaris.sh
+    for BATCH in $(seq 1 1) #2 4 8 16 32 64 128 256 512 1024)
+    do
+        NNODES=$(($NRANKS/$NPROC_PER_NODE + 1))
+        DATE=$(date +"%Y-%m-%d_%T")
+        WORKSPACE=/eagle/Diaspora/amal/TEKAPP_ASYNC_FULL_R${NRANKS}/B${BATCH}/D${DATE}/
+        mkdir  -p $WORKSPACE
+        cd $WORKSPACE
+        cp -r  $DIR/* .
+        echo Running in $WORKSPACE
+        qsub  -A Diaspora -l select=$NNODES:system=polaris -o $WORKSPACE polaris.sh
+    done
 done

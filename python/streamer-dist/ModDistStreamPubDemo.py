@@ -15,7 +15,6 @@ import csv
 
 def parse_arguments():
   parser = argparse.ArgumentParser( description='Data Distributor Process')
-  parser.add_argument('--protocol', default="na+sm", help='Mofka protocol')
 
   parser.add_argument('--group_file', type=str, default="mofka.json",
                       help='Group file for the mofka server')
@@ -98,6 +97,7 @@ def main():
       continue
 
     # Deserialize msg to image
+
     mofka_read_image = serializer.deserialize(serialized_image=mofka_data)
     serializer.info(mofka_read_image) # print image information
 
@@ -147,6 +147,8 @@ def main():
 
       #to send from mofka:
       mofka_sub = sub.flatten()
+      if args.nproc_sirt>2:
+        mofka_sub = np.tile(mofka_sub, args.nproc_sirt//2) # I suppose that the args.nproc_sirt is always a multiple of 2
       ncols = sub.shape[2]
       tt = mofka_dist.push_image(mofka_sub, args.num_sinograms, ncols, rotation,
                       mofka_read_image.UniqueId(), mofka_read_image.Center(), producer=producer)
