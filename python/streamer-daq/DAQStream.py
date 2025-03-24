@@ -53,6 +53,9 @@ def parse_arguments():
   parser.add_argument('--iteration_sleep', type=float, default=0,
                       help='Delay data publishing for each iteration.')
 
+  parser.add_argument('--proj_sleep', type=float, default=0.6,
+                      help='Delay data publishing for each projection.')
+
   parser.add_argument('--beg_sinogram', type=int, default=0,
                       help='Starting sinogram for reconstruction.')
 
@@ -447,7 +450,7 @@ def main():
                   num_sinograms=args.num_sinograms,
                   iteration=args.d_iteration,
                   slp=args.iteration_sleep,
-                  prj_slp=0.6)
+                  prj_slp=args.proj_sleep)
   elif args.mode == 2: # Test data acquisition
     test_daq( producer=producer,
               num_sinograms=args.num_sinograms,                       # Y

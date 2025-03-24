@@ -7,7 +7,7 @@
 #include <unistd.h>
 #include <chrono>
 #include "data_region_a.h"
-#include "disp_comm_base.h"
+// #include "disp_comm_base.h"
 #include "reduction_space_a.h"
 
 enum ReplicationTypes{
@@ -26,7 +26,7 @@ class DISPEngineBase{
     std::mutex partitioner_mutex_;
     ReplicationTypes replication_type_;
 
-    DISPCommBase<DT> *comm_;
+    // DISPCommBase<DT> *comm_;
 
     virtual void ReductionWrapper(AReductionSpaceBase<RST, DT> &reduction_space,
         ADataRegion<DT> &input_data, int &req_units)=0;
@@ -51,7 +51,7 @@ class DISPEngineBase{
 
   public:
     DISPEngineBase(
-        DISPCommBase<DT> *comm,
+        // DISPCommBase<DT> *comm,
         AReductionSpaceBase<RST, DT> *conf_reduction_space, 
         int num_reduction_threads);
     virtual ~DISPEngineBase();
@@ -104,7 +104,7 @@ int DISPEngineBase<RST, DT>::NumProcessors(){
 
 template <typename RST, typename DT>
 DISPEngineBase<RST, DT>::DISPEngineBase(
-    DISPCommBase<DT> *comm,
+    // DISPCommBase<DT> *comm,
     AReductionSpaceBase<RST, DT> *conf_reduction_space_i, 
     int num_reduction_threads):
   replication_type_(FULL_REPLICATION)
@@ -113,7 +113,7 @@ DISPEngineBase<RST, DT>::DISPEngineBase(
   num_reduction_threads_ = 
     (num_reduction_threads<1) ? num_procs_ : num_reduction_threads;
 
-  comm_ = comm;
+  // comm_ = comm;
 
   InitReductionSpaces(num_reduction_threads_, conf_reduction_space_i);
 }

@@ -65,17 +65,17 @@ class DISPEngineReduction : public DISPEngineBase<RST, DT>{
 
 
   public:
-    virtual void GlobalInPlaceSynch(
-        DataRegion2DBareBase<DT> &dr,
-        DISPCommBase<DT> &comm)
-    {
-      comm.GlobalInPlaceCombination(dr);
-    };
+    // virtual void GlobalInPlaceSynch(
+    //     DataRegion2DBareBase<DT> &dr,
+    //     DISPCommBase<DT> &comm)
+    // {
+    //   comm.GlobalInPlaceCombination(dr);
+    // };
 
     virtual void DistInPlaceGlobalSynchWrapper(){
      AReductionSpaceBase<RST, DT> &head_rs = *(this->reduction_spaces_)[0];
      DataRegion2DBareBase<DT> &dr = head_rs.reduction_objects();
-     GlobalInPlaceSynch(dr, *(this->comm_));
+    //  GlobalInPlaceSynch(dr, *(this->comm_));
     };
 
     virtual void SeqInPlaceLocalSynchWrapper(){
@@ -202,11 +202,11 @@ class DISPEngineReduction : public DISPEngineBase<RST, DT>{
     }
 
     DISPEngineReduction(
-        DISPCommBase<DT> *comm,
+        // DISPCommBase<DT> *comm,
         AReductionSpaceBase<RST, DT> *conf_reduction_space_i,
         int num_reduction_threads) :
       DISPEngineBase<RST, DT>(
-          comm,
+          // comm,
           conf_reduction_space_i,
           num_reduction_threads){};
 };

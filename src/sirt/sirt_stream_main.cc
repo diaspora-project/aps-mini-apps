@@ -16,6 +16,7 @@
 #include "trace_data.h"
 #include <vector>
 #include <unistd.h>
+#include <charconv>
 
 class TraceRuntimeConfig {
   public:
@@ -35,11 +36,19 @@ class TraceRuntimeConfig {
     int dest_port;
     std::string pub_addr;
     int pub_freq = 0;
+    int ckpt_freq = 1;
+    std::string task_id;
+    int task_index;
+    int num_tasks;
 
-    TraceRuntimeConfig(int argc, char **argv, int rank, int size){
+    TraceRuntimeConfig(int argc, char **argv){
       try
       {
         TCLAP::CmdLine cmd("SIRT Iterative Image Reconstruction", ' ', "0.01");
+        TCLAP::ValueArg<std::string> argTaskId(
+          "", "id", "The Task Id", false, "0", "string");
+          TCLAP::ValueArg<int> argNumTasks(
+          "", "np", "Number of Reconstruction Task/Process", false, 1, "int");
         TCLAP::ValueArg<std::string> argMofkaProtocol(
           "", "protocol", "Mofka protocol", false, "na+sm", "string");
         TCLAP::ValueArg<std::string> argGroupFile(
@@ -75,6 +84,9 @@ class TraceRuntimeConfig {
         TCLAP::ValueArg<int> argCkptFreq(
           "", "ckpt-freq", "Checkpoint frequency", false, 1, "int");
 
+        cmd.add(argTaskId);
+        cmd.add(argNumTasks);
+
         cmd.add(argMofkaProtocol);
         cmd.add(argGroupFile);
         cmd.add(argBatchSize);
@@ -91,7 +103,13 @@ class TraceRuntimeConfig {
         cmd.add(argWindowStep);
         cmd.add(argWindowIter);
 
+        cmd.add(argCkptFreq);
+
         cmd.parse(argc, argv);
+
+        task_id = argTaskId.getValue();
+        std::from_chars(task_id.data(), task_id.data() + task_id.size(), task_index);
+        num_tasks = argNumTasks.getValue();
         kReconOutputPath = argReconOutputPath.getValue();
         kReconOutputDir = argReconOutputDir.getValue();
         kReconDatasetPath = argReconDatasetPath.getValue();
@@ -104,9 +122,11 @@ class TraceRuntimeConfig {
         protocol = argMofkaProtocol.getValue();
         batchsize = argBatchSize.getValue();
         group_file = argGroupFile.getValue();
+        ckpt_freq = argCkptFreq.getValue();
 
-        std::cout << "MPI rank:"<< rank << "; MPI size:" << size << "; PID:" << getpid() << std::endl;
-        if(rank==0)
+        // std::cout << "MPI rank:"<< rank << "; MPI size:" << size << "; PID:" << getpid() << std::endl;
+        std::cout << "Task ID: " << task_id << " Task Index: " << task_index << "; Number of Tasks: " << num_tasks << "; PID: " << getpid() << std::endl;
+        if(task_index==0)
         {
           std::cout << "Output file path=" << kReconOutputPath << std::endl;
           std::cout << "Output dir path=" << kReconOutputDir << std::endl;
@@ -133,25 +153,25 @@ class TraceRuntimeConfig {
 int main(int argc, char **argv)
 {
   /* Initiate middleware's communication layer */
-  DISPCommBase<float> *comm =
-        new DISPCommMPI<float>(&argc, &argv);
-  TraceRuntimeConfig config(argc, argv, comm->rank(), comm->size());
+  TraceRuntimeConfig config(argc, argv);
   MofkaStream ms = MofkaStream{ config.group_file,
                                 config.batchsize,
                                 static_cast<uint32_t>(config.window_len),
-                                comm->rank(),
-                                comm->size()};
+                                config.task_index,
+                                config.num_tasks};
 
-  ms.handshake(comm->rank(), comm->size());
+  ms.handshake(config.task_index, config.num_tasks);
   std::string consuming_topic = "dist_sirt";
   std::string producing_topic = "sirt_den";
-  std::vector<size_t> targets = {static_cast<size_t>(comm->rank())};
+  std::vector<size_t> targets = {static_cast<size_t>(config.task_index)};
+
   mofka::Producer  producer = ms.getProducer(producing_topic, "sirt");
   mofka::Consumer consumer = ms.getConsumer(consuming_topic, "sirt", targets);
   /* Get metadata structure */
   json tmetadata = ms.getInfo();
   auto n_blocks = tmetadata["n_sinograms"].get<int64_t>();
   auto num_cols = tmetadata["n_rays_per_proj_row"].get<int64_t>();
+
   /***********************/
   /* Initiate middleware */
   /* Prepare main reduction space and its objects */
@@ -167,7 +187,7 @@ int main(int argc, char **argv)
   /* Prepare processing engine and main reduction space for other threads */
   DISPEngineBase<SIRTReconSpace, float> *engine =
     new DISPEngineReduction<SIRTReconSpace, float>(
-        comm,
+        // comm,
         main_recon_space,
         config.thread_count);
         /// # threads (0 for auto assign the number of threads)
@@ -244,8 +264,9 @@ int main(int argc, char **argv)
       }
 
       // Checkpoint
-      #if TIMERON
-      auto ckpt_beg = std::chrono::system_clock::now()
+      #ifdef TIMERON
+      auto ckpt_beg = std::chrono::system_clock::now();
+      #endif
       if(!(passes%config.ckpt_freq)){
         
       }
@@ -261,12 +282,12 @@ int main(int argc, char **argv)
       if(!(passes%config.write_freq)){
         std::stringstream iteration_stream;
         iteration_stream << std::setfill('0') << std::setw(6) << passes;
-        std::string outputpath = config.kReconOutputDir + "/" +
-          iteration_stream.str() + "-recon.h5";
-
-        trace_io::WriteRecon(
-            curr_slices->metadata(), h5md,
-            outputpath, config.kReconDatasetPath);
+        
+        // std::string outputpath = config.kReconOutputDir + "/" +
+        //   iteration_stream.str() + "-recon.h5";
+        // trace_io::WriteRecon(
+        //     curr_slices->metadata(), h5md,
+        //     outputpath, config.kReconDatasetPath);
 
         try {
           TraceMetadata &rank_metadata = curr_slices->metadata();
@@ -288,7 +309,7 @@ int main(int argc, char **argv)
             static_cast<hsize_t>(h5md.dims[2])};
 
           json md = { {"Type", "DATA"},
-                      {"rank", comm->rank()},
+                      {"rank", config.task_index},
                       {"iteration_stream", iteration_stream.str()},
                       {"rank_dims", rank_dims},
                       {"app_dims", app_dims},
@@ -300,7 +321,7 @@ int main(int argc, char **argv)
           spdlog::critical("{}", ex.what());
           exit(-1);
         }
-      MPI_Barrier(MPI_COMM_WORLD);
+      // MPI_Barrier(MPI_COMM_WORLD);
       }
       #ifdef TIMERON
       write_tot += (std::chrono::system_clock::now()-write_beg);
@@ -316,7 +337,7 @@ int main(int argc, char **argv)
   std::cout << "Flush " << ms.getBatch() << " Time: " << elapsed_t.count() << " sec" << std::endl;
   ms.writeTimes("producer");
   ms.writeTimes("consumer");
-  MPI_Barrier(MPI_COMM_WORLD);
+  // MPI_Barrier(MPI_COMM_WORLD);
   json md = {{"Type", "FIN"}};
   // data part
   float d = 1;
@@ -325,7 +346,7 @@ int main(int argc, char **argv)
 
   /**************************/
   #ifdef TIMERON
-  if(comm->rank()==0){
+  if(config.task_index==0){
     e2e_tot += (std::chrono::system_clock::now()-e2e_beg);
     std::cout << "End-to-End Reconstruction time=" << e2e_tot.count() << std::endl;
 
@@ -345,7 +366,7 @@ int main(int argc, char **argv)
   std::cout << "Deleting main_recon_space" << std::endl;
   delete main_recon_space;
   //delete curr_slices;
-  std::cout << "Deleting comm" << std::endl;
-  delete comm;
+  // std::cout << "Deleting comm" << std::endl;
+  // delete comm;
   std::cout << "Exiting" << std::endl;
 }
