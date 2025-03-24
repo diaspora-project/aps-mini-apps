@@ -1,5 +1,4 @@
-. ~/spack/share/spack/setup-env.sh
-spack env activate APS
+source ~/activate-spack.sh
 source envpy/bin/activate
 
 sirt_ranks=$1

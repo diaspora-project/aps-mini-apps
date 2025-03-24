@@ -1,9 +1,8 @@
- . ~/spack/share/spack/setup-env.sh;
-spack env activate APS;
+cp activate-spack.sh ~
+source ~/activate-spack.sh
 # python -m venv envpy
-# pip install parsl
 source envpy/bin/activate
-
+# pip install parsl
 
 app_dir=`pwd`
 
