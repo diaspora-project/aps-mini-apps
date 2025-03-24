@@ -82,7 +82,7 @@ def process_directory(model, directory_path):
                 file_path = os.path.join(root, file)
                 process_file(model, file_path)
 
-def main(input_path, model_path, protocol, group_file, batchsize, nproc_sirt):
+def main(input_path, recon_path, model_path, protocol, group_file, batchsize, nproc_sirt):
     # Load the saved model
     # model = keras.models.load_model(model_path)
     driver = mofka.MofkaDriver(group_file, use_progress_thread=True)
@@ -140,7 +140,7 @@ def main(input_path, model_path, protocol, group_file, batchsize, nproc_sirt):
                 print(batch_meta)
                 data = np.concatenate(batch_data, axis=0)
                 #process_stream(model, data, metadata)
-                output_path = batch_meta[0]["iteration_stream"]+'-denoised.h5'
+                output_path = recon_path + "/" + batch_meta[0]["iteration_stream"]+'-denoised.h5'
                 with h5py.File(output_path, 'w') as h5_output:
                     h5_output.create_dataset('/data', data=data)
     fields = ["t_wait", "t_metadata", "metadata_size" ,"t_data", "data_size"]
@@ -151,6 +151,7 @@ def main(input_path, model_path, protocol, group_file, batchsize, nproc_sirt):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Denoise HDF5 files using a trained model.')
     parser.add_argument('--input', type=str, required=False, help='Input file or directory path.')
+    parser.add_argument('--output', type=str, required=False, help='Output recon path.')
     parser.add_argument('--model', type=str, required=True, help='Path to the saved model.')
     parser.add_argument('--protocol', type=str, required=True, help='Mofka protocol')
     parser.add_argument('--group_file', type=str, required=True, help='Path to group file')
@@ -159,5 +160,5 @@ if __name__ == "__main__":
 
 
     args = parser.parse_args()
-    main(args.input, args.model, args.protocol, args.group_file, args.batchsize, args.nproc_sirt)
+    main(args.input, args.output, args.model, args.protocol, args.group_file, args.batchsize, args.nproc_sirt)
 
