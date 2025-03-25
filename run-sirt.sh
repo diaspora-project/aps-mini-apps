@@ -2,6 +2,7 @@ source ~/activate-spack.sh
 source envpy/bin/activate
 
 sirt_ranks=$1
+logdir=$2
 
 # mpiexec -n $sirt_ranks ./build/bin/sirt_stream \
 #     --write-freq 4  \
@@ -43,4 +44,5 @@ python ./build/python/streamer-sirt/ParslSirt.py \
     --center 1427 \
     --protocol na+sm \
     --group-file mofka.json \
-    --batchsize 4
+    --batchsize 4 \
+    --logdir ${logdir}

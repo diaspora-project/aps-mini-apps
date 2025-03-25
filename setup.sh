@@ -33,6 +33,7 @@ cp -r ../../../python/common ../
 echo "SETTING UP DENOISER -------------------- "
 cd ${app_dir}
 mkdir -p build/python/streamer-denoiser
+mkdir -p build/denoise
 cp python/streamer-denoiser/* build/python/streamer-denoiser
 
 

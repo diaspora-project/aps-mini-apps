@@ -10,7 +10,7 @@ def parse_arguments():
   parser = argparse.ArgumentParser(
           description='SIRT Iterative Image Reconstruction')
   
-  parser.add_argument('--np', type=str, default=1, help="Number of reconstruction tasks")
+  parser.add_argument('--np', type=int, default=1, help="Number of reconstruction tasks")
   
   parser.add_argument('--protocol', default="na+sm", help='Mofka protocol')
 
@@ -49,6 +49,9 @@ def parse_arguments():
 
   parser.add_argument('--window-iter', type=str, default="1",
                       help='Number of iterations on received window')
+
+  parser.add_argument('--logdir', type=str, default=".",
+                      help='Log directory for sirt processes')
   
   parser.add_argument('--ckpt-freq', type=str, default="1",
                       help='Checkpoint frequency')
@@ -59,9 +62,9 @@ def parse_arguments():
 
 # Define a bash app that executes a C++ program
 @bash_app
-def run_sirt(id, args=[]):
-    stderr = 'sirt-' + id + '.err'
-    stdout = 'sirt-' + id + '.out'
+def run_sirt(id, logdir=".", args=[]):
+    stderr = logdir + '/sirt-' + id + '.err'
+    stdout = logdir + '/sirt-' + id + '.out'
     sirt_stream = "build/bin/sirt_stream"
     cmd = sirt_stream + " --id " + id + " " + " ".join(args) + f" > {stdout} 2> {stderr}"
     print(cmd)
@@ -83,14 +86,16 @@ def main():
     params = parse_arguments()
     num_tasks = int(params.np)
     args = []
+    excluded_args = {"logdir"}
     for arg, value in vars(params).items():
-        args.append("--" + arg.replace("_", "-"))
-        args.append(value)
+        if arg not in excluded_args:
+            args.append("--" + arg.replace("_", "-"))
+            args.append(str(value))
     print("Number of tasks", num_tasks)
     print("Input arguments", args)
     
     # Execute the C++ program using the bash app
-    sirt_futures = [run_sirt(id=str(i), args=args) for i in range(num_tasks)]
+    sirt_futures = [run_sirt(id=str(i), logdir=params.logdir, args=args) for i in range(num_tasks)]
 
     # Wait for the results and print the output
     for sirt_future in sirt_futures:
