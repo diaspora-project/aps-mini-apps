@@ -18,6 +18,8 @@
 #include <unistd.h>
 #include <charconv>
 
+#include <veloc.h>
+
 class TraceRuntimeConfig {
   public:
     std::string kReconOutputPath;
@@ -40,6 +42,7 @@ class TraceRuntimeConfig {
     std::string task_id;
     int task_index;
     int num_tasks;
+    std::string ckpt_config;
 
     TraceRuntimeConfig(int argc, char **argv){
       try
@@ -83,6 +86,8 @@ class TraceRuntimeConfig {
           false, 1, "int");
         TCLAP::ValueArg<int> argCkptFreq(
           "", "ckpt-freq", "Checkpoint frequency", false, 1, "int");
+        TCLAP::ValueArg<int> argCkptConfig(
+          "", "ckpt-config", "Checkpoint Configuration (VeloC)", false, "veloc.cfg", "string");
 
         cmd.add(argTaskId);
         cmd.add(argNumTasks);
@@ -104,6 +109,7 @@ class TraceRuntimeConfig {
         cmd.add(argWindowIter);
 
         cmd.add(argCkptFreq);
+        cmd.add(argCkptConfig);
 
         cmd.parse(argc, argv);
 
@@ -123,6 +129,7 @@ class TraceRuntimeConfig {
         batchsize = argBatchSize.getValue();
         group_file = argGroupFile.getValue();
         ckpt_freq = argCkptFreq.getValue();
+        ckpt_config = argCkptConfig.getValue();
 
         // std::cout << "MPI rank:"<< rank << "; MPI size:" << size << "; PID:" << getpid() << std::endl;
         std::cout << "Task ID: " << task_id << " Task Index: " << task_index << "; Number of Tasks: " << num_tasks << "; PID: " << getpid() << std::endl;
@@ -220,6 +227,18 @@ int main(int argc, char **argv)
   h5md.dims[0] = 0;   /// Number of projections is unknown
   h5md.dims[2] = tmetadata["n_rays_per_proj_row"].get<int64_t>();
   size_t data_size = 0;
+
+  // Configure the VeloC checkpointing
+  veloc::client_t ckpt_client = veloc::get_client((unsigned int)config.task_index, config.ckpt_config);
+  // protect reconstruction memmory regions
+  if (!ckpt_client.mem_protect(0, recon_image.data(), recon_image.size() * sizeof(float))) {
+    spdlog::critical("Failed to protect memory region for reconstruction image.");
+    exit(-1);
+  }
+  if (!ckpt_client.mem_protect(1, main_recon_replica.data(), main_recon_replica.size() * sizeof(float))) {
+    spdlog::critical("Failed to protect memory region for main reconstruction replica.");
+    exit(-1);
+  }
 
   #ifdef TIMERON
   auto e2e_beg = std::chrono::system_clock::now();
