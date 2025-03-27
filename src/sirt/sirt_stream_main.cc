@@ -7,7 +7,6 @@
 #include "disp_engine_reduction.h"
 #include "sirt.h"
 #include <cassert>
-#include <spdlog/spdlog.h>
 #include <time.h>
 #include <string>
 #include <fstream>
