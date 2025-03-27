@@ -5,9 +5,9 @@
 spack:
   # add package specs to the `specs` list
   specs:
-  - mofka@main+mpi+python ^json-c@0.13.0 ^libfabric@1.19.1 ^mercury~boostsys~checksum
-    ^mochi-bedrock~ssg ^mpich@3.4
-  - py-mochi-margo
+  - mofka@0.5.1+mpi+python ^json-c@0.13.0 ^libfabric@1.19.1 ^mercury~boostsys~checksum ^mpich@3.4
+  - boost+serialization
+  - veloc-git@main ^kvtree@1.4.0 ^axl@0.8.0 ^rankstr@0.3.0 ^shuffile@0.3.0 ^redset@0.3.0 ^er@0.4.0
   - py-numpy
   - py-scipy
   - swig # rm
@@ -21,13 +21,13 @@ spack:
   - py-h5py
   - flatbuffers
   - py-flatbuffers
-  - py-tensorflow # it takes up to 8h to install :) comment if not needed
+  # - py-tensorflow # it takes up to 8h to install :) comment if not needed
   view: true
   concretizer:
     unify: true
   repos:
   # git clone https://github.com/mochi-hpc/mochi-spack-packages.git
-  - /path/to/mochi-spack-packages
+  - /home/ndhai/diaspora/mochi-spack-packages
   mirrors:
     mochi-buildcache:
       url: oci://ghcr.io/mochi-hpc/mochi-spack-buildcache

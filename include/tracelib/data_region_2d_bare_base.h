@@ -14,14 +14,42 @@
 #include <iostream>
 #include <vector>
 #include "data_region_bare_base.h"
+#include <boost/serialization/vector.hpp>
+#include <boost/serialization/serialization.hpp>
+#include <boost/serialization/split_member.hpp>
 
 template <typename T> 
 class DataRegion2DBareBase {
   private:
     std::vector<DataRegionBareBase<T>*> regions_;
-
     size_t rows_;
     size_t cols_;
+
+    friend class boost::serialization::access;
+
+    template<class Archive>
+    void save(Archive &ar, const unsigned int /*version*/) const { // Mark version as unused
+        ar & rows_;
+        ar & cols_;
+        for (const auto& region : regions_) {
+            ar & *region;
+        }
+    }
+
+    template<class Archive>
+    void load(Archive &ar, const unsigned int /*version*/) { // Mark version as unused
+        ar & rows_;
+        ar & cols_;
+        regions_.clear();
+        regions_.reserve(rows_);
+        for (size_t i = 0; i < rows_; ++i) {
+            auto region = new DataRegionBareBase<T>(cols_);
+            ar & *region;
+            regions_.push_back(region);
+        }
+    }
+
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
 
   public:
     DataRegion2DBareBase(size_t rows, size_t cols){

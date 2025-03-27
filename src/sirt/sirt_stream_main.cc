@@ -18,7 +18,8 @@
 #include <unistd.h>
 #include <charconv>
 
-#include <veloc.h>
+#include <veloc.hpp>
+#include <veloc/boost.hpp>
 
 class TraceRuntimeConfig {
   public:
@@ -43,6 +44,7 @@ class TraceRuntimeConfig {
     int task_index;
     int num_tasks;
     std::string ckpt_config;
+    std::string ckpt_name;
 
     TraceRuntimeConfig(int argc, char **argv){
       try
@@ -86,8 +88,10 @@ class TraceRuntimeConfig {
           false, 1, "int");
         TCLAP::ValueArg<int> argCkptFreq(
           "", "ckpt-freq", "Checkpoint frequency", false, 1, "int");
-        TCLAP::ValueArg<int> argCkptConfig(
+        TCLAP::ValueArg<std::string> argCkptConfig(
           "", "ckpt-config", "Checkpoint Configuration (VeloC)", false, "veloc.cfg", "string");
+         TCLAP::ValueArg<std::string> argCkptName(
+          "", "ckpt-config", "Checkpoint Name (VeloC)", false, "sirt-ckpt", "string");
 
         cmd.add(argTaskId);
         cmd.add(argNumTasks);
@@ -110,6 +114,7 @@ class TraceRuntimeConfig {
 
         cmd.add(argCkptFreq);
         cmd.add(argCkptConfig);
+        cmd.add(argCkptName);
 
         cmd.parse(argc, argv);
 
@@ -130,6 +135,7 @@ class TraceRuntimeConfig {
         group_file = argGroupFile.getValue();
         ckpt_freq = argCkptFreq.getValue();
         ckpt_config = argCkptConfig.getValue();
+        ckpt_name = argCkptName.getValue();
 
         // std::cout << "MPI rank:"<< rank << "; MPI size:" << size << "; PID:" << getpid() << std::endl;
         std::cout << "Task ID: " << task_id << " Task Index: " << task_index << "; Number of Tasks: " << num_tasks << "; PID: " << getpid() << std::endl;
@@ -188,7 +194,7 @@ int main(int argc, char **argv)
   auto main_recon_space = new SIRTReconSpace(
       n_blocks, 2*num_cols*num_cols);
   main_recon_space->Initialize(num_cols*num_cols);
-  auto &main_recon_replica = main_recon_space->reduction_objects();
+  DataRegion2DBareBase<float> &main_recon_replica = main_recon_space->reduction_objects();
   float init_val=0.;
   main_recon_replica.ResetAllItems(init_val);
   /* Prepare processing engine and main reduction space for other threads */
@@ -229,22 +235,25 @@ int main(int argc, char **argv)
   size_t data_size = 0;
 
   // Configure the VeloC checkpointing
-  veloc::client_t ckpt_client = veloc::get_client((unsigned int)config.task_index, config.ckpt_config);
-  // protect reconstruction memmory regions
-  if (!ckpt_client.mem_protect(0, recon_image.data(), recon_image.size() * sizeof(float))) {
-    spdlog::critical("Failed to protect memory region for reconstruction image.");
-    exit(-1);
-  }
-  if (!ckpt_client.mem_protect(1, main_recon_replica.data(), main_recon_replica.size() * sizeof(float))) {
-    spdlog::critical("Failed to protect memory region for main reconstruction replica.");
-    exit(-1);
+  veloc::client_t *ckpt_client = veloc::get_client((unsigned int)config.task_index, config.ckpt_config);
+  // Protect reconstruction memory regions
+  ckpt_client->mem_protect(
+      0, 
+      veloc::boost::serializer(main_recon_replica),
+      veloc::boost::deserializer(main_recon_replica)
+  );
+
+  int passes = ckpt_client->restart_test(config.ckpt_name, 0, config.task_index);
+  // Checkpoint restart if any
+  if(passes>0){
+    ckpt_client->restart(config.ckpt_name, 0);
   }
 
   #ifdef TIMERON
   auto e2e_beg = std::chrono::system_clock::now();
   #endif
 
-  for(int passes=0; ; ++passes){
+  for(; ; ++passes){
       #ifdef TIMERON
       auto datagen_beg = std::chrono::system_clock::now();
       #endif
@@ -287,7 +296,7 @@ int main(int argc, char **argv)
       auto ckpt_beg = std::chrono::system_clock::now();
       #endif
       if(!(passes%config.ckpt_freq)){
-        
+        ckpt_client->checkpoint(config.ckpt_config, passes);
       }
       #ifdef TIMERON
       ckpt_tot += (std::chrono::system_clock::now()-ckpt_beg);

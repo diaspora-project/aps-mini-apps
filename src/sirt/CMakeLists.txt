@@ -1,6 +1,11 @@
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Set CMP0167 policy to NEW to use BoostConfig.cmake
+if(POLICY CMP0167)
+    cmake_policy(SET CMP0167 NEW)
+endif()
+
 # setup cache variables for ccmake
 if (NOT CMAKE_BUILD_TYPE)
     set (CMAKE_BUILD_TYPE Release
@@ -34,12 +39,21 @@ find_package(Threads REQUIRED)
 #find_package(ZeroMQ)
 find_package(HDF5)
 
+# Find VeloC library
+find_package(veloc REQUIRED)
+
+# Manually specify the path to the veloc-client library
+find_library(VELOC_CLIENT_LIB veloc-client REQUIRED)
+
 if(NOT HDF5_FOUND OR NOT HDF5_IS_PARALLEL)
     message(FATAL_ERROR "HDF5 library not compiled with parallel support.")
 endif()
 
 # find mofka
 find_package (mofka REQUIRED)
+
+# Find Boost libraries
+find_package(Boost REQUIRED COMPONENTS serialization CONFIG)
 
 include_directories(${Trace_SOURCE_DIR}/include)
 include_directories(${Trace_SOURCE_DIR}/include/tracelib)
@@ -56,5 +70,16 @@ target_link_libraries(mofka_stream PRIVATE mofka::client)
 add_library(sirt ${CMAKE_CURRENT_LIST_DIR}/sirt.cc)
 
 add_executable(sirt_stream sirt_stream_main.cc)
-target_link_libraries(sirt_stream mofka_stream sirt trace_utils trace_h5io MPI::MPI_CXX hdf5::hdf5 Threads::Threads mofka::client)
-#target_include_directories(sirt_stream PRIVATE ${HDF5_INCLUDE_DIRS})
+target_link_libraries(sirt_stream
+    mofka_stream
+    sirt
+    trace_utils
+    trace_h5io
+    ${VELOC_CLIENT_LIB}  # Manually link the VeloC client library
+    Boost::serialization
+    MPI::MPI_CXX
+    hdf5::hdf5
+    Threads::Threads
+    hdf5::hdf5
+    mofka::client
+)
