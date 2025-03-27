@@ -11,6 +11,7 @@ import tomopy as tp
 import json
 from mofka_dist import MofkaDist
 import csv
+import signal
 #from memory_profiler import profile
 
 def parse_arguments():
@@ -57,11 +58,22 @@ def parse_arguments():
   parser.add_argument('--check_seq', action='store_true', default=False,
               help='Checks the incoming packages sequence numbers and prints out when there is problem (does not terminate). Expected sequence is 0, 1, .., i, i+1, ...')
 
+  parser.add_argument('--logdir', type=str, default='.',
+              help='Path to save log files.')
+
 
   return parser.parse_args()
 #@profile
 def main():
   args = parse_arguments()
+
+  # Register a signal handler for this function
+  def signal_handler(sig, frame):
+    print("\nCtrl+C pressed. Exiting immediately...")
+    sys.exit(0)  # Exit the program immediately
+
+  signal.signal(signal.SIGINT, signal_handler)
+
   # Setup mofka
   mofka_dist = MofkaDist(group_file=args.group_file, batchsize=args.batchsize)
   # Handshake with Sirt
@@ -89,6 +101,7 @@ def main():
 
     mofka_metadata, mofka_data, pull_times = mofka_dist.pull_image(consumer)
     if mofka_metadata["Type"] == "FIN": break
+    sequence_id = mofka_metadata["sequence_id"]
     total_received += 1
     total_size += len(mofka_data)
     mofka_consuming_time.append(pull_times)
@@ -148,7 +161,7 @@ def main():
       #to send from mofka:
       mofka_sub = sub.flatten()
       ncols = sub.shape[2]
-      tt = mofka_dist.push_image(mofka_sub, args.num_sinograms, ncols, rotation,
+      tt = mofka_dist.push_image(mofka_sub, sequence_id, args.num_sinograms, ncols, rotation,
                       mofka_read_image.UniqueId(), mofka_read_image.Center(), producer=producer)
 
       if all(isinstance(item, list) for item in tt):
@@ -197,12 +210,12 @@ def main():
 
   mofka_dist.done_image(producer)
   fields = ["type", "projection_id", "start", "stop", "duration", "metadata_size" ,"data_size"]
-  with open('Dist_push.csv', 'w') as f:
+  with open(args.logdir + '/Dist_push.csv', 'w') as f:
     write = csv.writer(f)
     write.writerow(fields)
     write.writerows(mofka_producing_time)
   fields = ["t_wait", "t_metadata", "metadata_size" ,"t_data", "data_size"]
-  with open('Dist_pull.csv', 'w') as f:
+  with open(args.logdir + '/Dist_pull.csv', 'w') as f:
     write = csv.writer(f)
     write.writerow(fields)
     write.writerows(mofka_consuming_time)

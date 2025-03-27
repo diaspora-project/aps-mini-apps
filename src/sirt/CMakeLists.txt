@@ -6,6 +6,11 @@ if(POLICY CMP0167)
     cmake_policy(SET CMP0167 NEW)
 endif()
 
+# Set CMP0144 policy to NEW to suppress warnings about BOOST_ROOT
+if(POLICY CMP0144)
+    cmake_policy(SET CMP0144 NEW)
+endif()
+
 # setup cache variables for ccmake
 if (NOT CMAKE_BUILD_TYPE)
     set (CMAKE_BUILD_TYPE Release

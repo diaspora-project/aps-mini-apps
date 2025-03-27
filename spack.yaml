@@ -8,6 +8,7 @@ spack:
   - mofka@0.5.1+mpi+python ^json-c@0.13.0 ^libfabric@1.19.1 ^mercury~boostsys~checksum ^mpich@3.4
   - boost+serialization
   - veloc@main ^kvtree@1.4.0 ^axl@0.8.0 ^rankstr@0.3.0 ^shuffile@0.3.0 ^redset@0.3.0 ^er@0.4.0
+  - py-parsl
   - py-numpy
   - py-scipy
   - swig # rm

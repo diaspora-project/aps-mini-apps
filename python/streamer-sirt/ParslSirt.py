@@ -7,57 +7,61 @@ parsl.load(config)
 
 
 def parse_arguments():
-  parser = argparse.ArgumentParser(
-          description='SIRT Iterative Image Reconstruction')
-  
-  parser.add_argument('--np', type=int, default=1, help="Number of reconstruction tasks")
-  
-  parser.add_argument('--protocol', default="na+sm", help='Mofka protocol')
+    parser = argparse.ArgumentParser(
+            description='SIRT Iterative Image Reconstruction')
+    
+    parser.add_argument('--np', type=int, default=1, help="Number of reconstruction tasks")
+    
+    parser.add_argument('--protocol', default="na+sm", help='Mofka protocol')
 
-  parser.add_argument('--group-file', type=str, default="mofka.json",
-                      help='Group file for the mofka server')
+    parser.add_argument('--group-file', type=str, default="mofka.json",
+                        help='Group file for the mofka server')
 
-  parser.add_argument('--batchsize', type=str, default="16",
-                      help='Mofka batch size')
+    parser.add_argument('--batchsize', type=str, default="16",
+                        help='Mofka batch size')
 
-  parser.add_argument('--reconOutputPath', type=str, default="./output.h5",
-                      help='Output file path for reconstructed image (hdf5)')
+    parser.add_argument('--reconOutputPath', type=str, default="./output.h5",
+                        help='Output file path for reconstructed image (hdf5)')
 
-  parser.add_argument('--recon-output-dir', type=str, default=".",
-                      help='Output directory for the streaming outputs')
+    parser.add_argument('--recon-output-dir', type=str, default=".",
+                        help='Output directory for the streaming outputs')
 
-  parser.add_argument('--reconDatasetPath', type=str, default="/data",
-                      help='Reconstruction dataset path in hdf5 file')
+    parser.add_argument('--reconDatasetPath', type=str, default="/data",
+                        help='Reconstruction dataset path in hdf5 file')
 
-  parser.add_argument('--pub-freq', type=str, default="10000",
-                      help='Publish frequency')
-  
-  parser.add_argument('--center', type=str, default="0.",
-                      help='Center value')
-  
-  parser.add_argument('--thread', type=str, default="1",
-                      help='Number of threads per process')
-  
-  parser.add_argument('--write-freq', type=str, default="10000",
-                      help='Write frequency')
+    parser.add_argument('--pub-freq', type=str, default="10000",
+                        help='Publish frequency')
+    
+    parser.add_argument('--center', type=str, default="0.",
+                        help='Center value')
+    
+    parser.add_argument('--thread', type=str, default="1",
+                        help='Number of threads per process')
+    
+    parser.add_argument('--write-freq', type=str, default="10000",
+                        help='Write frequency')
 
-  parser.add_argument('--window-length', type=str, default="32",
-                      help='Number of projections that will be stored in the window')
+    parser.add_argument('--window-length', type=str, default="32",
+                        help='Number of projections that will be stored in the window')
 
-  parser.add_argument('--window-step', type=str, default="1",
-                      help='Number of projections that will be received in each request')
+    parser.add_argument('--window-step', type=str, default="1",
+                        help='Number of projections that will be received in each request')
 
-  parser.add_argument('--window-iter', type=str, default="1",
-                      help='Number of iterations on received window')
+    parser.add_argument('--window-iter', type=str, default="1",
+                        help='Number of iterations on received window')
 
-  parser.add_argument('--logdir', type=str, default=".",
-                      help='Log directory for sirt processes')
-  
-  parser.add_argument('--ckpt-freq', type=str, default="1",
-                      help='Checkpoint frequency')
-
-  
-  return parser.parse_args()
+    parser.add_argument('--logdir', type=str, default=".",
+                        help='Log directory for sirt processes')
+    
+    parser.add_argument('--ckpt-freq', type=str, default="1",
+                        help='Checkpoint frequency')
+    parser.add_argument('--ckpt-name', type=str, default="sirt",
+                        help='Checkpoint name')
+    parser.add_argument('--ckpt-config', type=str, default="veloc.cfg",
+                        help='Checkpoint configuration (VeLoC)')
+    
+    
+    return parser.parse_args()
 
 
 # Define a bash app that executes a C++ program
@@ -86,7 +90,7 @@ def main():
     params = parse_arguments()
     num_tasks = int(params.np)
     args = []
-    excluded_args = {"logdir"}
+    excluded_args = {}
     for arg, value in vars(params).items():
         if arg not in excluded_args:
             args.append("--" + arg.replace("_", "-"))

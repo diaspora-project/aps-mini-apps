@@ -82,7 +82,7 @@ def process_directory(model, directory_path):
                 file_path = os.path.join(root, file)
                 process_file(model, file_path)
 
-def main(input_path, recon_path, model_path, protocol, group_file, batchsize, nproc_sirt):
+def main(input_path, recon_path, model_path, protocol, group_file, batchsize, nproc_sirt, logdir):
     # Load the saved model
     # model = keras.models.load_model(model_path)
     driver = mofka.MofkaDriver(group_file, use_progress_thread=True)
@@ -144,7 +144,7 @@ def main(input_path, recon_path, model_path, protocol, group_file, batchsize, np
                 with h5py.File(output_path, 'w') as h5_output:
                     h5_output.create_dataset('/data', data=data)
     fields = ["t_wait", "t_metadata", "metadata_size" ,"t_data", "data_size"]
-    with open('Den_pull.csv', 'w') as f:
+    with open(logdir + '/Den_pull.csv', 'w') as f:
         write = csv.writer(f)
         write.writerow(fields)
         write.writerows(mofka_times)
@@ -157,8 +157,9 @@ if __name__ == "__main__":
     parser.add_argument('--group_file', type=str, required=True, help='Path to group file')
     parser.add_argument("--batchsize", type=int, required=True, help="Mofka batchsize")
     parser.add_argument("--nproc_sirt", type=int, required=True, help="Number of Sirt Processes")
+    parser.add_argument("--logdir", type=str, required=True, help="Log directory")
 
 
     args = parser.parse_args()
-    main(args.input, args.output, args.model, args.protocol, args.group_file, args.batchsize, args.nproc_sirt)
+    main(args.input, args.output, args.model, args.protocol, args.group_file, args.batchsize, args.nproc_sirt, args.logdir)
 

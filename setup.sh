@@ -1,5 +1,5 @@
-cp activate-spack.sh ~
-source ~/activate-spack.sh
+# cp activate-spack.sh ~
+# source ~/activate-spack.sh
 # python -m venv envpy
 source envpy/bin/activate
 # pip install parsl

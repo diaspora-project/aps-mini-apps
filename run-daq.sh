@@ -1,12 +1,22 @@
 source ~/activate-spack.sh
 source envpy/bin/activate
 
+# Check if the number of arguments is correct
+if [ "$#" -ne 3 ]; then
+	echo "Usage: run-daq.sh <sirt_ranks> <num_sinograms>"
+	echo "  <sirt_ranks>    Number of ranks for the SIRT process"
+	echo "  <num_sinograms> Number of sinograms to process"
+	exit 1
+fi
+
 sirt_ranks=$1
 num_sinograms=$2
+logdir=$3
 echo "Number of processes $sirt_ranks"
 echo "Number of sinograms $num_sinograms"
 
-#DAQ topic
+trap "kill 0; exit 1" SIGINT SIGTERM
+
 mofkactl topic create daq_dist \
 	--groupfile mofka.json
 
@@ -64,5 +74,6 @@ python ./build/python/streamer-daq/DAQStream.py \
 	--synch_addr tcp://0.0.0.0:50001 \
 	--synch_count 1 \
 	--protocol na+sm \
-	--group_file mofka.json
+	--group_file mofka.json \
+	--logdir ${logdir}
 
