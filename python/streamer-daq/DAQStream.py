@@ -189,7 +189,8 @@ def simulate_daq(producer,
                  slp=0,
                  iteration=1,
                  save_after_serialize=False,
-                 prj_slp=0):
+                 prj_slp=0,
+                 logdir="."):
   global bsignal
 
   serialized_data = None
@@ -257,7 +258,7 @@ def simulate_daq(producer,
   print("Sent number of projections: {}; Total size (MiB): {:.2f}; Elapsed time (s): {:.2f}".format(nproj, tot_MiBs, elapsed_time))
   print("Rate (MiB/s): {:.2f}; (msg/s): {:.2f}".format(tot_MiBs/elapsed_time, nproj/elapsed_time))
   fields = ["type", "index", "start", "stop", "duration", "metadata_size", "data_size"]
-  with open(args.logdir + '/Daq_push.csv', 'w') as f:
+  with open(logdir + '/Daq_push.csv', 'w') as f:
     write = csv.writer(f)
     write.writerow(fields)
     write.writerows(mofka_t)
@@ -453,7 +454,8 @@ def main():
                   num_sinograms=args.num_sinograms,
                   iteration=args.d_iteration,
                   slp=args.iteration_sleep,
-                  prj_slp=args.proj_sleep)
+                  prj_slp=args.proj_sleep,
+                  logdir=args.logdir)
   elif args.mode == 2: # Test data acquisition
     test_daq( producer=producer,
               num_sinograms=args.num_sinograms,                       # Y
