@@ -27,7 +27,7 @@ spack:
     unify: true
   repos:
   # git clone https://github.com/mochi-hpc/mochi-spack-packages.git
-  - /home/ndhai/diaspora/mochi-spack-packages
+  - /path/to/mochi-spack-packages
   mirrors:
     mochi-buildcache:
       url: oci://ghcr.io/mochi-hpc/mochi-spack-buildcache
