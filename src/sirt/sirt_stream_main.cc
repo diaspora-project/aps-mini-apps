@@ -41,6 +41,7 @@ class TraceRuntimeConfig {
     std::string task_id;
     int task_index;
     int num_tasks;
+    int num_passes;
     int ckpt_freq = 1;
     std::string ckpt_config;
     std::string ckpt_name;
@@ -86,6 +87,9 @@ class TraceRuntimeConfig {
         TCLAP::ValueArg<float> argWindowIter(
           "", "window-iter", "Number of iterations on received window",
           false, 1, "int");
+        TCLAP::ValueArg<int> argNumPasses(
+          "", "num-passes", "Number of passes on data streams",
+          false, 20, "int");
         TCLAP::ValueArg<std::string> argLogDir(
           "", "logdir", "Log directory", false, ".", "string");
         TCLAP::ValueArg<int> argCkptFreq(
@@ -113,6 +117,7 @@ class TraceRuntimeConfig {
         cmd.add(argWindowLen);
         cmd.add(argWindowStep);
         cmd.add(argWindowIter);
+        cmd.add(argNumPasses);
 
         cmd.add(argLogDir);
 
@@ -134,6 +139,8 @@ class TraceRuntimeConfig {
         window_len= argWindowLen.getValue();
         window_step= argWindowStep.getValue();
         window_iter= argWindowIter.getValue();
+        num_passes = argNumPasses.getValue();
+
         protocol = argMofkaProtocol.getValue();
         batchsize = argBatchSize.getValue();
         group_file = argGroupFile.getValue();
@@ -264,7 +271,7 @@ int main(int argc, char **argv)
   auto e2e_beg = std::chrono::system_clock::now();
   #endif
 
-  for(; ; ++passes){
+  for(; passes < config.num_passes; ++passes){
       #ifdef TIMERON
       auto datagen_beg = std::chrono::system_clock::now();
       #endif

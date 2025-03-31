@@ -11,6 +11,7 @@ spack:
   - py-parsl
   - py-numpy
   - py-scipy
+  - spdlog
   - swig # rm
   - py-tomopy@1.11.0
   - libzmq # rm
