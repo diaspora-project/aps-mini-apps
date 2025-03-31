@@ -1,4 +1,4 @@
-source ~/activate-spack.sh
+source activate-spack.sh
 source envpy/bin/activate
 
 sirt_ranks=$1
