@@ -166,7 +166,7 @@ class MofkaStream
 
     void setProducerTimes(std::string op, uint64_t size, float time);
 
-    int writeTimes(std::string type);
+    int writeTimes(std::string path, std::string type);
 
 };
 #endif // MOFKA_STREAM_H

@@ -38,12 +38,13 @@ class TraceRuntimeConfig {
     int dest_port;
     std::string pub_addr;
     int pub_freq = 0;
-    int ckpt_freq = 1;
     std::string task_id;
     int task_index;
     int num_tasks;
+    int ckpt_freq = 1;
     std::string ckpt_config;
     std::string ckpt_name;
+    std::string logdir = ".";
 
     TraceRuntimeConfig(int argc, char **argv){
       try
@@ -85,12 +86,14 @@ class TraceRuntimeConfig {
         TCLAP::ValueArg<float> argWindowIter(
           "", "window-iter", "Number of iterations on received window",
           false, 1, "int");
+        TCLAP::ValueArg<std::string> argLogDir(
+          "", "logdir", "Log directory", false, ".", "string");
         TCLAP::ValueArg<int> argCkptFreq(
           "", "ckpt-freq", "Checkpoint frequency", false, 1, "int");
         TCLAP::ValueArg<std::string> argCkptConfig(
           "", "ckpt-config", "Checkpoint Configuration (VeloC)", false, "veloc.cfg", "string");
-         TCLAP::ValueArg<std::string> argCkptName(
-          "", "ckpt-config", "Checkpoint Name (VeloC)", false, "sirt-ckpt", "string");
+        TCLAP::ValueArg<std::string> argCkptName(
+          "", "ckpt-name", "Checkpoint Name (VeloC)", false, "sirt-ckpt", "string");
 
         cmd.add(argTaskId);
         cmd.add(argNumTasks);
@@ -110,6 +113,8 @@ class TraceRuntimeConfig {
         cmd.add(argWindowLen);
         cmd.add(argWindowStep);
         cmd.add(argWindowIter);
+
+        cmd.add(argLogDir);
 
         cmd.add(argCkptFreq);
         cmd.add(argCkptConfig);
@@ -135,6 +140,7 @@ class TraceRuntimeConfig {
         ckpt_freq = argCkptFreq.getValue();
         ckpt_config = argCkptConfig.getValue();
         ckpt_name = argCkptName.getValue();
+        logdir = argLogDir.getValue();
 
         // std::cout << "MPI rank:"<< rank << "; MPI size:" << size << "; PID:" << getpid() << std::endl;
         std::cout << "Task ID: " << task_id << " Task Index: " << task_index << "; Number of Tasks: " << num_tasks << "; PID: " << getpid() << std::endl;
@@ -241,11 +247,17 @@ int main(int argc, char **argv)
       veloc::boost::serializer(main_recon_replica),
       veloc::boost::deserializer(main_recon_replica)
   );
+  long progress = 0; // Reconstruction progress marked by the projection requence ids
+  ckpt_client->mem_protect(1, &progress, 1, sizeof(long));
 
   int passes = ckpt_client->restart_test(config.ckpt_name, 0, config.task_index);
   // Checkpoint restart if any
   if(passes>0){
+    std::cout << "Restarting from checkpoint at iteration " << passes << std::endl;
     ckpt_client->restart(config.ckpt_name, 0);
+  }else{
+    std::cout << "No checkpoint found. Starting from scratch" << std::endl;
+    passes = 0;
   }
 
   #ifdef TIMERON
@@ -295,7 +307,13 @@ int main(int argc, char **argv)
       auto ckpt_beg = std::chrono::system_clock::now();
       #endif
       if(!(passes%config.ckpt_freq)){
-        ckpt_client->checkpoint(config.ckpt_config, passes);
+        std::cout << "[Task-" << config.task_id << "] Checkpointing at iteration " << passes << std::endl;
+        ckpt_client->checkpoint_wait();
+        if (!ckpt_client->checkpoint(config.ckpt_config, passes)) {
+          std::cout << "[Task-" << config.task_id << "] Cannot checkpoint. passes: " << passes << std::endl;
+          throw std::runtime_error("Checkpointing failured");
+        }
+        std::cout << "[task-" << config.task_id << "]: Checkpointed version " << passes << std::endl;
       }
       #ifdef TIMERON
       ckpt_tot += (std::chrono::system_clock::now()-ckpt_beg);
@@ -362,8 +380,8 @@ int main(int argc, char **argv)
   std::chrono::duration<double> elapsed_t = end - start;
   ms.setProducerTimes("Flush", ms.getBufferSize()*data_size*sizeof(float), elapsed_t.count());
   std::cout << "Flush " << ms.getBatch() << " Time: " << elapsed_t.count() << " sec" << std::endl;
-  ms.writeTimes("producer");
-  ms.writeTimes("consumer");
+  ms.writeTimes(config.logdir, "producer");
+  ms.writeTimes(config.logdir, "consumer");
   // MPI_Barrier(MPI_COMM_WORLD);
   json md = {{"Type", "FIN"}};
   // data part

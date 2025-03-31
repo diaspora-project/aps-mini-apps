@@ -142,13 +142,13 @@ class MofkaDist:
         t_data = time.perf_counter()
         return json.loads(mofka_metadata), mofka_data, [t_wait - ts, t_meta- t_wait, sys.getsizeof(mofka_metadata), t_data - t_meta, len(mofka_data)]
 
-    def push_image(self, data: np.ndarray, row :int, col: int,
+    def push_image(self, data: np.ndarray, sequence_id: int, row :int, col: int,
                    theta: float, projection_id: int, center: float,
                    producer: mofka.Producer) -> int :
         dims = [row, col]
 
         center = (dims[1] / 2.0) if center == 0.0 else center
-        print(f"Sending proj: id={projection_id}; center={center}; dims[0]={dims[0]}; dims[1]={dims[1]}; theta={theta}")
+        print(f"Sending proj: sequence_id={sequence_id}; id={projection_id}; center={center}; dims[0]={dims[0]}; dims[1]={dims[1]}; theta={theta}")
 
         # Generate worker messages
         msgs = generate_worker_msgs(data,
@@ -157,7 +157,8 @@ class MofkaDist:
                                     theta,
                                     self.nranks,
                                     center,
-                                    self.seq)
+                                    sequence_id)
+                                    # self.seq)
         self.buffer.append(msgs)
         mofka_t = []
         # Send data to workers
@@ -167,7 +168,7 @@ class MofkaDist:
             #f.wait()
             mofka_t.append(["push", projection_id, ts, time.perf_counter(), time.perf_counter() - ts, sys.getsizeof(self.buffer[self.counter][i][0]) ,len(self.buffer[self.counter][i][1])])
 
-        self.seq += 1
+        # self.seq += 1
         self.counter += 1
         if self.counter == self.batch:
             ts = time.perf_counter()

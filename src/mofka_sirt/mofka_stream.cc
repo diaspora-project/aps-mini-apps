@@ -301,8 +301,8 @@ void MofkaStream::setProducerTimes(std::string op, uint64_t size, float time){
   producer_times.emplace_back(op, size, time);
 }
 
-int MofkaStream::writeTimes(std::string type){
-  std::string filename = "Sirt_"+ type + "_rank_" + std::to_string(getRank()) + ".csv";
+int MofkaStream::writeTimes(std::string path, std::string type){
+  std::string filename = path + "/Sirt_"+ type + "_rank_" + std::to_string(getRank()) + ".csv";
   std::ofstream file(filename);
   if (!file.is_open()) {
       std::cerr << "Failed to open file for writing." << std::endl;
