@@ -148,7 +148,7 @@ def main(input_path, model_path, group_file, batchsize, nproc_sirt):
 
             fieldnames = correct_order_meta[0].keys()
 
-            with open("metadata.csv", 'w', newline='') as csvfile:
+            with open("metadata.csv", 'a', newline='') as csvfile:
                 writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
                 writer.writeheader()
                 writer.writerows(correct_order_meta)
