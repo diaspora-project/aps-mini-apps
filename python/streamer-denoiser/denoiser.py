@@ -92,6 +92,7 @@ def main(input_path, model_path, group_file, batchsize, nproc_sirt):
     more_data = True
     mofka_times = []
     time0 = time.perf_counter()
+    cpt = nproc_sirt
     while more_data:
         data = []
         metadata = []
@@ -106,8 +107,10 @@ def main(input_path, model_path, group_file, batchsize, nproc_sirt):
             m["mofka_e_id"] = event.event_id
             m["mofka_e_partition"] = event.partition
             if m["Type"] == "FIN":
-                more_data = False
-                break
+                cpt = cpt-1
+                if cpt==0:
+                    more_data = False
+                    break
             else:
                 metadata.append(m)
                 t_data = time.perf_counter()
