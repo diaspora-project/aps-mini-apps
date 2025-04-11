@@ -10,9 +10,10 @@ import h5py as h5
 import dxchange
 import tomopy as tp
 import signal
-from pymargo.core import Engine
 import mochi.mofka.client as mofka
 import csv
+from collections import deque
+
 #from memory_profiler import profile
 
 
@@ -189,6 +190,7 @@ def simulate_daq(producer,
   mofka_t = []
   buffer = []
   i = 0
+  futures = deque()
   for it in range(iteration): # Simulate data acquisition
     print("Current iteration over dataset: {}/{}".format(it+1, iteration))
     for index in indices:
@@ -213,27 +215,39 @@ def simulate_daq(producer,
       md = {"index": int(index), "Type" : "DATA"}
       f = producer.push(md, buffer[i])
       #f.wait()
+      # if seq % batchsize == 0:
+      #   futures.append(f)
       mofka_t.append(["push", index, ts, time.perf_counter(), time.perf_counter() - ts, len(str(md)) , len(buffer[i])])
       tot_transfer_size+=len(buffer[i])
       seq+=1
       i+=1
-      if seq % batchsize == 0:
-        ts = time.perf_counter()
-        producer.flush()
-        mofka_t.append(["flush_after", index, ts, time.perf_counter(), time.perf_counter() - ts, batchsize*len(str(md)), len(buffer)*len(buffer[i-1])])
-        buffer=[]
-        i = 0
+
+      if i == 2*batchsize:
+        # ts = time.perf_counter()
+        # producer.flush()
+        # futures[0].wait()
+        # futures.popleft()
+        buffer = buffer[batchsize:]
+        i = i - batchsize
+        # mofka_t.append(["wait", index, ts, time.perf_counter(), time.perf_counter() - ts, batchsize*len(str(md)), len(buffer)*len(buffer[i-1])])
+
+
+
     time.sleep(slp)
   #Last flush if buffer was not full
   if len(buffer)>0:
     ts = time.perf_counter()
     producer.flush()
+    # while not futures:
+    #   futures[0].wait()
+    #   futures.popleft()
     mofka_t.append(["flush_after", index, ts, time.perf_counter(), time.perf_counter() - ts,len(buffer)*len(str(md)), len(buffer[i-1])])
   time1 = time.time()
 
   elapsed_time = time1-time0
   tot_MiBs = (tot_transfer_size*1.)/2**20
   nproj = iteration*len(serialized_data)
+  mofka_t.append(["total", 0, time0, time1, elapsed_time, tot_MiBs])
   print("Sent number of projections: {}; Total size (MiB): {:.2f}; Elapsed time (s): {:.2f}".format(nproj, tot_MiBs, elapsed_time))
   print("Rate (MiB/s): {:.2f}; (msg/s): {:.2f}".format(tot_MiBs/elapsed_time, nproj/elapsed_time))
   fields = ["type", "index", "start", "stop", "duration", "metadata_size", "data_size"]
@@ -401,7 +415,7 @@ def main():
   batchsize = args.batchsize #mofka.AdaptiveBatchSize
   thread_pool = mofka.ThreadPool(1)
   ordering = mofka.Ordering.Strict
-  producer = topic.producer(producer_name, batchsize, thread_pool, ordering)
+  producer = topic.producer(producer_name, batch_size=batchsize, thread_pool=thread_pool, ordering=ordering)
 
   time0 = time.time()
   if args.mode == 0: # Read data from PV

@@ -1,8 +1,8 @@
-import sys
 import numpy as np
 import json
 import mochi.mofka.client as mofka
 import time
+from collections import deque
 
 def generate_worker_msgs(data: np.ndarray, dims: list, projection_id: int, theta: float,
                          n_ranks: int, center: float, seq: int) -> list:
@@ -71,6 +71,7 @@ class MofkaDist:
         self.buffer = []
         self.counter = 0
         self.batch = batchsize
+        self.futures = deque()
 
     def producer(self, topic_name: str, producer_name: str) -> mofka.Producer:
         topic = self.driver.open_topic(topic_name)
@@ -78,9 +79,9 @@ class MofkaDist:
         thread_pool = mofka.ThreadPool(1)
         ordering = mofka.Ordering.Strict
         producer = topic.producer(producer_name,
-                                  batchsize,
-                                  thread_pool,
-                                  ordering)
+                                  batch_size=batchsize,
+                                  thread_pool=thread_pool,
+                                  ordering=ordering)
         return producer
 
     def consumer(self, topic_name: str, consumer_name: str) -> mofka.Consumer:
@@ -158,16 +159,21 @@ class MofkaDist:
             ts = time.perf_counter()
             f = producer.push(self.buffer[self.counter][i][0], self.buffer[self.counter][i][1])
             #f.wait()
+            # if self.counter % self.batch == 0:
+            #     self.futures.append(f)
             mofka_t.append(["push", projection_id, ts, time.perf_counter(), time.perf_counter() - ts, len(str(self.buffer[self.counter][i][0])) ,len(self.buffer[self.counter][i][1])])
 
         self.seq += 1
         self.counter += 1
-        if self.counter == self.batch:
-            ts = time.perf_counter()
-            producer.flush()
-            mofka_t.append(["flush_after", projection_id, ts, time.perf_counter(), time.perf_counter() - ts, self.nranks*len(self.buffer)* len(str(self.buffer[self.counter-1][0][0])), self.nranks*len(self.buffer)*len(self.buffer[self.counter-1][0][1])])
-            self.buffer = []
-            self.counter = 0
+        if self.counter == 2*self.batch:
+            # ts = time.perf_counter()
+            # #producer.flush()
+            # for i in range(self.nranks):
+            #     self.futures[0].wait()
+            #     self.futures.popleft()
+            #     mofka_t.append(["wait", projection_id, ts, time.perf_counter(), time.perf_counter() - ts, self.nranks*len(self.buffer)* len(str(self.buffer[self.counter-1][0][0])), self.nranks*len(self.buffer)*len(self.buffer[self.counter-1][0][1])])
+            self.buffer = self.buffer[self.batch:]
+            self.counter = self.counter - self.batch
 
         return mofka_t
 
@@ -175,6 +181,9 @@ class MofkaDist:
         if len(self.buffer)> 0:
             ts = time.perf_counter()
             producer.flush()
+            # while not self.futures:
+            #     self.futures[0].wait()
+            #     self.futures.popleft()
             self.seq += 1
             return ["last_flush","" , ts, time.perf_counter(), time.perf_counter() - ts, self.nranks*len(self.buffer)* len(str(self.buffer[self.counter-1][0][0])), self.nranks*len(self.buffer)*len(self.buffer[self.counter-1][0][1])]
         return None

@@ -198,6 +198,7 @@ def main():
             tot_MiBs/elapsed_time, total_received/elapsed_time))
 
   mofka_dist.done_image(producer)
+  mofka_producing_time.append(["total", 0, time0, time1, elapsed_time, tot_MiBs])
   fields = ["type", "projection_id", "start", "stop", "duration", "metadata_size" ,"data_size"]
   with open('Dist_push.csv', 'w') as f:
     write = csv.writer(f)

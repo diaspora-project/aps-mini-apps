@@ -5,13 +5,17 @@
         "libwarabi-bedrock-module.so",
         "libflock-bedrock-module.so"
     ],
+    "margo": {
+        "use_progress_thread": false,
+        "rpc_thread_count": 3
+    },
     "providers" : [
         {
             "name" : "my_flock_provider",
             "type" : "flock",
             "provider_id" : 1,
             "config": {
-                "bootstrap": "self",
+                "bootstrap": "mpi",
                 "file": "mofka.json",
                 "group": {
                     "type": "static"

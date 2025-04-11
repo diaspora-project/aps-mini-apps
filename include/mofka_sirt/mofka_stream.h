@@ -17,6 +17,7 @@
 #include <nlohmann/json.hpp>
 #include "trace_data.h"
 #include <mofka_stream.h>
+#include <queue>
 
 using json = nlohmann::json;
 namespace tl = thallium;
@@ -35,6 +36,7 @@ class MofkaStream
     std::vector<float> vproj;
     std::vector<float> vtheta;
     std::vector<json> vmeta;
+    std::queue<mofka::Future<mofka::EventID>> futures;
     json info;
 
     mofka::MofkaDriver driver;
@@ -163,6 +165,8 @@ class MofkaStream
     void setConsumerTimes(std::string op, uint64_t size, float time);
 
     std::vector<std::tuple<std::string, uint64_t, float>> getProducerTimes();
+
+    std::queue<mofka::Future<mofka::EventID>> getFutures();
 
     void setProducerTimes(std::string op, uint64_t size, float time);
 

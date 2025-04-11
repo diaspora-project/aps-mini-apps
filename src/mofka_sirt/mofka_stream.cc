@@ -127,30 +127,51 @@ void MofkaStream::publishImage(
   float *data,
   size_t size,
   mofka::Producer producer){
+
   mofka::Metadata metadata{meta};
   float* copy = new float[size];
   std::memcpy(copy, data, size * sizeof(float));
   buffer.push_back(copy);
   mofka::Data data_m = mofka::Data(buffer[buffer.size()-1], size*sizeof(float));
   auto start = std::chrono::high_resolution_clock::now();
-  auto future = producer.push(metadata, data_m);
-  //future.wait();
+  auto f  = producer.push(metadata, data_m);
   batch++;
   auto end = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> elapsed_push = end - start;
   std::chrono::duration<double> elapsed_flush = end - end;
   // std::cout << "Push " << elapsed.count() << " sec" << std::endl;
   producer_times.emplace_back("Push", size*sizeof(float), elapsed_push.count());
-  if (batch == batchsize){
-    start = std::chrono::high_resolution_clock::now();
-    producer.flush();
-    end = std::chrono::high_resolution_clock::now();
-    elapsed_flush = end - start;
-    // std::cout << "Flush " << batch << " Time: " << elapsed_flush.count() << " sec" << std::endl;
-    producer_times.emplace_back("Flush", buffer.size()*size*sizeof(float), elapsed_flush.count());
+  if (batch % batchsize == 0) futures.push(std::move(f));
+
+  if (futures.size() == 3){
+    // start = std::chrono::high_resolution_clock::now();
+    // producer.flush();
+    // futures.front().wait();
+    // futures.pop();
+    // end = std::chrono::high_resolution_clock::now();
+    // elapsed_flush = end - start;
+    // // std::cout << "Flush " << batch << " Time: " << elapsed_flush.count() << " sec" << std::endl;
+    // producer_times.emplace_back("Wait", buffer.size()*size*sizeof(float), elapsed_flush.count());
+
+    // try {
+    //   for(auto& f : futures){
+    //     start = std::chrono::high_resolution_clock::now();
+    //     f.wait();
+    //     end = std::chrono::high_resolution_clock::now();
+    //     elapsed_flush = end - start;
+    //     producer_times.emplace_back("Wait", buffer.size()*size*sizeof(float), elapsed_flush.count());
+
+    //   }
+    // } catch(const mofka::Exception& ex) {
+    //     std::cerr << "MOFKA EXCEPTION: " << ex.what() << std::endl;
+    // }
+    size_t c=0;
     for (float* ptr : buffer) {
         if (ptr==nullptr) continue;
         else delete[] ptr;
+        c++;
+        if (c==batchsize) break;
+
     }
     buffer.clear();
     batch=0;
@@ -285,6 +306,8 @@ uint32_t MofkaStream::getBatch() {return batch;}
 
 uint32_t MofkaStream::getCounter(){ return counter;}
 
+std::queue<mofka::Future<mofka::EventID>> MofkaStream::getFutures(){ return futures;}
+
 void MofkaStream::setInfo(json &j) {info = j;}
 
 void MofkaStream::windowLength(uint32_t wlen){ window_len = wlen;}
@@ -327,5 +350,3 @@ int MofkaStream::writeTimes(std::string type){
   std::cout << "Producer stats successfully written to " << filename << std::endl ;
   return 0;
 }
-
-

@@ -284,10 +284,28 @@ int main(int argc, char **argv)
   }
   auto start = std::chrono::high_resolution_clock::now();
   producer.flush();
+  // auto futures = ms.getFutures();
+  // while(!futures.empty()) {
+  //   futures.front().wait();
+  //   futures.pop();
+  // }
   auto end = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> elapsed_t = end - start;
   ms.setProducerTimes("Flush", ms.getBufferSize()*data_size*sizeof(float), elapsed_t.count());
-  std::cout << "Flush " << ms.getBatch() << " Time: " << elapsed_t.count() << " sec" << std::endl;
+
+
+  // try {
+  //   for(auto& f : ms.getFutures()) {
+  //     start = std::chrono::high_resolution_clock::now();
+  //     f.wait();
+  //     end = std::chrono::high_resolution_clock::now();
+  //     elapsed_t = end - start;
+  //     ms.setProducerTimes("Wait", ms.getBufferSize()*data_size*sizeof(float), elapsed_t.count());
+  //   }
+  // } catch(const mofka::Exception& ex) {
+  //     std::cerr << "MOFKA EXCEPTION: " << ex.what() << std::endl;
+  // }
+
   ms.writeTimes("producer");
   ms.writeTimes("consumer");
   MPI_Barrier(MPI_COMM_WORLD);

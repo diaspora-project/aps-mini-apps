@@ -91,6 +91,7 @@ def main(input_path, model_path, group_file, batchsize, nproc_sirt):
                               batch_size=batch_size)
     more_data = True
     mofka_times = []
+    time0 = time.perf_counter()
     while more_data:
         data = []
         metadata = []
@@ -102,6 +103,8 @@ def main(input_path, model_path, group_file, batchsize, nproc_sirt):
             m = event.metadata
             t_meta = time.perf_counter()
             m = json.loads(m)
+            m["mofka_e_id"] = event.event_id
+            m["mofka_e_partition"] = event.partition
             if m["Type"] == "FIN":
                 more_data = False
                 break
@@ -111,8 +114,12 @@ def main(input_path, model_path, group_file, batchsize, nproc_sirt):
                 dd = bytearray(event.data[0])
                 mofka_times.append([t_wait - ts, t_meta - t_wait, len(str(m)), time.perf_counter() - t_data, len(dd)])
                 dd = np.frombuffer(dd, dtype=np.float32)
-                dd = dd.reshape(metadata[i]["rank_dims"])
-                data.append(dd)
+                try:
+                    dd = dd.reshape(metadata[i]["rank_dims"])
+                    data.append(dd)
+                except :
+                    print(metadata, dd.shape, dd, flush=True)
+
         if len(metadata) > 0:
             correct_order_meta = [
                 d for _, d in sorted(
@@ -127,15 +134,28 @@ def main(input_path, model_path, group_file, batchsize, nproc_sirt):
                 )
             ]
 
+
             for j in range(len(correct_order_meta)//nproc_sirt):
                 batch_data = correct_order[j*nproc_sirt:nproc_sirt*(j+1)]
                 batch_meta = correct_order_meta[j*nproc_sirt:nproc_sirt*(j+1)]
+
                 print(batch_meta, flush=True)
                 data = np.concatenate(batch_data, axis=0)
                 #process_stream(model, data, metadata)
                 output_path = batch_meta[0]["iteration_stream"]+'-denoised.h5'
                 with h5py.File(output_path, 'w') as h5_output:
                     h5_output.create_dataset('/data', data=data)
+
+            fieldnames = correct_order_meta[0].keys()
+
+            with open("metadata.csv", 'w', newline='') as csvfile:
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(correct_order_meta)
+
+
+    print("Time to solution: ", time.perf_counter()-time0, flush=True)
+
     fields = ["t_wait", "t_metadata", "metadata_size" ,"t_data", "data_size"]
     with open('Den_pull.csv', 'w') as f:
         write = csv.writer(f)
