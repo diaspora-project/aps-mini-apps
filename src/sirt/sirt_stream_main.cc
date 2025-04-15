@@ -5,7 +5,7 @@
 #include "tclap/CmdLine.h"
 #include "disp_comm_mpi.h"
 #include "disp_engine_reduction.h"
-#include "sirt.h"
+#include "sirt.h" // Include SIRTReconSpace
 #include <cassert>
 #include <time.h>
 #include <string>
@@ -19,6 +19,19 @@
 
 #include <veloc.hpp>
 #include <veloc/boost.hpp>
+#include <boost/serialization/export.hpp>
+#include <boost/archive/text_oarchive.hpp>
+#include <boost/archive/text_iarchive.hpp>
+
+// Define an alias for the instantiated template class
+using DISPEngineReductionSIRT = DISPEngineReduction<SIRTReconSpace, float>;
+using DISPEngineBaseSIRT = DISPEngineBase<SIRTReconSpace, float>;
+using AReductionSpaceBaseSIRT = AReductionSpaceBase<SIRTReconSpace, float>;
+
+// Register the derived class
+BOOST_CLASS_EXPORT(AReductionSpaceBaseSIRT)
+BOOST_CLASS_EXPORT(DISPEngineBaseSIRT)
+BOOST_CLASS_EXPORT(DISPEngineReductionSIRT)
 
 class TraceRuntimeConfig {
   public:
@@ -89,7 +102,10 @@ class TraceRuntimeConfig {
           false, 1, "int");
         TCLAP::ValueArg<int> argNumPasses(
           "", "num-passes", "Number of passes on data streams",
-          false, 20, "int");
+          // false, 201, "int");
+          false, 4001, "int");
+          // false, 21, "int");
+          // false, 41, "int");
         TCLAP::ValueArg<std::string> argLogDir(
           "", "logdir", "Log directory", false, ".", "string");
         TCLAP::ValueArg<int> argCkptFreq(
@@ -183,7 +199,8 @@ int main(int argc, char **argv)
                                 config.batchsize,
                                 static_cast<uint32_t>(config.window_len),
                                 config.task_index,
-                                config.num_tasks};
+                                config.num_tasks,
+                                0}; // Add the missing progress argument
 
   ms.handshake(config.task_index, config.num_tasks);
   std::string consuming_topic = "dist_sirt";
@@ -196,26 +213,6 @@ int main(int argc, char **argv)
   json tmetadata = ms.getInfo();
   auto n_blocks = tmetadata["n_sinograms"].get<int64_t>();
   auto num_cols = tmetadata["n_rays_per_proj_row"].get<int64_t>();
-
-  /***********************/
-  /* Initiate middleware */
-  /* Prepare main reduction space and its objects */
-  /* The size of the reconstruction object (in reconstruction space) is
-   * twice the reconstruction object size, because of the length storage
-   */
-  auto main_recon_space = new SIRTReconSpace(
-      n_blocks, 2*num_cols*num_cols);
-  main_recon_space->Initialize(num_cols*num_cols);
-  DataRegion2DBareBase<float> &main_recon_replica = main_recon_space->reduction_objects();
-  float init_val=0.;
-  main_recon_replica.ResetAllItems(init_val);
-  /* Prepare processing engine and main reduction space for other threads */
-  DISPEngineBase<SIRTReconSpace, float> *engine =
-    new DISPEngineReduction<SIRTReconSpace, float>(
-        // comm,
-        main_recon_space,
-        config.thread_count);
-        /// # threads (0 for auto assign the number of threads)
 
   /**********************/
 
@@ -246,26 +243,54 @@ int main(int argc, char **argv)
   h5md.dims[2] = tmetadata["n_rays_per_proj_row"].get<int64_t>();
   size_t data_size = 0;
 
+  /***********************/
+  /* Initiate middleware */
+  /* Prepare main reduction space and its objects */
+  /* The size of the reconstruction object (in reconstruction space) is
+   * twice the reconstruction object size, because of the length storage
+   */
+  auto main_recon_space = new SIRTReconSpace(
+      n_blocks, 2*num_cols*num_cols);
+  main_recon_space->Initialize(num_cols*num_cols);
+
   // Configure the VeloC checkpointing
   veloc::client_t *ckpt_client = veloc::get_client((unsigned int)config.task_index, config.ckpt_config);
   // Protect reconstruction memory regions
-  ckpt_client->mem_protect(
-      0, 
-      veloc::boost::serializer(main_recon_replica),
-      veloc::boost::deserializer(main_recon_replica)
-  );
-  long progress = 0; // Reconstruction progress marked by the projection requence ids
-  ckpt_client->mem_protect(1, &progress, 1, sizeof(long));
+  int progress = 0; // Reconstruction progress marked by the projection requence ids
+  ckpt_client->mem_protect(0, veloc::boost::serializer(recon_image), veloc::boost::deserializer(recon_image));
+  ckpt_client->mem_protect(1, &progress, 1, sizeof(int));
+  // ckpt_client->mem_protect(
+  //     2, 
+  //     veloc::boost::serializer(main_recon_space),
+  //     veloc::boost::deserializer(main_recon_space)
+  // );
 
   int passes = ckpt_client->restart_test(config.ckpt_name, 0, config.task_index);
   // Checkpoint restart if any
   if(passes>0){
-    std::cout << "Restarting from checkpoint at iteration " << passes << std::endl;
-    ckpt_client->restart(config.ckpt_name, 0);
+    std::cout << "Checkpoint found at " << passes << ". Restarting from checkpoint" << std::endl;
+    ckpt_client->restart(config.ckpt_name, passes);
+    std::cout << "Restarted from checkpoint at iteration " << passes << ", progress = " << progress << std::endl;
+    ms.updateProgress(progress);
   }else{
     std::cout << "No checkpoint found. Starting from scratch" << std::endl;
     passes = 0;
   }
+
+  DataRegion2DBareBase<float> &main_recon_replica = main_recon_space->reduction_objects();
+  float init_val=0.;
+  if (progress == 0) {
+    main_recon_replica.ResetAllItems(init_val);
+  }
+
+  /* Prepare processing engine and main reduction space for other threads */
+  DISPEngineBase<SIRTReconSpace, float> *engine =
+    // new DISPEngineReduction<SIRTReconSpace, float>(
+    new DISPEngineReductionSIRT(
+        // comm,
+        main_recon_space,
+        config.thread_count);
+        /// # threads (0 for auto assign the number of threads)
 
   #ifdef TIMERON
   auto e2e_beg = std::chrono::system_clock::now();
@@ -276,13 +301,21 @@ int main(int argc, char **argv)
       auto datagen_beg = std::chrono::system_clock::now();
       #endif
       curr_slices = ms.readSlidingWindow(recon_image, config.window_step, consumer);
+      
       if(config.center!=0 && curr_slices!=nullptr)
         curr_slices->metadata().center(config.center);
       #ifdef TIMERON
       datagen_tot += (std::chrono::system_clock::now()-datagen_beg);
       #endif
-
-      if(curr_slices == nullptr) break; /// If nullptr, there is no more projections
+      
+      if (ms.isEndOfStream()) {
+        std::cout << "[Task-" << config.task_id << "] End of stream. Exiting..." << std::endl;
+        break;
+      }
+      if(curr_slices == nullptr) {
+        std::cout << "[Task-" << config.task_id << "] passes = " << passes << " -- No new data in the sliding window. Skip processing" << std::endl;
+        continue;
+      }
       /// Iterate on window
       for(int i=0; i<config.window_iter; ++i){
         #ifdef TIMERON
@@ -314,13 +347,14 @@ int main(int argc, char **argv)
       auto ckpt_beg = std::chrono::system_clock::now();
       #endif
       if(!(passes%config.ckpt_freq)){
-        std::cout << "[Task-" << config.task_id << "] Checkpointing at iteration " << passes << std::endl;
         ckpt_client->checkpoint_wait();
-        if (!ckpt_client->checkpoint(config.ckpt_config, passes)) {
+        progress = ms.getProgress();
+        std::cout << "[Task-" << config.task_id << "] Checkpointing at iteration " << passes << ", proogess = " << progress << std::endl;
+        if (!ckpt_client->checkpoint(config.ckpt_name, passes)) {
           std::cout << "[Task-" << config.task_id << "] Cannot checkpoint. passes: " << passes << std::endl;
           throw std::runtime_error("Checkpointing failured");
         }
-        std::cout << "[task-" << config.task_id << "]: Checkpointed version " << passes << std::endl;
+        std::cout << "[task-" << config.task_id << "]: Checkpointed version " << passes << ", proogess = " << progress << std::endl;
       }
       #ifdef TIMERON
       ckpt_tot += (std::chrono::system_clock::now()-ckpt_beg);
@@ -360,12 +394,13 @@ int main(int argc, char **argv)
             static_cast<hsize_t>(h5md.dims[2]),
             static_cast<hsize_t>(h5md.dims[2])};
 
-          json md = { {"Type", "DATA"},
-                      {"rank", config.task_index},
-                      {"iteration_stream", iteration_stream.str()},
-                      {"rank_dims", rank_dims},
-                      {"app_dims", app_dims},
-                      {"recon_slice_data_index", recon_slice_data_index}};
+          json md = json{
+              {"Type", "DATA"},
+              {"rank", config.task_index},
+              {"iteration_stream", iteration_stream.str()},
+              {"rank_dims", rank_dims},
+              {"app_dims", app_dims},
+              {"recon_slice_data_index", recon_slice_data_index}};
 
           ms.publishImage(md, &recon[recon_slice_data_index], data_size, producer);
 

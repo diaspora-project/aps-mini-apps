@@ -22,8 +22,8 @@ template <typename T>
 class DataRegion2DBareBase {
   private:
     std::vector<DataRegionBareBase<T>*> regions_;
-    size_t rows_;
-    size_t cols_;
+    size_t rows_ = 0;
+    size_t cols_ = 0;
 
     friend class boost::serialization::access;
 
@@ -52,6 +52,8 @@ class DataRegion2DBareBase {
     BOOST_SERIALIZATION_SPLIT_MEMBER()
 
   public:
+    DataRegion2DBareBase() : rows_(0), cols_(0) {} // Default constructor
+
     DataRegion2DBareBase(size_t rows, size_t cols){
       regions_.reserve(rows);
 

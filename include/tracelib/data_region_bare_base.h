@@ -27,8 +27,10 @@ class DataRegionBareBase : public ADataRegion<T> {
 
     template<class Archive>
     void serialize(Archive &ar, const unsigned int /*version*/) { // Mark version as unused
+        ar & boost::serialization::base_object<ADataRegion<T>>(*this);
         ar & size_;
         ar & data_;
+        // ar & boost::serialization::make_array(data_.data(), size_); // Serialize raw array
     }
 
   protected:
@@ -45,6 +47,9 @@ class DataRegionBareBase : public ADataRegion<T> {
     }
 
   public:
+
+    DataRegionBareBase() : DataRegionBareBase<T>(0) {}
+
     virtual ADataRegion<T>* Clone(){
       return new DataRegionBareBase<T>(*this);
     };

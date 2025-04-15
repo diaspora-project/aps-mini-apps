@@ -32,6 +32,9 @@ class MofkaStream
     int comm_rank;
     int comm_size;
 
+    int progress;
+    bool end_of_stream = false;
+
     std::vector<float> vproj;
     std::vector<float> vtheta;
     std::vector<json> vmeta;
@@ -88,7 +91,8 @@ class MofkaStream
                 size_t batchsize,
                 uint32_t window_len,
                 int rank,
-                int size);
+                int size,
+                int progress=0);
 
 
     /* Handshake with Dist component
@@ -167,6 +171,12 @@ class MofkaStream
     void setProducerTimes(std::string op, uint64_t size, float time);
 
     int writeTimes(std::string path, std::string type);
+
+    int getProgress() { return progress; }
+    void updateProgress(int progress) { this->progress = progress; } // Update progress for streaming control
+
+    bool isEndOfStream() { return end_of_stream; }
+    void setEndOfStream(bool eos) { end_of_stream = eos; } // Update end of stream flag
 
 };
 #endif // MOFKA_STREAM_H

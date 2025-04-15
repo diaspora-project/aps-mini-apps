@@ -13,16 +13,16 @@
 #include <iostream>
 #include <vector>
 #include "mirrored_region_bare_base.h"
+#include <boost/serialization/access.hpp>
+#include <boost/serialization/vector.hpp>
+#include <boost/serialization/base_object.hpp>
+#include <boost/serialization/split_member.hpp>
+#include <boost/serialization/export.hpp>
+#include <boost/serialization/shared_ptr.hpp>
 
 template <typename T>
 class ADataRegion {
   private:
-    /**
-     * \brief Main pointer that points to the beginning of this data
-     * region's data.
-     */
-    T *data_ = nullptr;
-
     /**
      * \brief Number of allocated data items.
      *
@@ -31,7 +31,24 @@ class ADataRegion {
      */
     size_t count_ = 0;
 
+    /**
+     * \brief Main pointer that points to the beginning of this data
+     * region's data.
+     */
+    T *data_ = nullptr;
 
+  protected:
+    /**
+     * \brief Represents the current index for the mirrored regions.
+     */
+    size_t index_ = 0;
+
+    /**
+     * \brief List of child mirrored regions.
+     */
+    std::vector<MirroredRegionBareBase<T> const *> mirrored_regions_;
+
+  private:
     /**
      * \brief Deletes the allocated data/mirrored regions and sets
      * #count_ and #index_ to 0.
@@ -48,22 +65,9 @@ class ADataRegion {
         delete m_region;
         m_region = nullptr;
       }
+      mirrored_regions_.clear();
       index_ = 0;
     }
-
-
-  protected:
-    /**
-     * \brief List of child mirrored regions.
-     *
-     */
-    std::vector<MirroredRegionBareBase<T> const *> mirrored_regions_;
-
-    /**
-     * \brief Represents the current index for the mirrored regions.
-     *
-     */
-    size_t index_ = 0;
 
     /**
      * \brief Creates a mirrored region using this class's #data_.
@@ -89,6 +93,23 @@ class ADataRegion {
      */
     size_t index() const { return index_; }
 
+    friend class boost::serialization::access;
+
+    template<class Archive>
+    void save(Archive &ar, const unsigned int /*version*/) const {
+        ar & count_;
+        ar & boost::serialization::make_array(data_, count_); // Serialize raw array
+    }
+
+    template<class Archive>
+    void load(Archive &ar, const unsigned int /*version*/) {
+        Clear(); // Clear existing data
+        ar & count_;
+        data_ = new T[count_];
+        ar & boost::serialization::make_array(data_, count_); // Deserialize raw array
+    }
+
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
 
   public:
     /**
@@ -96,8 +117,8 @@ class ADataRegion {
      * \param[in] count The number items this data region has.
      */
     explicit ADataRegion(const size_t count)
-      : data_{new T[count]}
-      , count_{count}
+      : count_{count}
+      , data_{new T[count]}
       , index_{0}
     {}
 
@@ -110,8 +131,8 @@ class ADataRegion {
      * previously.
      */
     explicit ADataRegion(T * const data, const size_t count)
-      : data_{data}
-      , count_{count}
+      : count_{count}
+      , data_{data}
       , index_{0}
     {}
 
@@ -156,8 +177,7 @@ class ADataRegion {
      * The memory allocated for this class is freed, i.e. #data_ and
      * #mirrored_regions_. Since mirrored regions point to the memory locations
      * pointed by #data_, no delete operation is performed on mirrored reionts'
-     * #data_.
-     * In other words, destructors of mirrored regions do not release memory
+     * #data_. In other words, destructors of mirrored regions do not release memory
      * pointed by their internal #data_ pointer.
      */
     virtual ~ADataRegion(){
@@ -265,8 +285,8 @@ class ADataRegion {
 /** Constructors & Assignments */
 template <typename T>
 ADataRegion<T>::ADataRegion(const ADataRegion<T> &region)
-  : data_{new T[region.count_]}
-  , count_{region.count_}
+  : count_{region.count_}
+  , data_{new T[region.count_]}
   , index_{0}
 {
   std::copy(region.data_, region.data_ + region.count_, data_);
@@ -274,8 +294,8 @@ ADataRegion<T>::ADataRegion(const ADataRegion<T> &region)
 
 template <typename T>
 ADataRegion<T>::ADataRegion (ADataRegion<T> &&region)
-  : data_{nullptr}
-  , count_{0}
+  : count_{0}
+  , data_{nullptr}
   , index_{0}
 {
   *this = std::move(region);

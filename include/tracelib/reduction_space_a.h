@@ -3,13 +3,22 @@
 
 #include "data_region_2d_bare_base.h"
 #include "mirrored_region_bare_base.h"
+#include <boost/serialization/access.hpp>
+#include <boost/serialization/base_object.hpp>
+#include <boost/serialization/vector.hpp>
+#include <boost/serialization/export.hpp>
 
-/// CT: Derived class type
-/// DT: Data type on which Reduce function operate
 template <typename CT, typename DT>
-class AReductionSpaceBase{
+class AReductionSpaceBase {
   private:
     DataRegion2DBareBase<DT> *reduction_objects_ = nullptr;
+
+    friend class boost::serialization::access;
+
+    template<class Archive>
+    void serialize(Archive &ar, const unsigned int /*version*/) {
+        ar & reduction_objects_;
+    }
 
   public:
     void Process(MirroredRegionBareBase<DT> &input) {
@@ -34,8 +43,8 @@ class AReductionSpaceBase{
     // deep copies
     virtual void CopyTo(CT &target)=0;
 
-    virtual CT *Clone(){
-      if(reduction_objects_ == nullptr)
+    virtual CT *Clone() {
+      if (reduction_objects_ == nullptr)
         throw std::invalid_argument("reduction objects point to nullptr!");
 
       auto &red_objs = *reduction_objects_;

@@ -1,5 +1,5 @@
 source activate-spack.sh
-source envpy/bin/activate
+# source envpy/bin/activate
 
 # Check if the number of parameters is correct
 if [ "$#" -ne 2 ]; then

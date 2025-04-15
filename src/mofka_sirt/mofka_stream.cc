@@ -33,10 +33,12 @@ void MofkaStream::addTomoMsg(mofka::Event event){
 /* Erase streaming message to buffers
 */
 void MofkaStream::eraseBegTraceMsg(){
+  progress++; // Update progress = # processed messages
+  std::cout << "[Task-" << getRank() << "]: Advancing sliding window: Progress: " << progress << std::endl;
   vtheta.erase(vtheta.begin());
   size_t n_rays_per_proj =
-  getInfo()["n_sinograms"].get<int64_t>() *
-  getInfo()["n_rays_per_proj_row"].get<int64_t>();
+    getInfo()["n_sinograms"].get<int64_t>() *
+    getInfo()["n_rays_per_proj_row"].get<int64_t>();
   vproj.erase(vproj.begin(),vproj.begin()+n_rays_per_proj);
   vmeta.erase(vmeta.begin());
 }
@@ -79,12 +81,14 @@ MofkaStream::MofkaStream(std::string group_file,
             size_t batchsize,
             uint32_t window_len,
             int rank,
-            int size):
-  batchsize {batchsize},
+            int size,
+            int progress) // Removed default argument
+  : batchsize {batchsize},
   window_len {window_len},
   counter {0},
   comm_rank {rank},
   comm_size {size},
+  progress {progress},
   driver {group_file, true}
   {}
 
@@ -222,9 +226,22 @@ DataRegionBase<float, TraceMetadata>* MofkaStream::readSlidingWindow(
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = end - start;
     setConsumerTimes("wait_t", 1, elapsed.count());
-    mofka_events.push_back(event);
+
     //if endMsg break
-    if (event.metadata().json()["Type"].get<std::string>() == "FIN") return nullptr;
+    if (event.metadata().json()["Type"].get<std::string>() == "FIN") {
+      setEndOfStream(true);
+      std::cout << "[Task-" << getRank() << "]: End of stream detected" << std::endl;
+      return nullptr;
+    }
+
+    // Only add the event if its sequence_id higher than the progress
+    int sequence_id = event.metadata().json()["seq_n"].get<int>();
+    std::cout << "[Task-" << getRank() << "]: seq_id: " << sequence_id << ", progress = " << progress << std::endl;
+    if (sequence_id < progress) {
+      std::cout << "[Task-" << getRank() << "]: Skipping seq_id: " << sequence_id << " < " << progress << " = progress" << std::endl;
+      continue; // Skip this event
+    }
+    mofka_events.push_back(event);
   }
   // TODO: After receiving message corrections might need to be applied
 
@@ -249,7 +266,7 @@ DataRegionBase<float, TraceMetadata>* MofkaStream::readSlidingWindow(
       addTomoMsg(msg);
       ++counter;
     }
-  std::cout << "After adding # items in window: " << vtheta.size() << std::endl;
+    std::cout << "After adding # items in window: " << vtheta.size() << std::endl;
   }
   /// New message arrived, there is no space in window
   else if(mofka_events.size()>0 && vtheta.size()>=window_len){

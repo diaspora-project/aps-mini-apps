@@ -7,8 +7,11 @@
 #include <unistd.h>
 #include <chrono>
 #include "data_region_a.h"
-// #include "disp_comm_base.h"
 #include "reduction_space_a.h"
+#include <boost/serialization/access.hpp>
+#include <boost/serialization/vector.hpp>
+#include <boost/serialization/base_object.hpp>
+#include <boost/serialization/split_member.hpp>
 
 enum ReplicationTypes{
   FULL_REPLICATION,
@@ -26,7 +29,26 @@ class DISPEngineBase{
     std::mutex partitioner_mutex_;
     ReplicationTypes replication_type_;
 
-    // DISPCommBase<DT> *comm_;
+    // Serialization support
+    friend class boost::serialization::access;
+
+    template<class Archive>
+    void save(Archive &ar, const unsigned int /*version*/) const {
+        ar & num_reduction_threads_;
+        ar & num_procs_;
+        ar & replication_type_;
+        ar & reduction_spaces_;
+    }
+
+    template<class Archive>
+    void load(Archive &ar, const unsigned int /*version*/) {
+        ar & num_reduction_threads_;
+        ar & num_procs_;
+        ar & replication_type_;
+        ar & reduction_spaces_;
+    }
+
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
 
     virtual void ReductionWrapper(AReductionSpaceBase<RST, DT> &reduction_space,
         ADataRegion<DT> &input_data, int &req_units)=0;
@@ -54,7 +76,7 @@ class DISPEngineBase{
         // DISPCommBase<DT> *comm,
         AReductionSpaceBase<RST, DT> *conf_reduction_space, 
         int num_reduction_threads);
-    virtual ~DISPEngineBase();
+    virtual ~DISPEngineBase(); // Make destructor virtual
 
     virtual void RunParallelReduction(ADataRegion<DT> &input_data, int 
         req_units)=0;

@@ -5,9 +5,21 @@
 #include "mirrored_region_bare_base.h"
 #include "reduction_space_a.h"
 #include <deque>
+#include <boost/serialization/access.hpp>
+#include <boost/serialization/base_object.hpp>
+#include <boost/serialization/export.hpp>
 
 template <typename RST, typename DT>
 class DISPEngineReduction : public DISPEngineBase<RST, DT>{
+  private:
+    friend class boost::serialization::access;
+
+    template<class Archive>
+    void serialize(Archive &ar, const unsigned int /* version */) {
+        ar & boost::serialization::base_object<DISPEngineBase<RST, DT>>(*this);
+        // Serialize additional members if needed
+    }
+
   protected:
     std::mutex work_queue_mutex;
 
@@ -65,6 +77,18 @@ class DISPEngineReduction : public DISPEngineBase<RST, DT>{
 
 
   public:
+    // Default constructor for Boost serialization
+    DISPEngineReduction() : DISPEngineBase<RST, DT>(nullptr, 0) {}
+
+    DISPEngineReduction(
+        AReductionSpaceBase<RST, DT> *conf_reduction_space_i,
+        int num_reduction_threads) :
+      DISPEngineBase<RST, DT>(
+          conf_reduction_space_i,
+          num_reduction_threads){}
+
+    virtual ~DISPEngineReduction() {}
+
     // virtual void GlobalInPlaceSynch(
     //     DataRegion2DBareBase<DT> &dr,
     //     DISPCommBase<DT> &comm)
@@ -166,7 +190,7 @@ class DISPEngineReduction : public DISPEngineBase<RST, DT>{
       ParInPlaceLocalSynch(this->reduction_spaces_, 2, this->num_reduction_threads_);
     }
 
-    virtual void RunParallelReduction(ADataRegion<DT> &input_data, int req_units)
+    virtual void RunParallelReduction(ADataRegion<DT> &input_data, int req_units) override
     {
       // Create threads
       std::vector<std::thread> reduction_threads;
@@ -185,7 +209,7 @@ class DISPEngineReduction : public DISPEngineBase<RST, DT>{
     }
 
 
-    virtual void ResetReductionSpaces(DT &val){
+    virtual void ResetReductionSpaces(DT &val) override {
       // Create threads
       std::vector<std::thread> reduction_threads;
       for(int i=0; i<this->num_reduction_threads_; i++){
@@ -200,15 +224,29 @@ class DISPEngineReduction : public DISPEngineBase<RST, DT>{
       for(auto &reduction_thread : reduction_threads)
         reduction_thread.join();
     }
-
-    DISPEngineReduction(
-        // DISPCommBase<DT> *comm,
-        AReductionSpaceBase<RST, DT> *conf_reduction_space_i,
-        int num_reduction_threads) :
-      DISPEngineBase<RST, DT>(
-          // comm,
-          conf_reduction_space_i,
-          num_reduction_threads){};
 };
+
+// Provide load_construct_data for Boost serialization
+namespace boost {
+namespace serialization {
+
+template<class Archive, typename RST, typename DT>
+inline void load_construct_data(Archive& ar, DISPEngineReduction<RST, DT> *t, const unsigned int /* version */) {
+    // Deserialize any required data (even if unused for now)
+    int dummy;
+    ar & dummy; // Example: Deserialize an integer (can be replaced with actual data)
+
+    // Create a default reduction space using the derived class
+    RST *default_reduction_space = new RST(0, 0);
+
+    // Allocate memory and construct the object
+    ::new(t) DISPEngineReduction<RST, DT>(default_reduction_space, 0);
+
+    // Clean up the temporary reduction space
+    delete default_reduction_space;
+}
+
+} // namespace serialization
+} // namespace boost
 
 #endif    // DISP_SRC_DISP_ENGINE_REDUCTION_H_
