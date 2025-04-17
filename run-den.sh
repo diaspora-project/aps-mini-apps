@@ -15,7 +15,7 @@ trap "echo 'Ctrl+C pressed. Terminating...'; exit 1" SIGINT SIGTERM
 
 rm ./build/denoise/*.h5
 
-python ./build/python/streamer-denoiser/denoiser.py \
+python -u ./build/python/streamer-denoiser/denoiser.py \
     --output ./build/denoise \
     --model ./build/python/streamer-denoiser/testA40GPU-it07500.h5 \
     --protocol na+sm \

@@ -8,21 +8,26 @@ pkill -9 -f "bedrock" || true
 pkill -9 -f "streamer-daq" || true
 pkill -9 -f "streamer-dist" || true
 pkill -9 -f "streamer-sirt" || true
+pkill -9 -f "sirt_stream" || true
 pkill -9 -f "streamer-den" || true
+pkill -INT -f "veloc" || true
+pkill -9 -f "FailureInjector" || true
 
 # Remove previous checkpoints
 rm -rf /tmp/scratch/*
 rm -rf /tmp/persistent/*
 
-# Check if the number of arguments is correct
-if [ "$#" -ne 2 ]; then
+# Check if the number of arguments is corre
+if [ "$#" -ne 3 ]; then
     echo "Usage: exec-pipeline.sh <sirt_ranks> <num_sinograms>"
     echo "  <sirt_ranks>    Number of ranks for the SIRT process"
     echo "  <num_sinograms> Number of sinograms to process"
+    echo "  <mtbf>         Mean time between failures (in seconds)"
     exit 1
 fi
 sirt_ranks=$1
 num_sinograms=$2
+mtbf=$3
 
 DATE=$(date +"%Y-%m-%d-%Hh%Mmin%Ssec")
 logdir=build/logs/D${DATE}
@@ -39,8 +44,13 @@ echo "Start DIST -----------------------------------------------------------"
 bash run-dist.sh ${num_sinograms} ${logdir} > ${logdir}/dist.out 2> ${logdir}/dist.err &
 echo "Start SIRT -----------------------------------------------------------"
 bash run-sirt.sh ${sirt_ranks} ${logdir} > ${logdir}/sirt.out 2> ${logdir}/sirt.err &
+echo "Start Exp Control ----------------------------------------------------"
+bash run-exp-control.sh ${mtbf} ${logdir} 2> ${logdir}/exp-control.err | tee ${logdir}/exp-control.out &
 echo "Start DEN ------------------------------------------------------------"
 bash run-den.sh ${sirt_ranks} ${logdir} 2> ${logdir}/den.err | tee ${logdir}/den.out
 
+echo "Clean up after run ---------------------------------------------------"
+pkill -9 -f "FailureInjector" || true
 echo "COMPLETE"
+
 

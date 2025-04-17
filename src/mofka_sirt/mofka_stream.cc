@@ -12,6 +12,7 @@ void MofkaStream::addTomoMsg(mofka::Event event){
   elapsed = end_t - start_t;
   setConsumerTimes("data_t", data.segments()[0].size, elapsed.count());
   // event.acknowledge(); // acknowledge event
+  pending_events.push_back(event);
   vmeta.push_back(metadata.json()); /// Setup metadata
   vtheta.push_back(metadata.json()["theta"].get<float_t>());
   spdlog::info("Received data {}", metadata.string());
@@ -41,6 +42,21 @@ void MofkaStream::eraseBegTraceMsg(){
     getInfo()["n_rays_per_proj_row"].get<int64_t>();
   vproj.erase(vproj.begin(),vproj.begin()+n_rays_per_proj);
   vmeta.erase(vmeta.begin());
+}
+
+void MofkaStream::acknowledge() {
+  auto current_proj_id = (*vmeta.begin())["seq_n"].get<int>();
+  while (!pending_events.empty()) {
+    auto event = pending_events.begin();
+    auto event_prog_id = event->metadata().json()["seq_n"].get<int>();
+    if (event_prog_id < current_proj_id) {
+      event->acknowledge();
+      std::cout << "[Task-" << getRank() << "]: Acknowledge: seq_id = " << event_prog_id << std::endl;
+      pending_events.erase(event);
+    } else {
+      break;
+    }
+  }
 }
 
 
@@ -126,11 +142,7 @@ void MofkaStream::handshake(int rank, int size){
 * @param data:     pointer to the reconstructed image
 * @param producer: mofka producer
 */
-void MofkaStream::publishImage(
-  json &meta,
-  float *data,
-  size_t size,
-  mofka::Producer producer){
+void MofkaStream::publishImage(json &meta, float *data, size_t size, mofka::Producer producer){
   mofka::Metadata metadata{meta};
   float* copy = new float[size];
   std::memcpy(copy, data, size * sizeof(float));
@@ -221,6 +233,7 @@ DataRegionBase<float, TraceMetadata>* MofkaStream::readSlidingWindow(
 
   for(int i=0; i<step; ++i) {
     // mofka messages
+
     auto start = std::chrono::high_resolution_clock::now();
     auto event = consumer.pull().wait();
     auto end = std::chrono::high_resolution_clock::now();
@@ -233,14 +246,17 @@ DataRegionBase<float, TraceMetadata>* MofkaStream::readSlidingWindow(
       std::cout << "[Task-" << getRank() << "]: End of stream detected" << std::endl;
       return nullptr;
     }
-
-    // Only add the event if its sequence_id higher than the progress
+    
     int sequence_id = event.metadata().json()["seq_n"].get<int>();
     std::cout << "[Task-" << getRank() << "]: seq_id: " << sequence_id << ", progress = " << progress << std::endl;
-    if (sequence_id < progress) {
-      std::cout << "[Task-" << getRank() << "]: Skipping seq_id: " << sequence_id << " < " << progress << " = progress" << std::endl;
-      continue; // Skip this event
-    }
+
+    // // Only add the event if its sequence_id higher than the progress
+    // int sequence_id = event.metadata().json()["seq_n"].get<int>();
+    // std::cout << "[Task-" << getRank() << "]: seq_id: " << sequence_id << ", progress = " << progress << std::endl;
+    // if (sequence_id < progress) {
+    //   std::cout << "[Task-" << getRank() << "]: Skipping seq_id: " << sequence_id << " < " << progress << " = progress" << std::endl;
+    //   continue; // Skip this event
+    // }
     mofka_events.push_back(event);
   }
   // TODO: After receiving message corrections might need to be applied

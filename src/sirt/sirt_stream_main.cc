@@ -16,6 +16,7 @@
 #include <vector>
 #include <unistd.h>
 #include <charconv>
+#include <csignal>
 
 #include <veloc.hpp>
 #include <veloc/boost.hpp>
@@ -191,8 +192,16 @@ class TraceRuntimeConfig {
     }
 };
 
+volatile std::sig_atomic_t sigterm_captured = 0;
+void handle_sigterm(int signum) {
+    std::cerr << "Received SIGTERM, cleaning up resources..." << std::endl;
+    sigterm_captured = signum;
+}
+
 int main(int argc, char **argv)
 {
+  std::signal(SIGTERM, handle_sigterm);
+
   /* Initiate middleware's communication layer */
   TraceRuntimeConfig config(argc, argv);
   MofkaStream ms = MofkaStream{ config.group_file,
@@ -203,6 +212,8 @@ int main(int argc, char **argv)
                                 0}; // Add the missing progress argument
 
   ms.handshake(config.task_index, config.num_tasks);
+
+  // Prepare consumer and producer
   std::string consuming_topic = "dist_sirt";
   std::string producing_topic = "sirt_den";
   std::vector<size_t> targets = {static_cast<size_t>(config.task_index)};
@@ -259,24 +270,19 @@ int main(int argc, char **argv)
   int progress = 0; // Reconstruction progress marked by the projection requence ids
   ckpt_client->mem_protect(0, veloc::boost::serializer(recon_image), veloc::boost::deserializer(recon_image));
   ckpt_client->mem_protect(1, &progress, 1, sizeof(int));
-  // ckpt_client->mem_protect(
-  //     2, 
-  //     veloc::boost::serializer(main_recon_space),
-  //     veloc::boost::deserializer(main_recon_space)
-  // );
 
   int passes = ckpt_client->restart_test(config.ckpt_name, 0, config.task_index);
   // Checkpoint restart if any
   if(passes>0){
     std::cout << "Checkpoint found at " << passes << ". Restarting from checkpoint" << std::endl;
     ckpt_client->restart(config.ckpt_name, passes);
-    std::cout << "Restarted from checkpoint at iteration " << passes << ", progress = " << progress << std::endl;
     ms.updateProgress(progress);
+    std::cout << "Restarted from checkpoint at iteration " << passes << ", progress = " << progress << std::endl;
   }else{
     std::cout << "No checkpoint found. Starting from scratch" << std::endl;
     passes = 0;
   }
-
+  
   DataRegion2DBareBase<float> &main_recon_replica = main_recon_space->reduction_objects();
   float init_val=0.;
   if (progress == 0) {
@@ -296,7 +302,15 @@ int main(int argc, char **argv)
   auto e2e_beg = std::chrono::system_clock::now();
   #endif
 
+  std::cout << "[Task-" << config.task_id << "] Start reconstruction passes = " << passes << std::endl;
+
   for(; passes < config.num_passes; ++passes){
+
+      if (sigterm_captured) {
+          std::cerr << "Termination signal received. Exiting..." << std::endl;
+          return sigterm_captured;
+      }
+
       #ifdef TIMERON
       auto datagen_beg = std::chrono::system_clock::now();
       #endif
@@ -318,6 +332,11 @@ int main(int argc, char **argv)
       }
       /// Iterate on window
       for(int i=0; i<config.window_iter; ++i){
+        if (sigterm_captured) {
+            std::cerr << "Termination signal received. Exiting..." << std::endl;
+            return sigterm_captured;
+        }
+
         #ifdef TIMERON
         auto recon_beg = std::chrono::system_clock::now();
         #endif
@@ -354,6 +373,7 @@ int main(int argc, char **argv)
           std::cout << "[Task-" << config.task_id << "] Cannot checkpoint. passes: " << passes << std::endl;
           throw std::runtime_error("Checkpointing failured");
         }
+        ms.acknowledge();
         std::cout << "[task-" << config.task_id << "]: Checkpointed version " << passes << ", proogess = " << progress << std::endl;
       }
       #ifdef TIMERON

@@ -3,6 +3,8 @@ from parsl.app.app import bash_app, python_app
 from parsl.configs.local_threads import config
 import argparse
 
+config.retries = 100000
+
 parsl.load(config)
 
 
@@ -70,7 +72,7 @@ def run_sirt(id, logdir=".", args=[]):
     stderr = logdir + '/sirt-' + id + '.err'
     stdout = logdir + '/sirt-' + id + '.out'
     sirt_stream = "build/bin/sirt_stream"
-    cmd = sirt_stream + " --id " + id + " " + " ".join(args) + f" > {stdout} 2> {stderr}"
+    cmd = sirt_stream + " --id " + id + " " + " ".join(args) + f" >> {stdout} 2>> {stderr}"
     print(cmd)
     return cmd
 

@@ -33,6 +33,7 @@ class MofkaStream
     int comm_size;
 
     int progress;
+    std::vector<mofka::Event> pending_events;
     bool end_of_stream = false;
 
     std::vector<float> vproj;
@@ -55,13 +56,30 @@ class MofkaStream
     mofka::PartitionSelector selector;
 
     mofka::DataSelector data_selector = [](const mofka::Metadata& metadata,
-                                           const mofka::DataDescriptor& descriptor) {
-      (void)metadata;
-      return descriptor;
+                                                const mofka::DataDescriptor& descriptor) {
+        (void)metadata;
+        return descriptor;
     };
+    // mofka::DataSelector data_selector = [this](const mofka::Metadata& metadata,
+    //                                            const mofka::DataDescriptor& descriptor) -> mofka::DataDescriptor {
+    //     // Access metadata JSON
+    //     int sequence_id = metadata.json()["seq_n"].get<int>();
+    //     std::cout << "[Task-" << this->getRank() << "]: seq_id: " << sequence_id
+    //               << ", progress = " << this->progress << std::endl;
+
+    //     // Check if the sequence ID is less than the progress
+    //     if (sequence_id < this->progress) {
+    //         std::cout << "[Task-" << this->getRank() << "]: Skipping seq_id: "
+    //                   << sequence_id << " < " << this->progress << " = progress" << std::endl;
+    //         return mofka::DataDescriptor::Null(); // Return an empty DataDescriptor
+    //     }
+    //     (void)metadata;
+    //     // Return the original descriptor
+    //     return descriptor;
+    // };
 
     mofka::DataBroker data_broker = [](const mofka::Metadata& metadata,
-                                       const mofka::DataDescriptor& descriptor) {
+                                           const mofka::DataDescriptor& descriptor) {
         (void)metadata;
         return mofka::Data{new float[descriptor.size()], descriptor.size()};
     };
@@ -161,6 +179,8 @@ class MofkaStream
     void setInfo(json &j);
 
     void windowLength(uint32_t wlen);
+
+    void acknowledge();
 
     std::vector<std::tuple<std::string, uint64_t, float>> getConsumerTimes();
 
