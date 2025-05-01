@@ -6,6 +6,8 @@
 #include "disp_engine_reduction.h"
 #include "trace_mq.h"
 #include <vector>
+#include <chrono>
+#include <fstream>
 
 class TraceStream
 {
@@ -17,6 +19,11 @@ class TraceStream
     std::vector<float> vproj;
     std::vector<float> vtheta;
     std::vector<tomo_msg_data_t> vmeta;
+    
+    std::vector<int> projection_ids_;
+    std::vector<int> datasize_;
+    std::vector<std::chrono::nanoseconds> timestamps_; // Vector to store timestamps
+
 
     /// Add streaming message to vectors
     void AddTomoMsg(tomo_msg_data_t &msg);
@@ -64,6 +71,11 @@ class TraceStream
      * @param slice Slice and its metadata information.
      */
     void PublishImage(DataRegionBase<float, TraceMetadata> &slice);
+
+    /* Save timestamps to a CSV file.
+     * @param filename Name of the CSV file.
+     */
+    void SaveTimestampsToCSV(const std::string &filename);
 };
 
 #endif // TRACE_COMMONS_STREAM_TRACE_STREAM_H

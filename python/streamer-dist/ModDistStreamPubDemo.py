@@ -91,6 +91,7 @@ def main():
     print(addr_split)
     tmq.handshake(addr_split[1], int(addr_split[2]), args.num_sinograms, args.num_columns)
   else: print("No distributor..")
+  print("Prefer time:", time.perf_counter())
 
   # Subscriber setup
   print("Subscribing to: {}".format(args.data_source_addr))
@@ -125,8 +126,16 @@ def main():
   total_size=0
   seq=0
   time0 = time.time()
+  timing_data = []  # List to store timing information
+  dist_send_timing = []
   while True:
-    msg = subscriber_socket.recv()
+    timed_msg = subscriber_socket.recv_pyobj()  # Receive Python object
+    receive_time = time.perf_counter()  # Record the time of receipt
+    [msg_index, ts, size], msg = timed_msg  # Extract timing information and message
+
+    # Save timing information
+    timing_data.append(["push", msg_index, ts, receive_time, receive_time - ts, 0 , size])
+
     total_received += 1
     total_size += len(msg)
     if msg == b"end_data": break # End of data acquisition
@@ -207,6 +216,9 @@ def main():
       if args.my_distributor_addr is not None:
         tmq.push_image(sub, args.num_sinograms, ncols, rotation, 
                         read_image.UniqueId(), read_image.Center())
+        
+        # Add timing information dist send
+        dist_send_timing.append(["send", read_image.UniqueId(), time.perf_counter(), sub.nbytes])
 
 
     # If incoming data is white field
@@ -244,6 +256,19 @@ def main():
   print("Rate (MiB/s): {:.2f}; (msg/s): {:.2f}".format(
             tot_MiBs/elapsed_time, total_received/elapsed_time))
 
+  # Save timing data to file
+  fields = ["type", "index", "start", "stop", "duration", "metadata_size", "data_size"]
+  with open("Daq_push.csv", "w") as f:
+    write = csv.writer(f)
+    write.writerow(fields)
+    write.writerows(timing_data)
+  
+  fields = ["type", "project_id", "start", "data_size"]
+  with open("Dist_send.csv", "w") as f:
+    write = csv.writer(f)
+    write.writerow(fields)
+    write.writerows(dist_send_timing)
+
   # Finalize TMQ
   if args.my_distributor_addr is not None:
     print("Sending finalize message")
@@ -254,4 +279,4 @@ def main():
 
 if __name__ == '__main__':
   main()
-  
+

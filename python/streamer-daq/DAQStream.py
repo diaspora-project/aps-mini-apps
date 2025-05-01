@@ -420,9 +420,8 @@ def simulate_daq_serialized(publisher_socket, input_f,
       ts = time.perf_counter()
       # dchunk = serialized_data[index]
       dchunk = serialized_data[index]
-      buffer.append(dchunk)
-      publisher_socket.send(dchunk, copy=False)
-      timer_data.append([["push", index, ts, time.perf_counter(), time.perf_counter() - ts, 0 , len(buffer[i])]])
+      timed_chunk = ([index, ts, len(dchunk)], dchunk)  # Add timing information to the tuple
+      publisher_socket.send_pyobj(timed_chunk, copy=False)  # Send as Python object
       seq += 1
       i += 1
       tot_transfer_size+=len(dchunk)
@@ -434,12 +433,6 @@ def simulate_daq_serialized(publisher_socket, input_f,
   nproj = iteration*len(serialized_data)
   print("Sent number of projections: {}; Total size (MiB): {:.2f}; Elapsed time (s): {:.2f}".format(nproj, tot_MiBs, elapsed_time))
   print("Rate (MiB/s): {:.2f}; (msg/s): {:.2f}".format(tot_MiBs/elapsed_time, nproj/elapsed_time))
-
-  fields = ["type", "index", "start", "stop", "duration", "metadata_size", "data_size"]
-  with open("Daq_push.csv", "w") as f:
-    write = csv.writer(f)
-    write.writerow(fields)
-    write.writerows(timer_data)
 
   return seq
 
@@ -709,7 +702,12 @@ def main():
   else:
     print("Unknown mode: {}".format(args.mode));
 
-  publisher_socket.send("end_data".encode())
+  # publisher_socket.send("end_data".encode())
+  dchunk = "end_data".encode()
+  ts = time.perf_counter()
+  timed_chunk = ([-1, ts, len(dchunk)], dchunk)
+  publisher_socket.send_pyobj(timed_chunk, copy=False)
+
   time1 = time.time()
   print("Total time (s): {:.2f}".format(time1-time0))
 

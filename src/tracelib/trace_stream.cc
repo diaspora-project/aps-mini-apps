@@ -33,6 +33,15 @@ DataRegionBase<float, TraceMetadata>* TraceStream::ReadSlidingWindow(
   for(int i=0; i<step; ++i) {
     tomo_msg_t *msg = traceMQ().ReceiveMsg();
     if(msg == nullptr) break;
+    
+    // Timing recording
+    auto timestamp = std::chrono::high_resolution_clock::now();
+    timestamps_.push_back(std::chrono::duration_cast<std::chrono::nanoseconds>(timestamp.time_since_epoch())); // Record timestamp
+    // Cast the data field to tomo_msg_data_t* to access projection_id
+    auto *msg_data = reinterpret_cast<tomo_msg_data_t*>(msg->data);
+    projection_ids_.push_back(msg_data->projection_id);
+    datasize_.push_back(msg->size);
+
     received_msgs.push_back(msg);
   }
 
@@ -158,5 +167,27 @@ void TraceStream::PublishImage(DataRegionBase<float, TraceMetadata> &slice){
   auto &image = mdata.recon();
   traceMQ().PublishMsg( &image[0], 
                           {mdata.num_slices(), mdata.num_cols(), mdata.num_cols()});
+}
+
+void TraceStream::SaveTimestampsToCSV(const std::string &filename) {
+  
+  traceMQ_.SaveTimestampsToCSV("data-" + filename);
+  
+  std::ofstream file(filename);
+  if (!file.is_open()) {
+    std::cerr << "Error: Unable to open file " << filename << std::endl;
+    return;
+  }
+
+  file << "type,projection_id,receive,data_size" << std::endl;
+  for (size_t i = 0; i < timestamps_.size(); ++i) {
+    file << "push," 
+         << projection_ids_[i] << "," 
+         << timestamps_[i].count() << "," 
+         << datasize_[i] 
+         << std::endl;
+  }
+
+  file.close();
 }
 

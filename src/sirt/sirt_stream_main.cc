@@ -133,6 +133,10 @@ int main(int argc, char **argv)
                       config.window_len, 
                       comm->rank(), comm->size(),
                       config.pub_addr);
+  // Print the current time stamp
+  auto timestamp = std::chrono::high_resolution_clock::now().time_since_epoch();
+  auto recorded_timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(timestamp);
+  std::cout << "Timestamp: " << recorded_timestamp.count() << " seconds" << std::endl;
 
   /* Get metadata structure */
   tomo_msg_metadata_t tmetadata = (tomo_msg_metadata_t)tstream.metadata();
@@ -285,6 +289,8 @@ int main(int argc, char **argv)
                                           (recon_tot.count()+inplace_tot.count()+update_tot.count()) << std::endl;
   }
   #endif
+
+  tstream.SaveTimestampsToCSV("dist_receive.csv");
 
   /* Clean-up the resources */
   std::cout << "Deleting h5md.dimm" << std::endl;

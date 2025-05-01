@@ -6,6 +6,8 @@
 #include <vector>
 #include "trace_prot_generated.h"
 #include "zmq.h"
+#include <chrono>
+#include <fstream>
 
 #define TRACEMQ_MSG_FIN_REP       0x00000000
 #define TRACEMQ_MSG_DATAINFO_REQ  0x00000001
@@ -69,6 +71,8 @@ class TraceMQ
     void *server_pub;
 
     flatbuffers::FlatBufferBuilder fbuilder_;
+
+    std::vector<std::chrono::nanoseconds> zmq_timestamps_; // Vector to store zmq timestamps
 
     /* State of the TraceMQ
      *
@@ -205,6 +209,11 @@ class TraceMQ
 
     tomo_msg_metadata_t metadata() const { return metadata_; }
     void metadata(tomo_msg_metadata_t metadata) { metadata_ = metadata; }
+
+    /* Save timestamps to a CSV file.
+     * @param filename Name of the CSV file.
+     */
+    void SaveTimestampsToCSV(const std::string &filename);
 
 };
 

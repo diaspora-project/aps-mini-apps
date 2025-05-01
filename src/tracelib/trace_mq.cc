@@ -20,13 +20,16 @@ TraceMQ::TraceMQ(
 
   context = zmq_ctx_new();
   server = zmq_socket(context, ZMQ_REQ);
-  int rc = zmq_connect(server, addr.c_str()); assert(rc==0); 
+  int rc = zmq_connect(server, addr.c_str()); assert(rc==0);
+
+  std::cout << "[" << comm_rank_ << "] Waiting for subscriber at: " << pub_info_ << std::endl;
 
   server_pub = zmq_socket(context, ZMQ_PUB);
   rc = zmq_bind(server_pub, pub_info_.c_str()); //assert(rc==0);
 }
 
 void TraceMQ::Initialize() {
+
   /// Handshake with server
   tomo_msg_t *msg = prepare_data_info_req_msg(seq_, comm_rank_, comm_size_);
   std::cout << "Sending handshake message" << std::endl;
@@ -81,7 +84,10 @@ void TraceMQ::PublishMsg(float *msg, std::vector<int> dims)
   fbuilder_.Clear();
 
   /// Publish
+  auto timestamp = std::chrono::high_resolution_clock::now().time_since_epoch();
+  zmq_timestamps_.push_back(std::chrono::duration_cast<std::chrono::nanoseconds>(timestamp)); // Record zmq timestamp
   int rc = zmq_send(server_pub, buf, size, 0); assert(rc==size);
+  std::cout << "Published image at " << std::chrono::duration_cast<std::chrono::nanoseconds>(timestamp).count() << std::endl;
   //zmq_msg_t zmsg;
   //int rc = zmq_msg_init_size(&zmsg, size); assert(rc==0);
   //memcpy(reinterpret_cast<void*>(zmq_msg_data(&zmsg)), reinterpret_cast<void*>(buf), size);
@@ -279,3 +285,20 @@ void TraceMQ::free_msg(tomo_msg_t *msg) {
   free(msg);
   msg=nullptr;
 }
+
+void TraceMQ::SaveTimestampsToCSV(const std::string &filename) {
+  std::ofstream file(filename);
+  if (!file.is_open()) {
+    std::cerr << "Error: Unable to open file " << filename << std::endl;
+    return;
+  }
+
+  file << "type,projection_id,receive,data_size" << std::endl;
+  for (size_t i = 0; i < zmq_timestamps_.size(); ++i) {
+    file << zmq_timestamps_[i].count() << ","
+         << std::endl;
+  }
+
+  file.close();
+}
+
