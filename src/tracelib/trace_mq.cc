@@ -293,7 +293,7 @@ void TraceMQ::SaveTimestampsToCSV(const std::string &filename) {
     return;
   }
 
-  file << "type,projection_id,receive,data_size" << std::endl;
+  file << "timestamp" << std::endl;
   for (size_t i = 0; i < zmq_timestamps_.size(); ++i) {
     file << zmq_timestamps_[i].count() << ","
          << std::endl;
