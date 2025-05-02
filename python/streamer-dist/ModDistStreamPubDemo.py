@@ -128,10 +128,16 @@ def main():
   time0 = time.time()
   timing_data = []  # List to store timing information
   dist_send_timing = []
+  dist_send_t = []
+  dist_recv_t = []
   while True:
+    recv_start = time.time()
     timed_msg = subscriber_socket.recv_pyobj()  # Receive Python object
+    recv_end = time.time()
     receive_time = time.perf_counter()  # Record the time of receipt
     [msg_index, ts, size], msg = timed_msg  # Extract timing information and message
+
+    dist_recv_t.append([msg_index, recv_start, recv_end - recv_start])  # Record the time of receipt
 
     # Save timing information
     timing_data.append(["push", msg_index, ts, receive_time, receive_time - ts, 0 , size])
@@ -214,12 +220,14 @@ def main():
       sub = sub.reshape(sub.shape[0]*sub.shape[1]*sub.shape[2])
 
       if args.my_distributor_addr is not None:
+        send_start = time.time()
         tmq.push_image(sub, args.num_sinograms, ncols, rotation, 
                         read_image.UniqueId(), read_image.Center())
+        send_end = time.time()
+        dist_send_t.append([read_image.UniqueId(), send_start, send_end - send_start])  # Record the time of sending
         
         # Add timing information dist send
         dist_send_timing.append(["send", read_image.UniqueId(), time.perf_counter(), sub.nbytes])
-
 
     # If incoming data is white field
     if read_image.Itype() is serializer.ITypes.White: 
@@ -255,6 +263,19 @@ def main():
   print("Received number of projections: {}; Total size (MiB): {:.2f}; Elapsed time (s): {:.2f}".format(total_received, tot_MiBs, elapsed_time))
   print("Rate (MiB/s): {:.2f}; (msg/s): {:.2f}".format(
             tot_MiBs/elapsed_time, total_received/elapsed_time))
+
+  # Save timming information
+  fields = ["index", "timestamp", "overhead"]
+  with open('dist_send.csv', 'w') as f:
+    write = csv.writer(f)
+    write.writerow(fields)
+    write.writerows(dist_send_t)
+  
+  fields = ["index", "timestamp", "overhead"]
+  with open('dist_recv.csv', 'w') as f:
+    write = csv.writer(f)
+    write.writerow(fields)
+    write.writerows(dist_recv_t)
 
   # Save timing data to file
   fields = ["type", "index", "start", "stop", "duration", "metadata_size", "data_size"]

@@ -2,6 +2,7 @@
 #include <sstream>
 #include <cstring>
 #include <cassert>
+#include <chrono>
 
 TraceMQ::TraceMQ(
   std::string dest_ip, int dest_port, int comm_rank, int comm_size, std::string pub_info) : 
@@ -85,9 +86,12 @@ void TraceMQ::PublishMsg(float *msg, std::vector<int> dims)
 
   /// Publish
   auto timestamp = std::chrono::high_resolution_clock::now().time_since_epoch();
-  zmq_timestamps_.push_back(std::chrono::duration_cast<std::chrono::nanoseconds>(timestamp)); // Record zmq timestamp
   int rc = zmq_send(server_pub, buf, size, 0); assert(rc==size);
-  std::cout << "Published image at " << std::chrono::duration_cast<std::chrono::nanoseconds>(timestamp).count() << std::endl;
+  auto complete_timestamp = std::chrono::high_resolution_clock::now().time_since_epoch();
+  std::chrono::duration<double> elapsed_seconds = complete_timestamp - timestamp;
+  zmq_timestamps_.push_back(std::chrono::duration_cast<std::chrono::nanoseconds>(timestamp)); // Record zmq timestamp
+  std::cout << "Published image at " << std::chrono::duration_cast<std::chrono::nanoseconds>(timestamp).count() << " in " << elapsed_seconds.count() << " sec." << std::endl;
+  sirt_send_t_.push_back(elapsed_seconds.count()); // Record sirt timestamp
   //zmq_msg_t zmsg;
   //int rc = zmq_msg_init_size(&zmsg, size); assert(rc==0);
   //memcpy(reinterpret_cast<void*>(zmq_msg_data(&zmsg)), reinterpret_cast<void*>(buf), size);
@@ -265,7 +269,11 @@ void TraceMQ::send_msg(void *server, tomo_msg_t* msg){
 tomo_msg_t* TraceMQ::recv_msg(void *server){
   zmq_msg_t zmsg;
   int rc = zmq_msg_init(&zmsg); assert(rc==0);
+  auto recv_start = std::chrono::high_resolution_clock::now();
   rc = zmq_msg_recv(&zmsg, server, 0); assert(rc!=-1);
+  auto recv_end = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double> elapsed_seconds = recv_end - recv_start;
+  sirt_recv_t_.push_back(elapsed_seconds.count()); // Record sirt timestamp
   /// Message size and calculated total message size needst to be the same
   /// FIXME?: We put tomo_msg_t.size to calculate zmq message size before it is
   /// being sent. It is being only being used for sanity check at the receiver
@@ -295,10 +303,31 @@ void TraceMQ::SaveTimestampsToCSV(const std::string &filename) {
 
   file << "timestamp" << std::endl;
   for (size_t i = 0; i < zmq_timestamps_.size(); ++i) {
-    file << zmq_timestamps_[i].count() << ","
-         << std::endl;
+    file << zmq_timestamps_[i].count() << "," << std::endl;
   }
 
   file.close();
+
+  std::ofstream send_file("send-" + filename);
+  if (!send_file.is_open()) {
+    std::cerr << "Error: Unable to open file " << "send-'" << filename << std::endl;
+    return;
+  }
+  send_file << "timestamp" << std::endl;
+  for (size_t i = 0; i < sirt_send_t_.size(); ++i) {
+    send_file << sirt_send_t_[i] << "," << std::endl;
+  }
+  send_file.close();
+
+  std::ofstream recv_file("recv-" + filename);
+  if (!recv_file.is_open()) {
+    std::cerr << "Error: Unable to open file " << "recv-" << filename << std::endl;
+    return;
+  }
+  recv_file << "timestamp" << std::endl;
+  for (size_t i = 0; i < sirt_recv_t_.size(); ++i) {
+    recv_file << sirt_recv_t_[i] << "," << std::endl;
+  }
+  recv_file.close();
 }
 

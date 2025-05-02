@@ -136,8 +136,11 @@ def main(input_path, recon_path, model_path, nproc_sirt, publisher_addr=None):
         ts = time.perf_counter()
         # m = subscriber_socket.recv_json()
         t_wait = time.perf_counter()
+        den_start = time.time()
         data = subscriber_socket.recv()
+        den_end = time.time()
         t_meta = time.perf_counter()
+        receive_timestamps.append(den_end - den_start)
         
         # if data["Type"] == "FIN":
         #     more_data = False
@@ -150,7 +153,7 @@ def main(input_path, recon_path, model_path, nproc_sirt, publisher_addr=None):
         #     data.append(data_array)
         #     receive_timestamps.append(t_data)
         
-        print("Received data at ", time.time())
+        print("Received data at ", time.time(), "duration", den_end - den_start)
         
         # if len(metadata) > 0:
         #     correct_order_meta = [

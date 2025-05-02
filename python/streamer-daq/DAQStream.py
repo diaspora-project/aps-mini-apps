@@ -374,6 +374,8 @@ def simulate_daq_serialized(publisher_socket, input_f,
                       iteration=1, save_after_serialize=False, prj_slp=0):
   global bsignal
 
+  zmq_t = []
+
   serialized_data = None
   if input_f.endswith('.npy'):
     serialized_data = np.load(input_f, allow_pickle=True)
@@ -421,7 +423,10 @@ def simulate_daq_serialized(publisher_socket, input_f,
       # dchunk = serialized_data[index]
       dchunk = serialized_data[index]
       timed_chunk = ([index, ts, len(dchunk)], dchunk)  # Add timing information to the tuple
+      start_send = time.time()
       publisher_socket.send_pyobj(timed_chunk, copy=False)  # Send as Python object
+      end_send = time.time()
+      zmq_t.append([index, start_send, end_send-start_send])
       seq += 1
       i += 1
       tot_transfer_size+=len(dchunk)
@@ -433,6 +438,12 @@ def simulate_daq_serialized(publisher_socket, input_f,
   nproj = iteration*len(serialized_data)
   print("Sent number of projections: {}; Total size (MiB): {:.2f}; Elapsed time (s): {:.2f}".format(nproj, tot_MiBs, elapsed_time))
   print("Rate (MiB/s): {:.2f}; (msg/s): {:.2f}".format(tot_MiBs/elapsed_time, nproj/elapsed_time))
+
+  fields = ["index", "timestamp", "overhead"]
+  with open('Daq_send.csv', 'w') as f:
+    write = csv.writer(f)
+    write.writerow(fields)
+    write.writerows(zmq_t)
 
   return seq
 

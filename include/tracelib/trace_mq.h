@@ -73,6 +73,8 @@ class TraceMQ
     flatbuffers::FlatBufferBuilder fbuilder_;
 
     std::vector<std::chrono::nanoseconds> zmq_timestamps_; // Vector to store zmq timestamps
+    std::vector<double> sirt_send_t_; // Vector to store timestamps
+    std::vector<double> sirt_recv_t_; // Vector to store timestamps
 
     /* State of the TraceMQ
      *
