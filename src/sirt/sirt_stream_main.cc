@@ -194,7 +194,7 @@ class TraceRuntimeConfig {
 
 volatile std::sig_atomic_t sigterm_captured = 0;
 void handle_sigterm(int signum) {
-    std::cerr << "Received SIGTERM, cleaning up resources..." << std::endl;
+    std::cerr << "Received SIGTERM, stoping reconstruction..." << std::endl;
     sigterm_captured = signum;
 }
 
@@ -212,6 +212,8 @@ int main(int argc, char **argv)
                                 0}; // Add the missing progress argument
 
   ms.handshake(config.task_index, config.num_tasks);
+
+  std::cout << "Handshake completed" << std::endl;
 
   // Prepare consumer and producer
   std::string consuming_topic = "dist_sirt";
@@ -306,10 +308,10 @@ int main(int argc, char **argv)
 
   for(; passes < config.num_passes; ++passes){
 
-      if (sigterm_captured) {
-          std::cerr << "Termination signal received. Exiting..." << std::endl;
-          return sigterm_captured;
-      }
+      // if (sigterm_captured) {
+      //     std::cerr << "Termination signal received. Exiting..." << std::endl;
+      //     return sigterm_captured;
+      // }
 
       #ifdef TIMERON
       auto datagen_beg = std::chrono::system_clock::now();

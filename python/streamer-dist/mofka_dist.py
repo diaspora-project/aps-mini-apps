@@ -84,9 +84,9 @@ class MofkaDist:
         thread_pool = mofka.ThreadPool(1)
         ordering = mofka.Ordering.Strict
         producer = topic.producer(producer_name,
-                                  batchsize,
-                                  thread_pool,
-                                  ordering)
+                                  batch_size=batchsize,
+                                  thread_pool=thread_pool,
+                                  ordering=ordering)
         return producer
 
     def consumer(self, topic_name: str, consumer_name: str) -> mofka.Consumer:
@@ -104,6 +104,7 @@ class MofkaDist:
     def handshake(self, nproc_sirt: int,  row: int, col: int) -> str :
         # Figure out how many ranks are there at the remote location
         if nproc_sirt == 0:
+            print("Getting number of ranks from SIRT")
             topic_name = "handshake_s_d"
             topic = self.driver.open_topic(topic_name)
             consumer = topic.consumer(name="handshaker",
@@ -120,13 +121,17 @@ class MofkaDist:
             raise ValueError('Number of reconstruction processes cannot be negative')
         else:
             self.nranks = nproc_sirt
+        print("Exchange metadata with SIRT: num sirt = ", self.nranks)
         topic_name = "handshake_d_s"
         producer = self.producer(topic_name, "handshaker")
         # distribute data info
         for p in range(self.nranks):
             info = assign_data(p, self.nranks, row, col)
+            print("Exchange metadata with sirt #", p)
             f = producer.push(info)
+        print("Flushing metadata to SIRT")
         producer.flush()
+        print("Completing exchanging with SIRT")
         self.seq += 1
         del producer
         return "Done"

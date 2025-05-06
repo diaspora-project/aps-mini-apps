@@ -37,4 +37,7 @@ mkdir -p build/python/streamer-denoiser
 mkdir -p build/denoise
 cp python/streamer-denoiser/* build/python/streamer-denoiser
 
+echo "SETTING UP LOGGING ---------------- "
+mkdir -p build/logs
+mkdir -p build/denoise
 

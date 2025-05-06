@@ -75,9 +75,13 @@ def main():
   signal.signal(signal.SIGINT, signal_handler)
 
   # Setup mofka
+  print("Setup Mofka ...")
   mofka_dist = MofkaDist(group_file=args.group_file, batchsize=args.batchsize)
   # Handshake with Sirt
+  print("Handshake with SIRT ...")
   mofka_dist.handshake(args.nproc_sirt, args.num_sinograms, args.num_columns)
+
+  print("Setting consumer and producer ...")
 
   consumer = mofka_dist.consumer(topic_name="daq_dist", consumer_name="dist")
   producer = mofka_dist.producer(topic_name="dist_sirt", producer_name="producer_dist")
@@ -85,6 +89,8 @@ def main():
   mofka_consuming_time = []
   # Setup serializer
   serializer = TraceSerializer.ImageSerializer()
+
+  print("Setting up serializer ...")
 
   # White/dark fields
   white_imgs=[]
@@ -97,6 +103,9 @@ def main():
   total_size=0
   seq=0
   time0 = time.time()
+
+  print("Starting to receive images ...")
+
   while True:
 
     mofka_metadata, mofka_data, pull_times = mofka_dist.pull_image(consumer)

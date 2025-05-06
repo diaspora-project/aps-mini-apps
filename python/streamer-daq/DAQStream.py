@@ -422,7 +422,7 @@ def main():
   batchsize = args.batchsize #mofka.AdaptiveBatchSize
   thread_pool = mofka.ThreadPool(1)
   ordering = mofka.Ordering.Strict
-  producer = topic.producer(producer_name, batchsize, thread_pool, ordering)
+  producer = topic.producer(producer_name, batch_size=batchsize, thread_pool=thread_pool, ordering=ordering)
 
   time0 = time.time()
   if args.mode == 0: # Read data from PV
@@ -447,6 +447,7 @@ def main():
 
   elif args.mode == 1: # Simulate data acquisition with a file
     print("Simulating data acquisition on file: {}; iteration: {}".format(args.simulation_file, args.d_iteration))
+    time.sleep(10)
     simulate_daq( producer=producer,
                   batchsize=args.batchsize,
                   input_f=args.simulation_file,

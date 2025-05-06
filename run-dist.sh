@@ -4,7 +4,7 @@ source activate-spack.sh
 # Check if the number of parameters is correct
 if [ "$#" -ne 2 ]; then
     echo "Illegal number of parameters"
-    echo "Usage: run-dist.sh <number of sinograms>"
+    echo "Usage: run-dist.sh <number of sinograms> <logdir>"
     exit 1
 fi
 

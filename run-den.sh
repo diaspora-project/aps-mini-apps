@@ -4,7 +4,7 @@ source activate-spack.sh
 # Check if the number of parameters is correct
 if [ "$#" -ne 2 ]; then
     echo "Illegal number of parameters"
-    echo "Usage: run-den.sh <number of processes>"
+    echo "Usage: run-den.sh <number of processes> <logdir>"
     exit 1
 fi
 
