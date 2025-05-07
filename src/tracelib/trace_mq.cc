@@ -313,7 +313,7 @@ void TraceMQ::SaveTimestampsToCSV(const std::string &filename) {
     std::cerr << "Error: Unable to open file " << "send-'" << filename << std::endl;
     return;
   }
-  send_file << "timestamp" << std::endl;
+  send_file << "overhead" << std::endl;
   for (size_t i = 0; i < sirt_send_t_.size(); ++i) {
     send_file << sirt_send_t_[i] << "," << std::endl;
   }
@@ -324,7 +324,7 @@ void TraceMQ::SaveTimestampsToCSV(const std::string &filename) {
     std::cerr << "Error: Unable to open file " << "recv-" << filename << std::endl;
     return;
   }
-  recv_file << "timestamp" << std::endl;
+  recv_file << "overhead" << std::endl;
   for (size_t i = 0; i < sirt_recv_t_.size(); ++i) {
     recv_file << sirt_recv_t_[i] << "," << std::endl;
   }
