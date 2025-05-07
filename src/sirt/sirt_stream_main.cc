@@ -129,10 +129,11 @@ int main(int argc, char **argv)
   DISPCommBase<float> *comm =
         new DISPCommMPI<float>(&argc, &argv);
   TraceRuntimeConfig config(argc, argv, comm->rank(), comm->size());
+  std::string pub_addr = config.pub_addr + ":" + std::to_string(52000 + comm->rank());
   TraceStream tstream(config.dest_host, config.dest_port, 
                       config.window_len, 
                       comm->rank(), comm->size(),
-                      config.pub_addr);
+                      pub_addr);
   // Print the current time stamp
   auto timestamp = std::chrono::high_resolution_clock::now().time_since_epoch();
   auto recorded_timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(timestamp);

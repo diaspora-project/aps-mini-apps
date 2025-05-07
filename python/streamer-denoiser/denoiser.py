@@ -119,64 +119,71 @@ def main(input_path, recon_path, model_path, nproc_sirt, publisher_addr=None):
     
 
     """Connect to ZMQ publisher and receive data."""
-    print("Subscribing to: {}".format(publisher_addr))
-    context = zmq.Context()
-    subscriber_socket = context.socket(zmq.SUB)
-    subscriber_socket.connect(publisher_addr)
-    subscriber_socket.setsockopt(zmq.SUBSCRIBE, b'')  # Subscribe to all messages
+    subscriber_sockets = []
+    for i in range(nproc_sirt):
+        publisher_address = publisher_addr + ":" + str(52000 + i)
+        print("Subscribing to: {}".format(publisher_address))
+        context = zmq.Context()
+        subscriber_socket = context.socket(zmq.SUB)
+        subscriber_socket.connect(publisher_address)
+        subscriber_socket.setsockopt(zmq.SUBSCRIBE, b'')  # Subscribe to all messages
+        subscriber_sockets.append(subscriber_socket)
     
     receive_timestamps = []
 
     print("Waiting for data...")
 
     while True:
-        data = []
-        metadata = []
 
-        ts = time.perf_counter()
-        # m = subscriber_socket.recv_json()
-        t_wait = time.perf_counter()
-        den_start = time.time()
-        data = subscriber_socket.recv()
-        den_end = time.time()
-        t_meta = time.perf_counter()
-        receive_timestamps.append(den_end - den_start)
-        
-        # if data["Type"] == "FIN":
-        #     more_data = False
-        #     break
-        # else:
-        #     metadata.append(m)
-        #     t_data = time.perf_counter()
-        #     data_array = np.frombuffer(data, dtype=np.float32)
-        #     mofka_times.append([t_wait - ts, t_meta - t_wait, sys.getsizeof(m), time.perf_counter() - t_data, len(dd)])
-        #     data.append(data_array)
-        #     receive_timestamps.append(t_data)
-        
-        print("Received data at ", time.time(), "duration", den_end - den_start)
-        
-        # if len(metadata) > 0:
-        #     correct_order_meta = [
-        #         d for _, d in sorted(
-        #             zip([(m["iteration_stream"], m["rank"]) for m in metadata], metadata),
-        #             key=lambda d: (d[0][0], d[0][1])  # Sort by iteration_stream first, then by rank
-        #         )
-        #     ]
-        #     correct_order = [
-        #         d for _, d in sorted(
-        #             zip([(m["iteration_stream"], m["rank"]) for m in metadata], data),
-        #             key=lambda d: (d[0][0], d[0][1])  # Sort by iteration_stream first, then by rank
-        #         )
-        #     ]
-        #     for j in range(len(correct_order_meta)//nproc_sirt):
-        #         batch_data = correct_order[j*nproc_sirt:nproc_sirt+j*nproc_sirt]
-        #         batch_meta = correct_order_meta[j*nproc_sirt:nproc_sirt+j*nproc_sirt]
-        #         print(batch_meta)
-        #         data = np.concatenate(batch_data, axis=0)
-        #         #process_stream(model, data, metadata)
-        #         output_path = recon_path + "/" + batch_meta[0]["iteration_stream"]+'-denoised.h5'
-        #         with h5py.File(output_path, 'w') as h5_output:
-        #             h5_output.create_dataset('/data', data=data)
+        for subscriber_socket in subscriber_sockets:
+
+            data = []
+            metadata = []
+
+            ts = time.perf_counter()
+            # m = subscriber_socket.recv_json()
+            t_wait = time.perf_counter()
+            den_start = time.time()
+            data = subscriber_socket.recv()
+            den_end = time.time()
+            t_meta = time.perf_counter()
+            receive_timestamps.append(den_end - den_start)
+            
+            # if data["Type"] == "FIN":
+            #     more_data = False
+            #     break
+            # else:
+            #     metadata.append(m)
+            #     t_data = time.perf_counter()
+            #     data_array = np.frombuffer(data, dtype=np.float32)
+            #     mofka_times.append([t_wait - ts, t_meta - t_wait, sys.getsizeof(m), time.perf_counter() - t_data, len(dd)])
+            #     data.append(data_array)
+            #     receive_timestamps.append(t_data)
+            
+            print("Received data at ", time.time(), "duration", den_end - den_start)
+            
+            # if len(metadata) > 0:
+            #     correct_order_meta = [
+            #         d for _, d in sorted(
+            #             zip([(m["iteration_stream"], m["rank"]) for m in metadata], metadata),
+            #             key=lambda d: (d[0][0], d[0][1])  # Sort by iteration_stream first, then by rank
+            #         )
+            #     ]
+            #     correct_order = [
+            #         d for _, d in sorted(
+            #             zip([(m["iteration_stream"], m["rank"]) for m in metadata], data),
+            #             key=lambda d: (d[0][0], d[0][1])  # Sort by iteration_stream first, then by rank
+            #         )
+            #     ]
+            #     for j in range(len(correct_order_meta)//nproc_sirt):
+            #         batch_data = correct_order[j*nproc_sirt:nproc_sirt+j*nproc_sirt]
+            #         batch_meta = correct_order_meta[j*nproc_sirt:nproc_sirt+j*nproc_sirt]
+            #         print(batch_meta)
+            #         data = np.concatenate(batch_data, axis=0)
+            #         #process_stream(model, data, metadata)
+            #         output_path = recon_path + "/" + batch_meta[0]["iteration_stream"]+'-denoised.h5'
+            #         with h5py.File(output_path, 'w') as h5_output:
+            #             h5_output.create_dataset('/data', data=data)
     logdir = "."
     with open(logdir + '/Den_timestamp.json', 'w') as f:
         write = csv.writer(f)
