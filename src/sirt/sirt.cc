@@ -26,7 +26,7 @@ float SIRTReconSpace::CalculateSimdata(
     }
     simdata += recon[indi[i]]*leng[i];
   }
-  if(nout_bound>num_grids) std::cout << "CalculateSimdata: # out of bound=" << nout_bound << std::endl;
+  if(nout_bound>static_cast<size_t>(num_grids)) std::cout << "CalculateSimdata: # out of bound=" << nout_bound << std::endl;
   return simdata;
 }
 
