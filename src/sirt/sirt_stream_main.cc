@@ -291,7 +291,8 @@ int main(int argc, char **argv)
   }
   #endif
 
-  tstream.SaveTimestampsToCSV("dist_receive" + std::string(comm->rank()) + ".csv");
+  // Save timestamps to a CSV file with the rank appended to the filename
+  tstream.SaveTimestampsToCSV("dist_receive" + std::to_string(comm->rank()) + ".csv");
 
   /* Clean-up the resources */
   std::cout << "Deleting h5md.dimm" << std::endl;
