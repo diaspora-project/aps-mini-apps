@@ -291,7 +291,7 @@ int main(int argc, char **argv)
   }
   #endif
 
-  tstream.SaveTimestampsToCSV("dist_receive.csv");
+  tstream.SaveTimestampsToCSV("dist_receive" + std::string(comm->rank()) + ".csv");
 
   /* Clean-up the resources */
   std::cout << "Deleting h5md.dimm" << std::endl;
