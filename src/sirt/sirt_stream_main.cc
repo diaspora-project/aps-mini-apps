@@ -11,7 +11,8 @@
 #include <string>
 #include <fstream>
 #include <iostream>
-#include <mofka_stream.h>
+#include "resilient/mofka_resilient_consumer.h"
+#include "resilient/mofka_resilient_producer.h"
 #include "trace_data.h"
 #include <vector>
 #include <unistd.h>
@@ -293,12 +294,7 @@ int main(int argc, char **argv)
 
   /* Prepare processing engine and main reduction space for other threads */
   DISPEngineBase<SIRTReconSpace, float> *engine =
-    // new DISPEngineReduction<SIRTReconSpace, float>(
-    new DISPEngineReductionSIRT(
-        // comm,
-        main_recon_space,
-        config.thread_count);
-        /// # threads (0 for auto assign the number of threads)
+    new DISPEngineReductionSIRT(main_recon_space, config.thread_count);
 
   #ifdef TIMERON
   auto e2e_beg = std::chrono::system_clock::now();
@@ -307,11 +303,6 @@ int main(int argc, char **argv)
   std::cout << "[Task-" << config.task_id << "] Start reconstruction passes = " << passes << std::endl;
 
   for(; passes < config.num_passes; ++passes){
-
-      // if (sigterm_captured) {
-      //     std::cerr << "Termination signal received. Exiting..." << std::endl;
-      //     return sigterm_captured;
-      // }
 
       #ifdef TIMERON
       auto datagen_beg = std::chrono::system_clock::now();
@@ -391,12 +382,6 @@ int main(int argc, char **argv)
         std::stringstream iteration_stream;
         iteration_stream << std::setfill('0') << std::setw(6) << passes;
         
-        // std::string outputpath = config.kReconOutputDir + "/" +
-        //   iteration_stream.str() + "-recon.h5";
-        // trace_io::WriteRecon(
-        //     curr_slices->metadata(), h5md,
-        //     outputpath, config.kReconDatasetPath);
-
         try {
           TraceMetadata &rank_metadata = curr_slices->metadata();
 
