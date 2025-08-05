@@ -18,16 +18,18 @@ rm -rf /tmp/scratch/*
 rm -rf /tmp/persistent/*
 
 # Check if the number of arguments is corre
-if [ "$#" -ne 3 ]; then
+if [ "$#" -ne 4 ]; then
     echo "Usage: exec-pipeline.sh <sirt_ranks> <num_sinograms>"
-    echo "  <sirt_ranks>    Number of ranks for the SIRT process"
+    echo "  <sirt_ranks>    Number of SIRT workers/processes"
+    echo "  <sirt_tasks>    Number of SIRT tasks/threads"
     echo "  <num_sinograms> Number of sinograms to process"
     echo "  <mtbf>         Mean time between failures (in seconds)"
     exit 1
 fi
 sirt_ranks=$1
-num_sinograms=$2
-mtbf=$3
+sirt_tasks=$2
+num_sinograms=$3
+mtbf=$4
 
 DATE=$(date +"%Y-%m-%d-%Hh%Mmin%Ssec")
 logdir=build/logs/D${DATE}

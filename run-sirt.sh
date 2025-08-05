@@ -50,7 +50,7 @@ trap "echo 'Ctrl+C pressed. Terminating...'; exit 1" SIGINT SIGTERM
 # run --id 0 --np 1 --write-freq 4 --window-iter 1 --window-step 4 --window-length 4 --thread 1 --center 1427 --protocol na+sm --group-file mofka.json --batchsize 4 --reconOutputPath ./output.h5 --recon-output-dir . --reconDatasetPath /data --pub-freq 10000 --ckpt-freq 4 --ckpt-name sirt --ckpt-config veloc.cfg --logdir .
 
 python ./build/python/streamer-sirt/ParslSirt.py \
-    --np ${sirt_ranks} \
+    --num-workers ${sirt_ranks} \
     --write-freq 4  \
     --window-iter 1 \
     --window-step 4 \

@@ -19,7 +19,7 @@ class RetConTask {
     : config(argc, argv), task_id(task_id), num_tasks(num_tasks) {}
 
     RetConTask(int task_id, int num_tasks, const TraceRuntimeConfig &cfg)
-    : config(cfg), task_id(task_id), num_tasks(num_tasks) {}
+    : config(cfg), task_id(task_id), num_tasks(num_tasks), ms(ms) {}
     
     /**
      * Run the RetCon task.

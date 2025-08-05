@@ -24,8 +24,8 @@ def parse_arguments():
   parser.add_argument('--batchsize', type=int, default=16,
                       help='mofka batch size')
 
-  parser.add_argument('--nproc_sirt', type=int, default=0,
-                      help='number of reconstruction processes')
+  parser.add_argument('--ntask_sirt', type=int, default=0,
+                      help='number of reconstruction tasks')
   # TQ communication
   parser.add_argument('--beg_sinogram', type=int,
                           help='Starting sinogram for reconstruction')
@@ -79,12 +79,16 @@ def main():
   mofka_dist = MofkaDist(group_file=args.group_file, batchsize=args.batchsize)
   # Handshake with Sirt
   print("Handshake with SIRT ...")
-  mofka_dist.handshake(args.nproc_sirt, args.num_sinograms, args.num_columns)
+  mofka_dist.handshake(args.ntask_sirt, args.num_sinograms, args.num_columns)
 
   print("Setting consumer and producer ...")
 
   consumer = mofka_dist.consumer(topic_name="daq_dist", consumer_name="dist")
   producer = mofka_dist.producer(topic_name="dist_sirt", producer_name="producer_dist")
+
+  action_consumer = mofka_dist.consumer(topic_name="dist_sirt_action", consumer_name="dist")
+  action_producer = mofka_dist.producer(topic_name="sirt_dist_action", producer_name="sirt")
+
   mofka_producing_time = []
   mofka_consuming_time = []
   # Setup serializer

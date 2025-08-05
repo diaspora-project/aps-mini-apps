@@ -110,22 +110,30 @@ MofkaStream::MofkaStream(std::string group_file,
 
 
 /* Handshake with Dist component
-* @param rank: MPI rank
-* @param size: MPI size
+* @param worker_index: worker index
+* @param num_workers:  number of workers
+
+* This function sets up the handshake with the distributed component.
+* It sends the worker index and number of workers to the distributed streamer.
+* It also receives metadata information from the distributed streamer.
 */
-void MofkaStream::handshake(int rank, int size){
+void MofkaStream::handshake(int worker_index, int num_workers) {
   std::string topic_name = "handshake_s_d";
   // Send comm size to dist_streamer
   mofka::Producer hs_producer = getProducer(topic_name, "hs_p");
 
-  json md = {{"comm_size", size}};
+  json md = {{"num_workers", num_workers},
+             {"worker_index", worker_index}};
+
   mofka::Metadata metadata{md};
   auto future = hs_producer.push(metadata);
   future.wait();
+}
 
+void MofkaStream::collect_metadata(int task_index) {
   // Receive metadata info
   topic_name = "handshake_d_s";
-  std::vector<size_t> targets = {static_cast<size_t>(rank)};
+  std::vector<size_t> targets = {static_cast<size_t>(worker_index)};
   mofka::TopicHandle topic = driver.openTopic(topic_name);
   mofka::Consumer hs_consumer = topic.consumer( "hs_c",
                                                 batchSize,
