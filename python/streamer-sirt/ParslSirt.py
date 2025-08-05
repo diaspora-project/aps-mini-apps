@@ -12,7 +12,7 @@ def parse_arguments():
     parser = argparse.ArgumentParser(
             description='SIRT Iterative Image Reconstruction')
     
-    parser.add_argument('--np', type=int, default=1, help="Number of reconstruction tasks")
+    parser.add_argument('--num-workers', type=int, default=1, help="Number of reconstruction tasks")
     
     parser.add_argument('--protocol', default="na+sm", help='Mofka protocol')
 
@@ -72,7 +72,7 @@ def run_sirt(id, logdir=".", args=[]):
     stderr = logdir + '/sirt-' + id + '.err'
     stdout = logdir + '/sirt-' + id + '.out'
     sirt_stream = "build/bin/sirt_stream"
-    cmd = sirt_stream + " --id " + id + " " + " ".join(args) + f" >> {stdout} 2>> {stderr}"
+    cmd = sirt_stream + " --worker-id " + id + " " + " ".join(args) + f" >> {stdout} 2>> {stderr}"
     print(cmd)
     return cmd
 
