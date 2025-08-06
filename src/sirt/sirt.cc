@@ -107,24 +107,16 @@ void SIRTReconSpace::Initialize(int n_grids){
   leng = new float[2*num_grids];
   leng2 = new float[2*num_grids];
   indi = new int[2*num_grids];
-}
 
-void SIRTReconSpace::Finalize(){
-  delete [] coordx;
-  delete [] coordy;
-  delete [] ax;
-  delete [] ay;
-  delete [] bx;
-  delete [] by;
-  delete [] coorx;
-  delete [] coory;
-  delete [] leng;
-  delete [] leng2;
-  delete [] indi;
+  std::cout << "SIRTReconSpace initialized with num_grids=" << num_grids << std::endl;
 }
 
 void SIRTReconSpace::Reduce(MirroredRegionBareBase<float> &input)
 {
+  if (coordx == nullptr || coordy == nullptr) {
+    throw std::runtime_error("SIRTReconSpace::Reduce: coordx or coordy is not initialized. Did you forget to call Initialize?");
+  }
+
   auto &rays = *(static_cast<MirroredRegionBase<float, TraceMetadata>*>(&input));
   auto &metadata = rays.metadata();
 

@@ -1,5 +1,5 @@
 #include <iomanip>
-#include "sirt/retcon_engine.h"
+#include "sirt/recon_engine.h"
 #include "trace_h5io.h"
 #include "data_region_base.h"
 #include "tclap/CmdLine.h"
@@ -11,8 +11,6 @@
 #include <string>
 #include <fstream>
 #include <iostream>
-#include "resilient/mofka_resilient_consumer.h"
-#include "resilient/mofka_resilient_producer.h"
 #include "trace_data.h"
 #include <vector>
 #include <unistd.h>
@@ -36,16 +34,16 @@ BOOST_CLASS_EXPORT(AReductionSpaceBaseSIRT)
 BOOST_CLASS_EXPORT(DISPEngineBaseSIRT)
 BOOST_CLASS_EXPORT(DISPEngineReductionSIRT)
 
-int RetConTask::run() {
+int ReconTask::run() {
 
   MofkaStream ms = MofkaStream{config.group_file,
     config.batchsize,
     static_cast<uint32_t>(config.window_len),
-    config.task_index,
+    task_id,
     0
   }; // Add the missing progress argument
 
-  ms.collect_metadata(task_id);
+  ms.handshake(task_id);
 
   // Prepare consumer and producer
   std::string consuming_topic = "dist_sirt";
@@ -99,13 +97,13 @@ int RetConTask::run() {
   main_recon_space->Initialize(num_cols*num_cols);
 
   // Configure the VeloC checkpointing
-  veloc::client_t *ckpt_client = veloc::get_client((unsigned int)config.task_index, config.ckpt_config);
+  veloc::client_t *ckpt_client = veloc::get_client((unsigned int)task_id, config.ckpt_config);
   // Protect reconstruction memory regions
   int progress = 0; // Reconstruction progress marked by the projection requence ids
   ckpt_client->mem_protect(0, veloc::boost::serializer(recon_image), veloc::boost::deserializer(recon_image));
   ckpt_client->mem_protect(1, &progress, 1, sizeof(int));
 
-  int passes = ckpt_client->restart_test(config.ckpt_name, 0, config.task_index);
+  int passes = ckpt_client->restart_test(config.ckpt_name, 0, task_id);
   // Checkpoint restart if any
   if(passes>0){
     std::cout << "Checkpoint found at " << passes << ". Restarting from checkpoint" << std::endl;
@@ -131,7 +129,7 @@ int RetConTask::run() {
   auto e2e_beg = std::chrono::system_clock::now();
   #endif
 
-  std::cout << "[Task-" << config.task_id << "] Start reconstruction passes = " << passes << std::endl;
+  std::cout << "[Task-" << task_id << "] Start reconstruction passes = " << passes << std::endl;
 
   for(; passes < config.num_passes; ++passes){
 
@@ -147,19 +145,15 @@ int RetConTask::run() {
     #endif
     
     if (ms.isEndOfStream()) {
-      std::cout << "[Task-" << config.task_id << "] End of stream. Exiting..." << std::endl;
+      std::cout << "[Task-" << task_id << "] End of stream. Exiting..." << std::endl;
       break;
     }
     if(curr_slices == nullptr) {
-      std::cout << "[Task-" << config.task_id << "] passes = " << passes << " -- No new data in the sliding window. Skip processing" << std::endl;
+      std::cout << "[Task-" << task_id << "] passes = " << passes << " -- No new data in the sliding window. Skip processing" << std::endl;
       continue;
     }
     /// Iterate on window
     for(int i=0; i<config.window_iter; ++i){
-      if (sigterm_captured) {
-          std::cerr << "Termination signal received. Exiting..." << std::endl;
-          return sigterm_captured;
-      }
 
       #ifdef TIMERON
       auto recon_beg = std::chrono::system_clock::now();
@@ -192,13 +186,13 @@ int RetConTask::run() {
     if(!(passes%config.ckpt_freq) || stop_flag.load()){
       ckpt_client->checkpoint_wait();
       progress = ms.getProgress();
-      std::cout << "[Task-" << config.task_id << "] Checkpointing at iteration " << passes << ", proogess = " << progress << std::endl;
+      std::cout << "[Task-" << task_id << "] Checkpointing at iteration " << passes << ", proogess = " << progress << std::endl;
       if (!ckpt_client->checkpoint(config.ckpt_name, passes)) {
-        std::cout << "[Task-" << config.task_id << "] Cannot checkpoint. passes: " << passes << std::endl;
+        std::cout << "[Task-" << task_id << "] Cannot checkpoint. passes: " << passes << std::endl;
         throw std::runtime_error("Checkpointing failured");
       }
       ms.acknowledge();
-      std::cout << "[task-" << config.task_id << "]: Checkpointed version " << passes << ", proogess = " << progress << std::endl;
+      std::cout << "[task-" << task_id << "]: Checkpointed version " << passes << ", proogess = " << progress << std::endl;
     }
     #ifdef TIMERON
     ckpt_tot += (std::chrono::system_clock::now()-ckpt_beg);
@@ -234,7 +228,7 @@ int RetConTask::run() {
 
         json md = json{
             {"Type", "DATA"},
-            {"rank", config.task_index},
+            {"rank", task_id},
             {"iteration_stream", iteration_stream.str()},
             {"rank_dims", rank_dims},
             {"app_dims", app_dims},
@@ -243,7 +237,8 @@ int RetConTask::run() {
         ms.publishImage(md, &recon[recon_slice_data_index], data_size, producer);
 
       } catch(const mofka::Exception& ex) {
-        spdlog::critical("{}", ex.what());
+        // spdlog::critical("{}", ex.what());
+        std::cerr << "[Task-" << task_id << "] Error during publishing image: " << ex.what() << std::endl;
         exit(-1);
       }
     // MPI_Barrier(MPI_COMM_WORLD);
@@ -285,7 +280,7 @@ int RetConTask::run() {
 
   /**************************/
   #ifdef TIMERON
-  if(config.task_index==0){
+  if(task_id==0){
     e2e_tot += (std::chrono::system_clock::now()-e2e_beg);
     std::cout << "End-to-End Reconstruction time=" << e2e_tot.count() << std::endl;
 
@@ -308,9 +303,10 @@ int RetConTask::run() {
   // std::cout << "Deleting comm" << std::endl;
   // delete comm;
   std::cout << "Exiting" << std::endl;
+  return 0;
 }
 
-RetConTask::stop(std::function<void()> callback = nullptr) {
+void ReconTask::stop(std::function<void()> callback) {
   if (callback) {
     on_stop_callback = callback;
   }  

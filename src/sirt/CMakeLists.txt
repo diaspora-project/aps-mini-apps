@@ -61,12 +61,16 @@ find_package (mofka REQUIRED)
 # Find Boost libraries
 find_package(Boost REQUIRED COMPONENTS serialization CONFIG)
 
+# Just for local installation, adjust the path depending on your setup
+link_directories(/home/ndhai/src/spack-aps/var/spack/environments/APS/.spack-env/view/lib)
+
 include_directories(${Trace_SOURCE_DIR}/include)
 include_directories(${Trace_SOURCE_DIR}/include/tracelib)
 include_directories(${HDF5_INCLUDE_DIRS})
 
 include_directories(${Trace_SOURCE_DIR}/include)
 include_directories(${Trace_SOURCE_DIR}/include/mofka_sirt)
+include_directories(${Trace_SOURCE_DIR}/include/sirt)
 
 add_library(trace_utils ${Trace_SOURCE_DIR}/src/tracelib/trace_utils.cc)
 add_library(trace_h5io ${Trace_SOURCE_DIR}/src/tracelib/trace_h5io.cc)
@@ -75,12 +79,16 @@ add_library(mofka_stream ${Trace_SOURCE_DIR}/src/mofka_sirt/mofka_stream.cc)
 target_link_libraries(mofka_stream PRIVATE mofka::client)
 add_library(sirt ${CMAKE_CURRENT_LIST_DIR}/sirt.cc)
 
+add_library(recon_engine ${Trace_SOURCE_DIR}/src/sirt/recon_engine.cc)
+target_link_libraries(recon_engine PUBLIC sirt mofka_stream trace_utils trace_h5io)
+
 add_executable(sirt_stream sirt_stream_main.cc)
 target_link_libraries(sirt_stream
     mofka_stream
     sirt
     trace_utils
     trace_h5io
+    recon_engine
     ${VELOC_CLIENT_LIB}  # Manually link the VeloC client library
     Boost::serialization
     MPI::MPI_CXX

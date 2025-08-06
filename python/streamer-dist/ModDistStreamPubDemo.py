@@ -89,6 +89,24 @@ def main():
   action_consumer = mofka_dist.consumer(topic_name="dist_sirt_action", consumer_name="dist")
   action_producer = mofka_dist.producer(topic_name="sirt_dist_action", producer_name="sirt")
 
+  # Statically assign tasks to workers
+  num_tasks = args.ntask_sirt
+  num_workers = mofka_dist.nworkers
+  # assign tasks to workers in round-robin fashion
+  task_to_worker = [[] for _ in range(num_workers)]
+  for t in range(num_tasks):
+    task_to_worker[t % num_workers].append(t)
+  for w in range(num_workers):
+    print(f"Worker {w} assigned tasks: {task_to_worker[w]}")
+    for t in range(len(task_to_worker[w])):
+      assign_info = {
+          "Type": "START_TASK",
+          "worker_id": w,
+          "tasks": task_to_worker[w][t]
+      }
+      action_producer.push(assign_info)
+
+
   mofka_producing_time = []
   mofka_consuming_time = []
   # Setup serializer
@@ -234,6 +252,18 @@ def main():
     write.writerows(mofka_consuming_time)
   del producer
   del consumer
+  
+  print("Notifying SIRT that we are done ...")
+  for w in range(num_workers):
+    action_info = {
+        "Type": "SHUTDOWN",
+        "worker_id": w
+    }
+    action_producer.push(action_info)
+  
+  del action_producer
+  del action_consumer
+
   print("Exiting ...")
 
 if __name__ == '__main__':

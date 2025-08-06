@@ -1,3 +1,6 @@
+#ifndef TRACE_RUNTIME_CONFIG_H
+#define TRACE_RUNTIME_CONFIG_H
+
 #include <iomanip>
 #include "trace_h5io.h"
 #include "tclap/CmdLine.h"
@@ -169,3 +172,5 @@ class TraceRuntimeConfig {
         }
       }
   };
+
+#endif // TRACE_RUNTIME_CONFIG_H

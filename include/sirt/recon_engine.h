@@ -4,7 +4,7 @@
 #include "trace_runtime_config.h"
 #include <atomic>
 
-class RetconTask {
+class ReconTask {
 
   private:
     TraceRuntimeConfig config;
@@ -13,14 +13,17 @@ class RetconTask {
     std::atomic<bool> stop_flag{false};
     std::function<void()> on_stop_callback = nullptr;
 
+    
   public:
-    RetconTask(int task_id, int argc, char **argv)
+    ReconTask(int task_id, int argc, char **argv)
     : config(argc, argv), task_id(task_id) {}
 
-    RetconTask(int task_id, const TraceRuntimeConfig &cfg)
+    ReconTask(int task_id, const TraceRuntimeConfig &cfg)
     : config(cfg), task_id(task_id) {}
+
+    ReconTask() : config(0, nullptr), task_id(0) {}
     
-    RetconTask& operator=(RetconTask&& other) noexcept {
+    ReconTask& operator=(ReconTask&& other) noexcept {
       if (this != &other) {
         config = std::move(other.config);
         task_id = other.task_id;
@@ -34,7 +37,7 @@ class RetconTask {
       }
       return *this;
     }
-    RetconTask(const RetconTask& other) = delete; // Disable copy constructor
+    ReconTask(const ReconTask& other) = delete; // Disable copy constructor
 
     /**
      * Run the RetCon task.

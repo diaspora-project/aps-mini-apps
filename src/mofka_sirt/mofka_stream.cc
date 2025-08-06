@@ -15,7 +15,7 @@ void MofkaStream::addTomoMsg(mofka::Event event){
   pending_events.push_back(event);
   vmeta.push_back(metadata.json()); /// Setup metadata
   vtheta.push_back(metadata.json()["theta"].get<float_t>());
-  spdlog::info("Received data {}", metadata.string());
+  // spdlog::info("Received data {}", metadata.string());
 
   size_t n_rays_per_proj =
   getInfo()["n_sinograms"].get<int64_t>() *
@@ -117,10 +117,10 @@ MofkaStream::MofkaStream(std::string group_file,
 * It sends the worker index and number of workers to the distributed streamer.
 * It also receives metadata information from the distributed streamer.
 */
-void MofkaStream::handshake(int worker_index, int num_workers) {
+void MofkaStream::handshake(int task_index) {
   // Receive metadata info
   std::string topic_name = "handshake_d_s";
-  std::vector<size_t> targets = {static_cast<size_t>(worker_index)};
+  std::vector<size_t> targets = {static_cast<size_t>(task_index)};
   mofka::TopicHandle topic = driver.openTopic(topic_name);
   mofka::Consumer hs_consumer = topic.consumer( "hs_c",
                                                 batchSize,

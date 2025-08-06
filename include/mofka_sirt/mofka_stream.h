@@ -6,7 +6,6 @@
 #include <mofka/Client.hpp>
 #include <mofka/TopicHandle.hpp>
 #include <mofka/MofkaDriver.hpp>
-#include <spdlog/spdlog.h>
 #include <fmt/format.h>
 #include <time.h>
 #include <string>
@@ -115,7 +114,8 @@ class MofkaStream
     * @param rank: MPI rank
     * @param size: MPI size
     */
-    void handshake(int rank, int size);
+    // void handshake(int rank, int size);
+    void handshake(int rank);
 
     /* Publish reconstructed image
     * @param metadata: metadata in json format

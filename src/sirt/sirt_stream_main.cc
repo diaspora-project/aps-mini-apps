@@ -7,9 +7,10 @@
 #include <unistd.h>
 #include <csignal>
 #include "sirt/trace_runtime_config.h"
-#include "sirt/retcon_engine.h"
+#include "sirt/recon_engine.h"
 #include <mofka_stream.h>
 #include <unordered_map>
+#include <thread>
 
 
 volatile std::sig_atomic_t sigterm_captured = 0;
@@ -48,16 +49,22 @@ int main(int argc, char **argv) {
     mofka::TopicHandle consuming_topic = driver.openTopic("dist_sirt_action");
     mofka::TopicHandle producing_topic = driver.openTopic("sirt_dist_action");
     mofka::Producer producer = producing_topic.producer("sirt", 1, 1, mofka::Ordering::Strict);
-    std::vector<size_t> targets = {static_cast<size_t>(config.worker_index)};
-    mofka::Consumer consumer = consuming_topic.consumer("sirt", 1, 1, targets);
+    // std::vector<size_t> targets = {static_cast<size_t>(config.worker_index)};
+    // mofka::Consumer consumer = consuming_topic.consumer("sirt", 1, 1, targets);
+    mofka::Consumer consumer = consuming_topic.consumer("sirt", 1, 1);
 
-    std::unordered_map<int, RetconTask> running_tasks;
+    std::unordered_map<int, ReconTask> running_tasks;
+    std::unordered_map<int, std::thread> running_threads;
+    std::vector<std::thread> stopped_threads;
 
     bool running = true;
     while (true) {
         // listen for action messages and initialize/terminate assigned reconstruction tasks.
         auto event = consumer.pull().wait();
         auto json_metadata = event.metadata().json();
+        if (json_metadata["worker_id"].get<int>() != config.worker_index) {
+            continue; // Ignore messages not meant for this worker
+        }
         std::string event_type = json_metadata["Type"].get<std::string>();
         if (event_type == "END_TASK") {
             int task_id = json_metadata["task_id"].get<int>();
@@ -71,12 +78,28 @@ int main(int argc, char **argv) {
                     producer.push(end_md).wait();
                 });
                 running_tasks.erase(task_id);
+                stopped_threads.push_back(std::move(running_threads[task_id]));
+                running_threads.erase(task_id);
             }
         }else if (event_type == "START_TASK") {
           int task_id = json_metadata["task_id"].get<int>();
-          RetconTask new_task(task_id, argc, argv);
-          running_tasks[task_id] = std::move(new_task);
-          running_tasks[task_id].run();
+          if (running_tasks.find(task_id) != running_tasks.end()) {
+              std::cerr << "[Worker-" << config.worker_id << "] Task " << task_id << " is already running. Ignoring START_TASK command." << std::endl;
+          }else{
+              std::cout << "[Worker-" << config.worker_id << "] Starting Task " << task_id << std::endl;
+              running_tasks.emplace(
+                std::piecewise_construct,
+                std::forward_as_tuple(task_id),
+                std::forward_as_tuple(task_id, argc, argv)
+              );
+              running_threads.emplace(
+                std::piecewise_construct,
+                std::forward_as_tuple(task_id),
+                std::forward_as_tuple([&, task_id] {
+                    running_tasks.at(task_id).run();
+              })
+      );
+          }
         }else if (event_type == "SHUTDOWN") {
             std::cout << "[Worker-" << config.worker_id << "] End of stream. Exiting..." << std::endl;
             running = false;
@@ -89,5 +112,13 @@ int main(int argc, char **argv) {
     // Stop running tasks
     for (auto& [task_id, task] : running_tasks) {
         task.stop();
+    }
+    for (auto& [task_id, thread] : running_threads) {
+        thread.join();
+    }
+    for (auto& thread : stopped_threads) {
+        if (thread.joinable()) {
+            thread.join();
+        }
     }
 }
