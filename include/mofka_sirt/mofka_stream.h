@@ -21,8 +21,6 @@
 using json = nlohmann::json;
 namespace tl = thallium;
 
-
-
 class MofkaStream
 {
   private:
@@ -30,7 +28,7 @@ class MofkaStream
     uint32_t window_len;
     uint32_t counter;
     int comm_rank;
-    int comm_size;
+    // int comm_size;
 
     int progress;
     std::vector<mofka::Event> pending_events;
@@ -109,7 +107,7 @@ class MofkaStream
                 size_t batchsize,
                 uint32_t window_len,
                 int rank,
-                int size,
+                // int size,
                 int progress=0);
 
 

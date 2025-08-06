@@ -97,13 +97,13 @@ MofkaStream::MofkaStream(std::string group_file,
             size_t batchsize,
             uint32_t window_len,
             int rank,
-            int size,
+            // int size,
             int progress) // Removed default argument
   : batchsize {batchsize},
   window_len {window_len},
   counter {0},
   comm_rank {rank},
-  comm_size {size},
+  // comm_size {size},
   progress {progress},
   driver {group_file, true}
   {}
@@ -118,21 +118,8 @@ MofkaStream::MofkaStream(std::string group_file,
 * It also receives metadata information from the distributed streamer.
 */
 void MofkaStream::handshake(int worker_index, int num_workers) {
-  std::string topic_name = "handshake_s_d";
-  // Send comm size to dist_streamer
-  mofka::Producer hs_producer = getProducer(topic_name, "hs_p");
-
-  json md = {{"num_workers", num_workers},
-             {"worker_index", worker_index}};
-
-  mofka::Metadata metadata{md};
-  auto future = hs_producer.push(metadata);
-  future.wait();
-}
-
-void MofkaStream::collect_metadata(int task_index) {
   // Receive metadata info
-  topic_name = "handshake_d_s";
+  std::string topic_name = "handshake_d_s";
   std::vector<size_t> targets = {static_cast<size_t>(worker_index)};
   mofka::TopicHandle topic = driver.openTopic(topic_name);
   mofka::Consumer hs_consumer = topic.consumer( "hs_c",

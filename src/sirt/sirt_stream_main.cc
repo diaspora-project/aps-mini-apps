@@ -2,15 +2,14 @@
 #include <cassert>
 #include <time.h>
 #include <string>
-#include <fstream>
 #include <iostream>
-#include "trace_data.h"
 #include <vector>
 #include <unistd.h>
-#include <charconv>
 #include <csignal>
 #include "sirt/trace_runtime_config.h"
+#include "sirt/retcon_engine.h"
 #include <mofka_stream.h>
+#include <unordered_map>
 
 
 volatile std::sig_atomic_t sigterm_captured = 0;
@@ -24,30 +23,35 @@ int main(int argc, char **argv) {
 
     /* Initiate middleware's communication layer */
     TraceRuntimeConfig config(argc, argv);
-    MofkaStream ms = MofkaStream{ config.group_file,
-                                config.batchsize,
-                                static_cast<uint32_t>(config.window_len),
-                                config.task_index,
-                                config.num_tasks,
-                                0}; // Add the missing progress argument
+    
+    // Send worker information to dist
+    std::cout << "Handshaking: sending worker information to dist..." << std::endl;
+    std::string topic_name = "handshake_s_d";
+    mofka::MofkaDriver driver(config.group_file, true);
+    mofka::TopicHandle hs_topic = driver.openTopic(topic_name);
+    mofka::Producer hs_producer = hs_topic.producer(
+      "hs_p",
+      config.batchsize,
+      config.thread_count,
+      mofka::Ordering::Strict
+    );
 
-    ms.handshake(config.worker_index, config.num_workers);
+    json md = {{"num_workers", config.num_workers},
+             {"worker_index", config.worker_index}};
+    mofka::Metadata metadata{md};
+    auto future = hs_producer.push(metadata);
+    future.wait();
 
     std::cout << "Handshake completed" << std::endl;
 
     // Prepare action channel between consumer and producer
-    std::string consuming_topic = "dist_sirt_action";
-    std::string producing_topic = "sirt_dist_action";
+    mofka::TopicHandle consuming_topic = driver.openTopic("dist_sirt_action");
+    mofka::TopicHandle producing_topic = driver.openTopic("sirt_dist_action");
+    mofka::Producer producer = producing_topic.producer("sirt", 1, 1, mofka::Ordering::Strict);
     std::vector<size_t> targets = {static_cast<size_t>(config.worker_index)};
+    mofka::Consumer consumer = consuming_topic.consumer("sirt", 1, 1, targets);
 
-    mofka::Producer producer = ms.getProducer(producing_topic, "sirt");
-    mofka::Consumer consumer = ms.getConsumer(consuming_topic, "sirt", targets);
-    /* Get metadata structure */
-    json channel_metadata = ms.getInfo();
-    auto n_blocks = tmetadata["n_sinograms"].get<int64_t>();
-    auto num_cols = tmetadata["n_rays_per_proj_row"].get<int64_t>();
-
-    std::map<int, RetconTask> running_tasks;
+    std::unordered_map<int, RetconTask> running_tasks;
 
     bool running = true;
     while (true) {
@@ -55,33 +59,28 @@ int main(int argc, char **argv) {
         auto event = consumer.pull().wait();
         auto json_metadata = event.metadata().json();
         std::string event_type = json_metadata["Type"].get<std::string>();
-        switch (event_type) {
-        case "END_TASK":
+        if (event_type == "END_TASK") {
             int task_id = json_metadata["task_id"].get<int>();
             if (running_tasks.find(task_id) != running_tasks.end()) {
                 running_tasks[task_id].stop([&] {
-                    std::cout << "[Worker-" << config.task_id << "] Task " << task_id << " completed. Notifying the producer the completion" << std::endl;
+                    std::cout << "[Worker-" << config.worker_id << "] Task " << task_id << " completed. Notifying the producer the completion" << std::endl;
                     json end_md = {
                         {"Type", "COMPLETE"},
-                        {"task_id", task_id},
-                        {"iteration_stream", std::to_string(running_tasks[task_id].getNumPasses())}
+                        {"task_id", task_id}
                     };
                     producer.push(end_md).wait();
                 });
                 running_tasks.erase(task_id);
             }
-            break;
-        case "START_TASK":
-            int task_id = json_metadata["task_id"].get<int>();
-            RetConTask new_task(task_id, config.num_tasks, argc, argv);
-            running_tasks[task_id] = std::move(new_task);
-            running_tasks[task_id].run();
-            break;
-        case "SHUTDOWN":
-            std::cout << "[Worker-" << config.task_id << "] End of stream. Exiting..." << std::endl;
+        }else if (event_type == "START_TASK") {
+          int task_id = json_metadata["task_id"].get<int>();
+          RetconTask new_task(task_id, argc, argv);
+          running_tasks[task_id] = std::move(new_task);
+          running_tasks[task_id].run();
+        }else if (event_type == "SHUTDOWN") {
+            std::cout << "[Worker-" << config.worker_id << "] End of stream. Exiting..." << std::endl;
             running = false;
-            break;
-        default:
+        }else{
             std::cerr << "Unknown event type: " << event_type << std::endl;
             break;
         }

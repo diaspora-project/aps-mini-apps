@@ -4,23 +4,38 @@
 #include "trace_runtime_config.h"
 #include <atomic>
 
-class RetConTask {
+class RetconTask {
 
   private:
     TraceRuntimeConfig config;
     int task_id = 0;
-    int num_tasks = 1;
     // stop flag as atomic variable to handle graceful shutdown
     std::atomic<bool> stop_flag{false};
     std::function<void()> on_stop_callback = nullptr;
 
   public:
-    RetConTask(int task_id, int num_tasks, int argc, char **argv)
-    : config(argc, argv), task_id(task_id), num_tasks(num_tasks) {}
+    RetconTask(int task_id, int argc, char **argv)
+    : config(argc, argv), task_id(task_id) {}
 
-    RetConTask(int task_id, int num_tasks, const TraceRuntimeConfig &cfg)
-    : config(cfg), task_id(task_id), num_tasks(num_tasks), ms(ms) {}
+    RetconTask(int task_id, const TraceRuntimeConfig &cfg)
+    : config(cfg), task_id(task_id) {}
     
+    RetconTask& operator=(RetconTask&& other) noexcept {
+      if (this != &other) {
+        config = std::move(other.config);
+        task_id = other.task_id;
+        stop_flag.store(other.stop_flag.load());
+        if (other.on_stop_callback) {
+          on_stop_callback = std::move(other.on_stop_callback);
+        } else {
+          on_stop_callback = nullptr;
+        }
+        on_stop_callback = std::move(other.on_stop_callback);
+      }
+      return *this;
+    }
+    RetconTask(const RetconTask& other) = delete; // Disable copy constructor
+
     /**
      * Run the RetCon task.
      * @return 0 on success, non-zero on failure.
