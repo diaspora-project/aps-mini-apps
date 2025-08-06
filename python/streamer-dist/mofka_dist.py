@@ -73,7 +73,7 @@ class MofkaDist:
         # setup mofka
         self.driver = mofka.MofkaDriver(group_file, use_progress_thread=True)
         self.seq = 0
-        self.nranks = 1
+        self.ntasks = 1
         self.buffer = []
         self.counter = 0
         self.batch = batchsize
@@ -101,33 +101,33 @@ class MofkaDist:
         return consumer
 
 
-    def handshake(self, nproc_sirt: int,  row: int, col: int) -> str :
+    def handshake(self, ntask_sirt: int,  row: int, col: int) -> str :
         # Figure out how many ranks are there at the remote location
-        if nproc_sirt == 0:
-            print("Getting number of ranks from SIRT")
-            topic_name = "handshake_s_d"
-            topic = self.driver.open_topic(topic_name)
-            consumer = topic.consumer(name="handshaker",
-                                    thread_pool=mofka.ThreadPool(0),
-                                    batch_size=self.batch)
-            f = consumer.pull()
-            event = f.wait()
-            self.nranks = json.loads(event.metadata)["comm_size"]
-            self.seq += 1
-            del event
-            del consumer
-            del topic
-        elif nproc_sirt< 0:
+        print("Getting number of workers from SIRT")
+        topic_name = "handshake_s_d"
+        topic = self.driver.open_topic(topic_name)
+        consumer = topic.consumer(name="handshaker",
+                                thread_pool=mofka.ThreadPool(0),
+                                batch_size=self.batch)
+        f = consumer.pull()
+        event = f.wait()
+        self.nworkers = json.loads(event.metadata)["num_workers"]
+        self.seq += 1
+        del event
+        del consumer
+        del topic
+        # Check if the number of tasks is valid
+        if ntask_sirt< 0:
             raise ValueError('Number of reconstruction processes cannot be negative')
         else:
-            self.nranks = nproc_sirt
-        print("Exchange metadata with SIRT: num sirt = ", self.nranks)
+            self.ntasks = ntask_sirt
+        print("Exchange metadata with SIRT: num sirt = ", self.ntasks, "num tasks = ", self.ntasks)
         topic_name = "handshake_d_s"
         producer = self.producer(topic_name, "handshaker")
         # distribute data info
-        for p in range(self.nranks):
-            info = assign_data(p, self.nranks, row, col)
-            print("Exchange metadata with sirt #", p)
+        for p in range(self.ntasks):
+            info = assign_data(p, self.ntasks, row, col)
+            print("Exchange metadata with task #", p)
             f = producer.push(info)
         print("Flushing metadata to SIRT")
         producer.flush()
@@ -160,14 +160,14 @@ class MofkaDist:
                                     dims,
                                     projection_id,
                                     theta,
-                                    self.nranks,
+                                    self.ntasks,
                                     center,
                                     sequence_id)
                                     # self.seq)
         self.buffer.append(msgs)
         mofka_t = []
         # Send data to workers
-        for i in range(self.nranks):
+        for i in range(self.ntasks):
             ts = time.perf_counter()
             f = producer.push(self.buffer[self.counter][i][0], self.buffer[self.counter][i][1])
             #f.wait()
@@ -178,7 +178,7 @@ class MofkaDist:
         if self.counter == self.batch:
             ts = time.perf_counter()
             producer.flush()
-            mofka_t.append(["flush_after", projection_id, ts, time.perf_counter(), time.perf_counter() - ts, self.nranks*len(self.buffer)* sys.getsizeof(self.buffer[self.counter-1][0][0]), self.nranks*len(self.buffer)*len(self.buffer[self.counter-1][0][1])])
+            mofka_t.append(["flush_after", projection_id, ts, time.perf_counter(), time.perf_counter() - ts, self.ntasks*len(self.buffer)* sys.getsizeof(self.buffer[self.counter-1][0][0]), self.ntasks*len(self.buffer)*len(self.buffer[self.counter-1][0][1])])
             self.buffer = []
             self.counter = 0
 
@@ -189,13 +189,13 @@ class MofkaDist:
             ts = time.perf_counter()
             producer.flush()
             self.seq += 1
-            return ["last_flush","" , ts, time.perf_counter(), time.perf_counter() - ts, self.nranks*len(self.buffer)* sys.getsizeof(self.buffer[self.counter-1][0][0]), self.nranks*len(self.buffer)*len(self.buffer[self.counter-1][0][1])]
+            return ["last_flush","" , ts, time.perf_counter(), time.perf_counter() - ts, self.ntasks*len(self.buffer)* sys.getsizeof(self.buffer[self.counter-1][0][0]), self.ntasks*len(self.buffer)*len(self.buffer[self.counter-1][0][1])]
         return None
 
     def done_image(self, producer) -> int:
         msg_metadata = {"Type": "FIN" }
         # Send Fin message to workers
-        for _ in range(self.nranks):
+        for _ in range(self.ntasks):
             producer.push(msg_metadata, bytearray(1))
         producer.flush()
         self.seq += 1

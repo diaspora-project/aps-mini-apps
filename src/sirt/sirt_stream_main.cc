@@ -1,18 +1,9 @@
 #include <iomanip>
-#include "mpi.h"
-#include "trace_h5io.h"
-#include "data_region_base.h"
-#include "tclap/CmdLine.h"
-#include "disp_comm_mpi.h"
-#include "disp_engine_reduction.h"
-#include "sirt.h" // Include SIRTReconSpace
 #include <cassert>
 #include <time.h>
 #include <string>
 #include <fstream>
 #include <iostream>
-#include "resilient/mofka_resilient_consumer.h"
-#include "resilient/mofka_resilient_producer.h"
 #include "trace_data.h"
 #include <vector>
 #include <unistd.h>
@@ -40,7 +31,7 @@ int main(int argc, char **argv) {
                                 config.num_tasks,
                                 0}; // Add the missing progress argument
 
-    ms.handshake(config.task_index, config.num_tasks);
+    ms.handshake(config.worker_index, config.num_workers);
 
     std::cout << "Handshake completed" << std::endl;
 

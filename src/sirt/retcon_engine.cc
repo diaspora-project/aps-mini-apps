@@ -41,17 +41,15 @@ namespace resilient {
 
   int RetConTask::run() {
 
-    /* Initiate middleware's communication layer */
-    MofkaStream ms = MofkaStream{ config.group_file,
-                                  config.batchsize,
-                                  static_cast<uint32_t>(config.window_len),
-                                  task_id,
-                                  num_tasks,
-                                  0}; // Add the missing progress argument
+    MofkaStream ms = MofkaStream{config.group_file,
+      config.batchsize,
+      static_cast<uint32_t>(config.window_len),
+      config.task_index,
+      config.num_tasks,
+      0
+    }; // Add the missing progress argument
 
-    ms.handshake(task_id, num_tasks);
-
-    std::cout << "Handshake completed" << std::endl;
+    ms.collect_metadata(task_id);
 
     // Prepare consumer and producer
     std::string consuming_topic = "dist_sirt";

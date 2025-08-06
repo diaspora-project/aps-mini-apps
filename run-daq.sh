@@ -63,6 +63,12 @@ mofkactl partition add handshake_s_d \
 	--metadata "${METADATA_PROVIDER}" \
 	--data "${DATA_PROVIDER}"
 
+# Action channel for flow control and load balancing
+mofka topic create dist_sirt_action \
+	--groupfile mofka.json
+mofka topic create sirt_dist_action \
+	--groupfile mofka.json
+
 for i in $(seq 1 $sirt_ranks)
 do
 	mofkactl partition add dist_sirt \
@@ -73,6 +79,13 @@ do
 		--data "${DATA_PROVIDER}"
 
 	mofkactl partition add handshake_d_s \
+		--type memory \
+		--rank 0 \
+		--groupfile mofka.json \
+		--metadata "${METADATA_PROVIDER}" \
+		--data "${DATA_PROVIDER}"
+
+	mofkactl partition add sirt_dist_action \
 		--type memory \
 		--rank 0 \
 		--groupfile mofka.json \

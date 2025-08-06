@@ -33,7 +33,6 @@ class TraceRuntimeConfig {
       std::string worker_id;
       int worker_index;
       int num_workers;
-      int num_tasks;
       int num_passes;
       int ckpt_freq = 1;
       std::string ckpt_config;
@@ -48,8 +47,6 @@ class TraceRuntimeConfig {
             "", "worker-id", "The Worker Id", false, "0", "string");
           TCLAP::ValueArg<int> argNumWorkers(
             "", "num-workers", "Number of Reconstruction Workers", false, 1, "int");
-          TCLAP::ValueArg<int> argNumTasks(
-            "", "num-tasks", "Number of Reconstruction Tasks", false, 1, "int");
           TCLAP::ValueArg<std::string> argMofkaProtocol(
             "", "protocol", "Mofka protocol", false, "na+sm", "string");
           TCLAP::ValueArg<std::string> argGroupFile(
@@ -99,7 +96,6 @@ class TraceRuntimeConfig {
   
           cmd.add(argWorkerId);
           cmd.add(argNumWorkers);
-          cmd.add(argNumTasks);
   
           cmd.add(argMofkaProtocol);
           cmd.add(argGroupFile);
@@ -129,7 +125,6 @@ class TraceRuntimeConfig {
           worker_id = argWorkerId.getValue();
           std::from_chars(worker_id.data(), worker_id.data() + worker_id.size(), worker_index);
           num_workers = argNumWorkers.getValue();
-          num_tasks = argNumTasks.getValue();
           kReconOutputPath = argReconOutputPath.getValue();
           kReconOutputDir = argReconOutputDir.getValue();
           kReconDatasetPath = argReconDatasetPath.getValue();

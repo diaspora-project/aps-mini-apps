@@ -12,7 +12,9 @@ def parse_arguments():
     parser = argparse.ArgumentParser(
             description='SIRT Iterative Image Reconstruction')
     
-    parser.add_argument('--num-workers', type=int, default=1, help="Number of reconstruction tasks")
+    parser.add_argument('--num-workers', type=int, default=1, help="Number of reconstruction workers")
+    
+    parser.add_argument('--num-tasks', type=int, default=1, help="Number of reconstruction tasks")
     
     parser.add_argument('--protocol', default="na+sm", help='Mofka protocol')
 
@@ -90,13 +92,15 @@ args = [
 
 def main():
     params = parse_arguments()
-    num_tasks = int(params.np)
+    num_tasks = int(params.num_tasks)
+    num_workers = int(params.num_workers)
     args = []
     excluded_args = {}
     for arg, value in vars(params).items():
         if arg not in excluded_args:
             args.append("--" + arg.replace("_", "-"))
             args.append(str(value))
+    print("Number of workers", num_workers)
     print("Number of tasks", num_tasks)
     print("Input arguments", args)
     
