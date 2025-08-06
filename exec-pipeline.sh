@@ -37,15 +37,20 @@ echo "Logging execution information at ${logdir}"
 echo "Start Mofka server ---------------------------------------------------"
 bash run-mofka.sh > ${logdir}/mofka.out 2> ${logdir}/mofka.err &
 sleep 10
+
 echo "Start DAQ ------------------------------------------------------------"
 bash run-daq.sh ${sirt_ranks} ${num_sinograms} ${logdir} > ${logdir}/daq.out 2> ${logdir}/daq.err &
 sleep 10
+
 echo "Start DIST -----------------------------------------------------------"
 bash run-dist.sh ${num_sinograms} ${logdir} > ${logdir}/dist.out 2> ${logdir}/dist.err &
+
 echo "Start SIRT -----------------------------------------------------------"
 bash run-sirt.sh ${sirt_ranks} ${logdir} > ${logdir}/sirt.out 2> ${logdir}/sirt.err &
+
 echo "Start Exp Control ----------------------------------------------------"
 bash run-exp-control.sh ${mtbf} ${logdir} 2> ${logdir}/exp-control.err | tee ${logdir}/exp-control.out &
+
 echo "Start DEN ------------------------------------------------------------"
 bash run-den.sh ${sirt_ranks} ${logdir} 2> ${logdir}/den.err | tee ${logdir}/den.out
 

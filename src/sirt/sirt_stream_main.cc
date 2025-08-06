@@ -35,6 +35,12 @@ BOOST_CLASS_EXPORT(AReductionSpaceBaseSIRT)
 BOOST_CLASS_EXPORT(DISPEngineBaseSIRT)
 BOOST_CLASS_EXPORT(DISPEngineReductionSIRT)
 
+volatile std::sig_atomic_t sigterm_captured = 0;
+void handle_sigterm(int signum) {
+    std::cerr << "Received SIGTERM, stoping reconstruction..." << std::endl;
+    sigterm_captured = signum;
+}
+
 class TraceRuntimeConfig {
   public:
     std::string kReconOutputPath;
@@ -192,12 +198,6 @@ class TraceRuntimeConfig {
       }
     }
 };
-
-volatile std::sig_atomic_t sigterm_captured = 0;
-void handle_sigterm(int signum) {
-    std::cerr << "Received SIGTERM, stoping reconstruction..." << std::endl;
-    sigterm_captured = signum;
-}
 
 int main(int argc, char **argv)
 {
