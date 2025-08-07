@@ -43,7 +43,10 @@ int ReconTask::run() {
     0
   }; // Add the missing progress argument
 
+  std::cout << "[Task-" << task_id << "] Handshaking with DIST..." << std::endl;
   ms.handshake(task_id);
+
+  std::cout << "[Task-" << task_id << "] Handshake completed. Setting up consumer and producer" << std::endl;
 
   // Prepare consumer and producer
   std::string consuming_topic = "dist_sirt";
@@ -56,6 +59,8 @@ int ReconTask::run() {
   json tmetadata = ms.getInfo();
   auto n_blocks = tmetadata["n_sinograms"].get<int64_t>();
   auto num_cols = tmetadata["n_rays_per_proj_row"].get<int64_t>();
+
+  std::cout << "[Task-" << task_id << "] Start reconstruction" << std::endl;
 
   /**********************/
 

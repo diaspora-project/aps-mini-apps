@@ -81,13 +81,13 @@ def main():
   print("Handshake with SIRT ...")
   mofka_dist.handshake(args.ntask_sirt, args.num_sinograms, args.num_columns)
 
-  print("Setting consumer and producer ...")
+  print("Setting up consumer and producer ...")
 
   consumer = mofka_dist.consumer(topic_name="daq_dist", consumer_name="dist")
   producer = mofka_dist.producer(topic_name="dist_sirt", producer_name="producer_dist")
 
-  action_consumer = mofka_dist.consumer(topic_name="dist_sirt_action", consumer_name="dist")
-  action_producer = mofka_dist.producer(topic_name="sirt_dist_action", producer_name="sirt")
+  action_consumer = mofka_dist.consumer(topic_name="sirt_dist_action", consumer_name="dist")
+  action_producer = mofka_dist.producer(topic_name="dist_sirt_action", producer_name="dist")
 
   # Statically assign tasks to workers
   num_tasks = args.ntask_sirt
@@ -102,9 +102,10 @@ def main():
       assign_info = {
           "Type": "START_TASK",
           "worker_id": w,
-          "tasks": task_to_worker[w][t]
+          "task_id": task_to_worker[w][t]
       }
       action_producer.push(assign_info)
+  action_producer.flush()
 
 
   mofka_producing_time = []

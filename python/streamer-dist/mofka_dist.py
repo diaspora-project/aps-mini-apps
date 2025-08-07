@@ -117,11 +117,11 @@ class MofkaDist:
         del consumer
         del topic
         # Check if the number of tasks is valid
-        if ntask_sirt< 0:
-            raise ValueError('Number of reconstruction processes cannot be negative')
+        if ntask_sirt <= 0:
+            raise ValueError('Number of reconstruction processes must be possitive')
         else:
             self.ntasks = ntask_sirt
-        print("Exchange metadata with SIRT: num sirt = ", self.ntasks, "num tasks = ", self.ntasks)
+        print("Exchange metadata with SIRT: num sirt = ", self.nworkers, "num tasks = ", self.ntasks)
         topic_name = "handshake_d_s"
         producer = self.producer(topic_name, "handshaker")
         # distribute data info

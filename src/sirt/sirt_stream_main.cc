@@ -26,7 +26,7 @@ int main(int argc, char **argv) {
     TraceRuntimeConfig config(argc, argv);
     
     // Send worker information to dist
-    std::cout << "Handshaking: sending worker information to dist..." << std::endl;
+    std::cout << "[Worker-" << config.worker_id << "] Handshaking: sending worker information to dist..." << std::endl;
     std::string topic_name = "handshake_s_d";
     mofka::MofkaDriver driver(config.group_file, true);
     mofka::TopicHandle hs_topic = driver.openTopic(topic_name);
@@ -43,19 +43,35 @@ int main(int argc, char **argv) {
     auto future = hs_producer.push(metadata);
     future.wait();
 
-    std::cout << "Handshake completed" << std::endl;
+    std::cout << "[Worker-" << config.worker_id << "] Handshaking completed" << std::endl;
 
     // Prepare action channel between consumer and producer
     mofka::TopicHandle consuming_topic = driver.openTopic("dist_sirt_action");
     mofka::TopicHandle producing_topic = driver.openTopic("sirt_dist_action");
     mofka::Producer producer = producing_topic.producer("sirt", 1, 1, mofka::Ordering::Strict);
     // std::vector<size_t> targets = {static_cast<size_t>(config.worker_index)};
-    // mofka::Consumer consumer = consuming_topic.consumer("sirt", 1, 1, targets);
-    mofka::Consumer consumer = consuming_topic.consumer("sirt", 1, 1);
+    std::vector<size_t> targets = {static_cast<size_t>(0)};
+    mofka::Consumer consumer = consuming_topic.consumer("sirt", 1, 1, targets);
+    // mofka::Consumer consumer = consuming_topic.consumer(
+    //     "sirt",
+    //     1, // thread count
+    //     1, // batch size
+    //     [](const mofka::Metadata& metadata, const mofka::DataDescriptor& descriptor) {
+    //         (void)metadata;
+    //         return descriptor;
+    //     },
+    //     [](const mofka::Metadata& metadata, const mofka::DataDescriptor& descriptor) {
+    //         (void)metadata;
+    //         return mofka::Data{new float[descriptor.size()], descriptor.size()};
+    //     },
+    //     targets
+    // );
 
     std::unordered_map<int, ReconTask> running_tasks;
     std::unordered_map<int, std::thread> running_threads;
     std::vector<std::thread> stopped_threads;
+
+    std::cout << "[Worker-" << config.worker_id << "] Listening for exchange information from DIST..." << std::endl;
 
     bool running = true;
     while (true) {

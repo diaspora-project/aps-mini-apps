@@ -14,8 +14,6 @@ def parse_arguments():
     
     parser.add_argument('--num-workers', type=int, default=1, help="Number of reconstruction workers")
     
-    parser.add_argument('--num-tasks', type=int, default=1, help="Number of reconstruction tasks")
-    
     parser.add_argument('--protocol', default="na+sm", help='Mofka protocol')
 
     parser.add_argument('--group-file', type=str, default="mofka.json",
@@ -92,7 +90,6 @@ args = [
 
 def main():
     params = parse_arguments()
-    num_tasks = int(params.num_tasks)
     num_workers = int(params.num_workers)
     args = []
     excluded_args = {}
@@ -101,11 +98,10 @@ def main():
             args.append("--" + arg.replace("_", "-"))
             args.append(str(value))
     print("Number of workers", num_workers)
-    print("Number of tasks", num_tasks)
     print("Input arguments", args)
     
     # Execute the C++ program using the bash app
-    sirt_futures = [run_sirt(id=str(i), logdir=params.logdir, args=args) for i in range(num_tasks)]
+    sirt_futures = [run_sirt(id=str(i), logdir=params.logdir, args=args) for i in range(num_workers)]
 
     # Wait for the results and print the output
     for sirt_future in sirt_futures:
