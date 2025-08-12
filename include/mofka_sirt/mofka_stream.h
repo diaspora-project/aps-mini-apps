@@ -15,7 +15,6 @@
 #include <utility>
 #include <nlohmann/json.hpp>
 #include "trace_data.h"
-#include <mofka_stream.h>
 
 using json = nlohmann::json;
 namespace tl = thallium;
@@ -102,7 +101,7 @@ class MofkaStream
 
   public:
 
-    MofkaStream(std::string group_file,
+    MofkaStream(mofka::MofkaDriver driver,
                 size_t batchsize,
                 uint32_t window_len,
                 int rank,

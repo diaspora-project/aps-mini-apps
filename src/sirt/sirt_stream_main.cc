@@ -106,7 +106,7 @@ int main(int argc, char **argv) {
               running_tasks.emplace(
                 std::piecewise_construct,
                 std::forward_as_tuple(task_id),
-                std::forward_as_tuple(task_id, argc, argv)
+                std::forward_as_tuple(task_id, driver, argc, argv)
               );
               running_threads.emplace(
                 std::piecewise_construct,

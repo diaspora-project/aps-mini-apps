@@ -17,6 +17,7 @@
 #include <charconv>
 #include <csignal>
 
+
 #include <veloc.hpp>
 #include <veloc/boost.hpp>
 #include <boost/serialization/export.hpp>
@@ -34,9 +35,23 @@ BOOST_CLASS_EXPORT(AReductionSpaceBaseSIRT)
 BOOST_CLASS_EXPORT(DISPEngineBaseSIRT)
 BOOST_CLASS_EXPORT(DISPEngineReductionSIRT)
 
+int saveAsHDF5(const char* fname, float* recon, hsize_t* output_dims) {
+  hid_t output_file_id = H5Fcreate(fname, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+  if (output_file_id < 0) {
+      return 1;
+  }
+  hid_t output_dataspace_id = H5Screate_simple(3, output_dims, NULL);
+  hid_t output_dataset_id = H5Dcreate(output_file_id, "/data", H5T_NATIVE_FLOAT, output_dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+  H5Dwrite(output_dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, recon);
+  H5Dclose(output_dataset_id);
+  H5Sclose(output_dataspace_id);
+  H5Fclose(output_file_id);
+  return 0;
+}
+
 int ReconTask::run() {
 
-  MofkaStream ms = MofkaStream{config.group_file,
+  MofkaStream ms = MofkaStream{driver,
     config.batchsize,
     static_cast<uint32_t>(config.window_len),
     task_id,
@@ -60,7 +75,7 @@ int ReconTask::run() {
   auto n_blocks = tmetadata["n_sinograms"].get<int64_t>();
   auto num_cols = tmetadata["n_rays_per_proj_row"].get<int64_t>();
 
-  std::cout << "[Task-" << task_id << "] Start reconstruction" << std::endl;
+  std::cout << "[Task-" << task_id << "] Start reconstruction: n_blocks" << n_blocks << " num_cols: " << num_cols << std::endl;
 
   /**********************/
 
@@ -238,6 +253,20 @@ int ReconTask::run() {
             {"rank_dims", rank_dims},
             {"app_dims", app_dims},
             {"recon_slice_data_index", recon_slice_data_index}};
+
+        if (passes % 4 == 0) {
+          std::stringstream iteration_stream;
+          iteration_stream << std::setfill('0') << std::setw(6) << passes;
+          std::string outputpath = config.kReconOutputDir + "/" + 
+            iteration_stream.str() + "-recon.h5";
+
+          // trace_io::WriteRecon(
+          //     curr_slices->metadata(), h5md, 
+          //     outputpath, config.kReconDatasetPath);
+          saveAsHDF5(outputpath.c_str(), 
+              &recon[recon_slice_data_index], app_dims);
+          
+        }
 
         ms.publishImage(md, &recon[recon_slice_data_index], data_size, producer);
 

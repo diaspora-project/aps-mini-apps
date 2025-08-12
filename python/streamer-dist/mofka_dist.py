@@ -164,6 +164,7 @@ class MofkaDist:
                                     center,
                                     sequence_id)
                                     # self.seq)
+        print("Pushing images")
         self.buffer.append(msgs)
         mofka_t = []
         # Send data to workers
@@ -173,14 +174,18 @@ class MofkaDist:
             #f.wait()
             mofka_t.append(["push", projection_id, ts, time.perf_counter(), time.perf_counter() - ts, sys.getsizeof(self.buffer[self.counter][i][0]) ,len(self.buffer[self.counter][i][1])])
 
-        # self.seq += 1
-        self.counter += 1
-        if self.counter == self.batch:
-            ts = time.perf_counter()
-            producer.flush()
-            mofka_t.append(["flush_after", projection_id, ts, time.perf_counter(), time.perf_counter() - ts, self.ntasks*len(self.buffer)* sys.getsizeof(self.buffer[self.counter-1][0][0]), self.ntasks*len(self.buffer)*len(self.buffer[self.counter-1][0][1])])
-            self.buffer = []
-            self.counter = 0
+        print("Flusing images")
+
+        # # self.seq += 1
+        # self.counter += 1
+        # if self.counter == self.batch:
+        #     ts = time.perf_counter()
+        #     producer.flush()
+        #     mofka_t.append(["flush_after", projection_id, ts, time.perf_counter(), time.perf_counter() - ts, self.ntasks*len(self.buffer)* sys.getsizeof(self.buffer[self.counter-1][0][0]), self.ntasks*len(self.buffer)*len(self.buffer[self.counter-1][0][1])])
+        #     self.buffer = []
+        #     self.counter = 0
+        
+        # print("Finish flushing")
 
         return mofka_t
 

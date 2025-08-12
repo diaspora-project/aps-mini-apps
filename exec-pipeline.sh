@@ -38,23 +38,29 @@ echo "Logging execution information at ${logdir}"
 
 echo "Start Mofka server ---------------------------------------------------"
 bash run-mofka.sh > ${logdir}/mofka.out 2> ${logdir}/mofka.err &
+echo bash run-mofka.sh
 sleep 10
 
 echo "Start DAQ ------------------------------------------------------------"
 bash run-daq.sh ${sirt_ranks} ${sirt_tasks} ${num_sinograms} ${logdir} > ${logdir}/daq.out 2> ${logdir}/daq.err &
+echo bash run-daq.sh ${sirt_ranks} ${sirt_tasks} ${num_sinograms} ${logdir}
 sleep 10
 
 echo "Start DIST -----------------------------------------------------------"
 bash run-dist.sh ${num_sinograms} ${sirt_tasks} ${logdir} > ${logdir}/dist.out 2> ${logdir}/dist.err &
+echo bash run-dist.sh ${num_sinograms} ${sirt_tasks} ${logdir}
 
 echo "Start SIRT -----------------------------------------------------------"
 bash run-sirt.sh ${sirt_ranks} ${logdir} > ${logdir}/sirt.out 2> ${logdir}/sirt.err &
+echo bash run-sirt.sh ${sirt_ranks} ${logdir}
 
 # echo "Start Exp Control ----------------------------------------------------"
-# bash run-exp-control.sh ${mtbf} ${logdir} 2> ${logdir}/exp-control.err | tee ${logdir}/exp-control.out &
+bash run-exp-control.sh ${mtbf} ${logdir} 2> ${logdir}/exp-control.err | tee ${logdir}/exp-control.out &
 
 echo "Start DEN ------------------------------------------------------------"
+echo bash run-den.sh ${sirt_ranks} ${logdir}
 bash run-den.sh ${sirt_ranks} ${logdir} 2> ${logdir}/den.err | tee ${logdir}/den.out
+
 
 echo "Clean up after run ---------------------------------------------------"
 pkill -9 -f "FailureInjector" || true

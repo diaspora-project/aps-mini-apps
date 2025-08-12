@@ -45,15 +45,16 @@ find_package(Threads REQUIRED)
 #find_package(ZeroMQ)
 find_package(HDF5)
 
+if(NOT HDF5_FOUND OR NOT HDF5_IS_PARALLEL)
+    message(FATAL_ERROR "HDF5 library not compiled with parallel support.")
+endif()
+
+
 # Find VeloC library
 find_package(veloc REQUIRED)
 
 # Manually specify the path to the veloc-client library
 find_library(VELOC_CLIENT_LIB veloc-client REQUIRED)
-
-if(NOT HDF5_FOUND OR NOT HDF5_IS_PARALLEL)
-    message(FATAL_ERROR "HDF5 library not compiled with parallel support.")
-endif()
 
 # find mofka
 find_package (mofka REQUIRED)
@@ -74,6 +75,7 @@ include_directories(${Trace_SOURCE_DIR}/include/sirt)
 
 add_library(trace_utils ${Trace_SOURCE_DIR}/src/tracelib/trace_utils.cc)
 add_library(trace_h5io ${Trace_SOURCE_DIR}/src/tracelib/trace_h5io.cc)
+target_link_libraries(trace_h5io PUBLIC hdf5::hdf5 MPI::MPI_C)
 
 add_library(mofka_stream ${Trace_SOURCE_DIR}/src/mofka_sirt/mofka_stream.cc)
 target_link_libraries(mofka_stream PRIVATE mofka::client)
@@ -92,7 +94,6 @@ target_link_libraries(sirt_stream
     ${VELOC_CLIENT_LIB}  # Manually link the VeloC client library
     Boost::serialization
     MPI::MPI_CXX
-    hdf5::hdf5
     Threads::Threads
     hdf5::hdf5
     mofka::client

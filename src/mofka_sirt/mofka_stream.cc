@@ -93,7 +93,7 @@ DataRegionBase<float, TraceMetadata>* MofkaStream::setupTraceDataRegion(
   return curr_data;
 }
 
-MofkaStream::MofkaStream(std::string group_file,
+MofkaStream::MofkaStream(mofka::MofkaDriver driver,
             size_t batchsize,
             uint32_t window_len,
             int rank,
@@ -105,7 +105,7 @@ MofkaStream::MofkaStream(std::string group_file,
   comm_rank {rank},
   // comm_size {size},
   progress {progress},
-  driver {group_file, true}
+  driver {driver}
   {}
 
 

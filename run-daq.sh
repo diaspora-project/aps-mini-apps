@@ -79,11 +79,18 @@ do
 		--groupfile mofka.json \
 		--metadata "${METADATA_PROVIDER}" \
 		--data "${DATA_PROVIDER}"
+	
+	mofkactl partition add handshake_d_s \
+		--type memory \
+		--rank 0 \
+		--groupfile mofka.json \
+		--metadata "${METADATA_PROVIDER}" \
+		--data "${DATA_PROVIDER}"
 done
 
 for i in $(seq 1 $sirt_ranks)
 do
-	mofkactl partition add handshake_d_s \
+	mofkactl partition add handshake_s_d \
 		--type memory \
 		--rank 0 \
 		--groupfile mofka.json \
