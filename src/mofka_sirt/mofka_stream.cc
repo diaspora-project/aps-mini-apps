@@ -243,7 +243,10 @@ DataRegionBase<float, TraceMetadata>* MofkaStream::readSlidingWindow(
     }
     
     int sequence_id = event.metadata().json()["seq_n"].get<int>();
-    std::cout << "[Task-" << getRank() << "]: seq_id: " << sequence_id << ", progress = " << progress << std::endl;
+    int proj_id = event.metadata().json()["projection_id"].get<int>();
+    double theta = event.metadata().json()["theta"].get<float>();
+    double center = event.metadata().json()["center"].get<float>();
+    std::cout << "[Task-" << getRank() << "]: seq_id: " << sequence_id << " projection_id: " << proj_id << " theta: " << theta << " center: " << center << ", progress = " << progress << std::endl;
 
     // // Only add the event if its sequence_id higher than the progress
     // int sequence_id = event.metadata().json()["seq_n"].get<int>();

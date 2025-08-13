@@ -446,7 +446,7 @@ def main():
       tdet.start_monitor()  # Infinite loop
 
   elif args.mode == 1: # Simulate data acquisition with a file
-    print("Simulating data acquisition on file: {}; iteration: {}".format(args.simulation_file, args.d_iteration))
+    print("Simulating data acquisition on file: {}; iteration: {} num_sinograms: {}".format(args.simulation_file, args.d_iteration, args.num_sinograms))
     time.sleep(10)
     simulate_daq( producer=producer,
                   batchsize=args.batchsize,

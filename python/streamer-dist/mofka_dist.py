@@ -25,6 +25,9 @@ def generate_worker_msgs(data: np.ndarray, dims: list, projection_id: int, theta
         msgs.append(msg)
         curr_sinogram_id += (nsin + r)
 
+        # metadata = msg[0]
+        # print(f"Rank {i}: seq_id {metadata['seq_n']} proj_id {metadata['projection_id']}, theta: {metadata['theta']} center: {metadata['center']}")
+
     return msgs
 
 def prepare_data_rep_msg(seq: int, projection_id: int, theta: float,
@@ -171,19 +174,23 @@ class MofkaDist:
         for i in range(self.ntasks):
             ts = time.perf_counter()
             f = producer.push(self.buffer[self.counter][i][0], self.buffer[self.counter][i][1])
+            
+            metadata = self.buffer[self.counter][i][0]
+            print(f"Task {i}: seq_id {metadata['seq_n']} proj_id {metadata['projection_id']}, theta: {metadata['theta']} center: {metadata['center']}")
+
             #f.wait()
             mofka_t.append(["push", projection_id, ts, time.perf_counter(), time.perf_counter() - ts, sys.getsizeof(self.buffer[self.counter][i][0]) ,len(self.buffer[self.counter][i][1])])
 
         print("Flusing images")
 
-        # # self.seq += 1
-        # self.counter += 1
-        # if self.counter == self.batch:
-        #     ts = time.perf_counter()
-        #     producer.flush()
-        #     mofka_t.append(["flush_after", projection_id, ts, time.perf_counter(), time.perf_counter() - ts, self.ntasks*len(self.buffer)* sys.getsizeof(self.buffer[self.counter-1][0][0]), self.ntasks*len(self.buffer)*len(self.buffer[self.counter-1][0][1])])
-        #     self.buffer = []
-        #     self.counter = 0
+        # self.seq += 1
+        self.counter += 1
+        if self.counter == self.batch:
+            ts = time.perf_counter()
+            producer.flush()
+            mofka_t.append(["flush_after", projection_id, ts, time.perf_counter(), time.perf_counter() - ts, self.ntasks*len(self.buffer)* sys.getsizeof(self.buffer[self.counter-1][0][0]), self.ntasks*len(self.buffer)*len(self.buffer[self.counter-1][0][1])])
+            self.buffer = []
+            self.counter = 0
         
         # print("Finish flushing")
 
