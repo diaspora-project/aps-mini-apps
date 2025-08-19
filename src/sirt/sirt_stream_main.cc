@@ -73,8 +73,10 @@ int main(int argc, char **argv) {
 
     std::cout << "[Worker-" << config.worker_id << "] Listening for exchange information from DIST..." << std::endl;
 
+    std::mutex ckpt_mutex;
+
     bool running = true;
-    while (true) {
+    while (running) {
         // listen for action messages and initialize/terminate assigned reconstruction tasks.
         auto event = consumer.pull().wait();
         auto json_metadata = event.metadata().json();
@@ -106,15 +108,15 @@ int main(int argc, char **argv) {
               running_tasks.emplace(
                 std::piecewise_construct,
                 std::forward_as_tuple(task_id),
-                std::forward_as_tuple(task_id, driver, argc, argv)
+                std::forward_as_tuple(task_id, driver, &ckpt_mutex, argc, argv)
               );
               running_threads.emplace(
                 std::piecewise_construct,
                 std::forward_as_tuple(task_id),
                 std::forward_as_tuple([&, task_id] {
                     running_tasks.at(task_id).run();
-              })
-      );
+                })
+            );
           }
         }else if (event_type == "SHUTDOWN") {
             std::cout << "[Worker-" << config.worker_id << "] End of stream. Exiting..." << std::endl;
@@ -125,16 +127,25 @@ int main(int argc, char **argv) {
         }
     }
 
-    // Stop running tasks
-    for (auto& [task_id, task] : running_tasks) {
-        task.stop();
-    }
+    // std::cout << "[Worker-" << config.worker_id << "] Waiting for running tasks..." << std::endl; 
+
+    // // Stop running tasks
+    // for (auto& [task_id, task] : running_tasks) {
+    //     task.stop();
+    // }
+
+    std::cout << "[Worker-" << config.worker_id << "] Waiting for running threads to finish..." << std::endl;
+
     for (auto& [task_id, thread] : running_threads) {
         thread.join();
+        std::cout << "[Worker-" << config.worker_id << "] Task " << task_id << " stopped." << std::endl;
     }
     for (auto& thread : stopped_threads) {
         if (thread.joinable()) {
             thread.join();
         }
     }
+
+    std::cout << "[Worker-" << config.worker_id << "] All tasks stopped. Exiting..." << std::endl;
+
 }

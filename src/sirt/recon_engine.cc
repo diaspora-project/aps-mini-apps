@@ -117,23 +117,29 @@ int ReconTask::run() {
   main_recon_space->Initialize(num_cols*num_cols);
 
   // Configure the VeloC checkpointing
-  veloc::client_t *ckpt_client = veloc::get_client((unsigned int)task_id, config.ckpt_config);
+  unsigned int ckpt_id = 0;
+  ckpt_mutex->lock();
+  // veloc::client_t *ckpt_client = veloc::get_client((unsigned int)task_id, config.ckpt_config);
+  veloc::client_t *ckpt_client = veloc::get_client(ckpt_id, config.ckpt_config);
+  std::string ckpt_name = config.ckpt_name + "_" + std::to_string(task_id);
   // Protect reconstruction memory regions
   int progress = 0; // Reconstruction progress marked by the projection requence ids
-  ckpt_client->mem_protect(0, veloc::boost::serializer(recon_image), veloc::boost::deserializer(recon_image));
-  ckpt_client->mem_protect(1, &progress, 1, sizeof(int));
+  ckpt_client->mem_protect(0, veloc::boost::serializer(recon_image), veloc::boost::deserializer(recon_image), ckpt_name);
+  ckpt_client->mem_protect(1, &progress, 1, sizeof(int), ckpt_name);
 
-  int passes = ckpt_client->restart_test(config.ckpt_name, 0, task_id);
+  // int passes = ckpt_client->restart_test(config.ckpt_name, 0, task_id);
+  int passes = ckpt_client->restart_test(ckpt_name, 0, ckpt_id);
   // Checkpoint restart if any
   if(passes>0){
-    std::cout << "Checkpoint found at " << passes << ". Restarting from checkpoint" << std::endl;
+    std::cout << "[Task-" << task_id << "] Checkpoint found at " << passes << ". Restarting from checkpoint" << std::endl;
     ckpt_client->restart(config.ckpt_name, passes);
     ms.updateProgress(progress);
-    std::cout << "Restarted from checkpoint at iteration " << passes << ", progress = " << progress << std::endl;
+    std::cout << "[Task-" << task_id << "] Restarted from checkpoint at iteration " << passes << ", progress = " << progress << std::endl;
   }else{
-    std::cout << "No checkpoint found. Starting from scratch" << std::endl;
+    std::cout << "[Task-" << task_id << "] No checkpoint found. Starting from scratch" << std::endl;
     passes = 0;
   }
+  ckpt_mutex->unlock();
   
   DataRegion2DBareBase<float> &main_recon_replica = main_recon_space->reduction_objects();
   float init_val=0.;
@@ -204,15 +210,18 @@ int ReconTask::run() {
     auto ckpt_beg = std::chrono::system_clock::now();
     #endif
     if(!(passes%config.ckpt_freq) || stop_flag.load()){
+      ckpt_mutex->lock();
       ckpt_client->checkpoint_wait();
       progress = ms.getProgress();
-      std::cout << "[Task-" << task_id << "] Checkpointing at iteration " << passes << ", proogess = " << progress << std::endl;
-      if (!ckpt_client->checkpoint(config.ckpt_name, passes)) {
+      std::cout << "[Task-" << task_id << "] Checkpointing at iteration " << passes << ", progress = " << progress << std::endl;
+      // if (!ckpt_client->checkpoint(config.ckpt_name, passes)) {
+      if (!ckpt_client->checkpoint(ckpt_name, passes)) {
         std::cout << "[Task-" << task_id << "] Cannot checkpoint. passes: " << passes << std::endl;
         throw std::runtime_error("Checkpointing failured");
       }
       ms.acknowledge();
-      std::cout << "[task-" << task_id << "]: Checkpointed version " << passes << ", proogess = " << progress << std::endl;
+      std::cout << "[task-" << task_id << "]: Checkpointed version " << passes << ", progress = " << progress << std::endl;
+      ckpt_mutex->unlock();
     }
     #ifdef TIMERON
     ckpt_tot += (std::chrono::system_clock::now()-ckpt_beg);
@@ -254,19 +263,15 @@ int ReconTask::run() {
             {"app_dims", app_dims},
             {"recon_slice_data_index", recon_slice_data_index}};
 
-        if (passes % 4 == 0) {
-          std::stringstream iteration_stream;
-          iteration_stream << std::setfill('0') << std::setw(6) << passes;
-          std::string outputpath = config.kReconOutputDir + "/" + 
-            iteration_stream.str() + "-recon.h5";
-
-          // trace_io::WriteRecon(
-          //     curr_slices->metadata(), h5md, 
-          //     outputpath, config.kReconDatasetPath);
-          saveAsHDF5(outputpath.c_str(), 
-              &recon[recon_slice_data_index], app_dims);
+        // if (passes % 4 == 0) {
+        //   std::stringstream iteration_stream;
+        //   iteration_stream << std::setfill('0') << std::setw(6) << passes;
+        //   std::string outputpath = config.kReconOutputDir + "/" + 
+        //     iteration_stream.str() + "-recon.h5";
+        //   saveAsHDF5(outputpath.c_str(), 
+        //       &recon[recon_slice_data_index], app_dims);
           
-        }
+        // }
 
         ms.publishImage(md, &recon[recon_slice_data_index], data_size, producer);
 
@@ -329,14 +334,13 @@ int ReconTask::run() {
   }
   #endif
   /* Clean-up the resources */
-  std::cout << "Deleting h5md.dimm" << std::endl;
+  std::cout << "[Task-" << task_id << "] Releasing local resources" << std::endl;
   delete [] h5md.dims;
-  std::cout << "Deleting main_recon_space" << std::endl;
   delete main_recon_space;
   //delete curr_slices;
   // std::cout << "Deleting comm" << std::endl;
   // delete comm;
-  std::cout << "Exiting" << std::endl;
+  std::cout << "[Task-" << task_id << "] Complete" << std::endl;
   return 0;
 }
 

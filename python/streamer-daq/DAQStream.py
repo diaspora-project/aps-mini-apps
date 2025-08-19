@@ -244,6 +244,11 @@ def simulate_daq(producer,
         mofka_t.append(["flush_after", index, ts, time.perf_counter(), time.perf_counter() - ts, batchsize*sys.getsizeof(md), len(buffer)*len(buffer[i-1])])
         buffer=[]
         i = 0
+      
+      # HARD STOP AT 100 PROJECTIONS, FOR TESTING PURPOSES ONLY
+      if seq == 100:
+        break
+
     time.sleep(slp)
   #Last flush if buffer was not full
   if len(buffer)>0:

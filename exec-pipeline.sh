@@ -49,6 +49,7 @@ sleep 10
 echo "Start DIST -----------------------------------------------------------"
 bash run-dist.sh ${num_sinograms} ${sirt_tasks} ${logdir} > ${logdir}/dist.out 2> ${logdir}/dist.err &
 echo bash run-dist.sh ${num_sinograms} ${sirt_tasks} ${logdir}
+sleep 10
 
 echo "Start SIRT -----------------------------------------------------------"
 bash run-sirt.sh ${sirt_ranks} ${logdir} > ${logdir}/sirt.out 2> ${logdir}/sirt.err &
@@ -58,8 +59,8 @@ echo bash run-sirt.sh ${sirt_ranks} ${logdir}
 bash run-exp-control.sh ${mtbf} ${logdir} 2> ${logdir}/exp-control.err | tee ${logdir}/exp-control.out &
 
 echo "Start DEN ------------------------------------------------------------"
-echo bash run-den.sh ${sirt_ranks} ${logdir}
-bash run-den.sh ${sirt_ranks} ${logdir} 2> ${logdir}/den.err | tee ${logdir}/den.out
+echo bash run-den.sh ${sirt_tasks} ${logdir}
+bash run-den.sh ${sirt_tasks} ${logdir} 2> ${logdir}/den.err | tee ${logdir}/den.out
 
 
 echo "Clean up after run ---------------------------------------------------"

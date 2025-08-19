@@ -156,7 +156,7 @@ class MofkaDist:
         dims = [row, col]
 
         center = (dims[1] / 2.0) if center == 0.0 else center
-        print(f"Sending proj: sequence_id={sequence_id}; id={projection_id}; center={center}; dims[0]={dims[0]}; dims[1]={dims[1]}; theta={theta}")
+        # print(f"Sending proj: sequence_id={sequence_id}; id={projection_id}; center={center}; dims[0]={dims[0]}; dims[1]={dims[1]}; theta={theta}")
 
         # Generate worker messages
         msgs = generate_worker_msgs(data,
@@ -167,7 +167,7 @@ class MofkaDist:
                                     center,
                                     sequence_id)
                                     # self.seq)
-        print("Pushing images")
+        # print("Pushing images")
         self.buffer.append(msgs)
         mofka_t = []
         # Send data to workers
@@ -181,7 +181,7 @@ class MofkaDist:
             #f.wait()
             mofka_t.append(["push", projection_id, ts, time.perf_counter(), time.perf_counter() - ts, sys.getsizeof(self.buffer[self.counter][i][0]) ,len(self.buffer[self.counter][i][1])])
 
-        print("Flusing images")
+        # print("Flusing images")
 
         # self.seq += 1
         self.counter += 1

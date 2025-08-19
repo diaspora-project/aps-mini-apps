@@ -15,13 +15,15 @@ class ReconTask {
     std::function<void()> on_stop_callback = nullptr;
     mofka::MofkaDriver driver;
 
+    std::mutex *ckpt_mutex;
+
     
   public:
-    ReconTask(int task_id, mofka::MofkaDriver driver, int argc, char **argv)
-    : config(argc, argv), task_id(task_id), driver(driver) {}
+    ReconTask(int task_id, mofka::MofkaDriver driver, std::mutex *ckpt_mutex, int argc, char **argv)
+    : config(argc, argv), task_id(task_id), driver(driver), ckpt_mutex(ckpt_mutex) {}
 
-    ReconTask(int task_id, mofka::MofkaDriver driver, const TraceRuntimeConfig &cfg)
-    : config(cfg), task_id(task_id), driver(driver) {}
+    ReconTask(int task_id, mofka::MofkaDriver driver, const TraceRuntimeConfig &cfg, std::mutex *ckpt_mutex)
+    : config(cfg), task_id(task_id), driver(driver), ckpt_mutex(ckpt_mutex) {}
 
     ReconTask() : config(0, nullptr), task_id(0) {}
     

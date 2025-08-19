@@ -261,6 +261,7 @@ def main():
         "worker_id": w
     }
     action_producer.push(action_info)
+  action_producer.flush()
   
   del action_producer
   del action_consumer
