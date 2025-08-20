@@ -75,7 +75,7 @@ int ReconTask::run() {
   auto n_blocks = tmetadata["n_sinograms"].get<int64_t>();
   auto num_cols = tmetadata["n_rays_per_proj_row"].get<int64_t>();
 
-  std::cout << "[Task-" << task_id << "] Start reconstruction: n_blocks: " << n_blocks << " num_cols: " << num_cols << std::endl;
+  std::cout << "[Task-" << task_id << "] Init reconstruction: n_blocks: " << n_blocks << " num_cols: " << num_cols << std::endl;
 
   /**********************/
 

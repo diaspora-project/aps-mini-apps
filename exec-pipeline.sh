@@ -11,6 +11,7 @@ pkill -9 -f "streamer-sirt" || true
 pkill -9 -f "sirt_stream" || true
 pkill -9 -f "streamer-den" || true
 pkill -INT -f "veloc" || true
+pkill -INT -f "veloc-backend" || true
 pkill -9 -f "FailureInjector" || true
 
 # Remove previous checkpoints
@@ -49,7 +50,7 @@ sleep 10
 echo "Start DIST -----------------------------------------------------------"
 bash run-dist.sh ${num_sinograms} ${sirt_tasks} ${logdir} > ${logdir}/dist.out 2> ${logdir}/dist.err &
 echo bash run-dist.sh ${num_sinograms} ${sirt_tasks} ${logdir}
-sleep 10
+# sleep 10
 
 echo "Start SIRT -----------------------------------------------------------"
 bash run-sirt.sh ${sirt_ranks} ${logdir} > ${logdir}/sirt.out 2> ${logdir}/sirt.err &

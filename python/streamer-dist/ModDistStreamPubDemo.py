@@ -77,15 +77,14 @@ def main():
   # Setup mofka
   print("Setup Mofka ...")
   mofka_dist = MofkaDist(group_file=args.group_file, batchsize=args.batchsize)
+
   # Handshake with Sirt
   print("Handshake with SIRT ...")
   mofka_dist.handshake(args.ntask_sirt, args.num_sinograms, args.num_columns)
 
   print("Setting up consumer and producer ...")
-
   consumer = mofka_dist.consumer(topic_name="daq_dist", consumer_name="dist")
-  producer = mofka_dist.producer(topic_name="dist_sirt", producer_name="producer_dist")
-
+  producer = mofka_dist.producer(topic_name="dist_sirt", producer_name="dist")
   action_consumer = mofka_dist.consumer(topic_name="sirt_dist_action", consumer_name="dist")
   action_producer = mofka_dist.producer(topic_name="dist_sirt_action", producer_name="dist")
 

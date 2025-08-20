@@ -246,8 +246,8 @@ def simulate_daq(producer,
         i = 0
       
       # HARD STOP AT 100 PROJECTIONS, FOR TESTING PURPOSES ONLY
-      if seq == 100:
-        break
+      # if seq == 100:
+      #   break
 
     time.sleep(slp)
   #Last flush if buffer was not full
