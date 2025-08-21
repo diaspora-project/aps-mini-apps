@@ -159,6 +159,12 @@ int ReconTask::run() {
 
   for(; passes < config.num_passes; ++passes){
 
+    int killed = kill_signal.load();
+    if (killed != 0) {
+      std::cout << "[Task-" << task_id << "] Received kill signal: " << killed << ". Exiting..." << std::endl;
+      return killed;
+    }
+
     #ifdef TIMERON
     auto datagen_beg = std::chrono::system_clock::now();
     #endif
@@ -180,6 +186,12 @@ int ReconTask::run() {
     }
     /// Iterate on window
     for(int i=0; i<config.window_iter; ++i){
+
+      int killed = kill_signal.load();
+      if (killed != 0) {
+        std::cout << "[Task-" << task_id << "] Received kill signal: " << killed << ". Exiting..." << std::endl;
+        return killed;
+      }
 
       #ifdef TIMERON
       auto recon_beg = std::chrono::system_clock::now();
@@ -349,5 +361,9 @@ void ReconTask::stop(std::function<void()> callback) {
     on_stop_callback = callback;
   }  
   stop_flag.store(true);
+}
+
+void ReconTask::kill(int signal) {
+  kill_signal.store(signal);
 }
 

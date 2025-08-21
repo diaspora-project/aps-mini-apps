@@ -12,6 +12,7 @@ class ReconTask {
     int task_id = 0;
     // stop flag as atomic variable to handle graceful shutdown
     std::atomic<bool> stop_flag{false};
+    std::atomic<int> kill_signal{0};
     std::function<void()> on_stop_callback = nullptr;
     mofka::MofkaDriver driver;
 
@@ -54,6 +55,11 @@ class ReconTask {
      * Stop the RetCon task with callback as a parameter that will be called when the stop flag is set.
      */
     void stop(std::function<void()> callback = nullptr);
+
+    /**
+     * Kill the RetCon task immediately (non-graceful shutdown).
+     */
+    void kill(int signal = -1);
 };
 
 #endif // SIRT_RETCON_ENGINE_H

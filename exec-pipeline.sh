@@ -11,7 +11,7 @@ pkill -9 -f "streamer-sirt" || true
 pkill -9 -f "sirt_stream" || true
 pkill -9 -f "streamer-den" || true
 pkill -INT -f "veloc" || true
-pkill -INT -f "veloc-backend" || true
+pkill -9 -f "veloc-backend" || true
 pkill -9 -f "FailureInjector" || true
 
 # Remove previous checkpoints

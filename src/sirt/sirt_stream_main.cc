@@ -12,11 +12,35 @@
 #include <unordered_map>
 #include <thread>
 
+std::unordered_map<int, ReconTask> running_tasks;
+std::unordered_map<int, std::thread> running_threads;
+std::vector<std::thread> stopped_threads;
+
+void cleanup() {
+    for (auto& [task_id, thread] : running_threads) {
+        thread.join();
+        std::cout << "Task " << task_id << " stopped." << std::endl;
+    }
+    for (auto& thread : stopped_threads) {
+        if (thread.joinable()) {
+            thread.join();
+        }
+    }
+    std::cout << "All tasks stopped." << std::endl;
+}
 
 volatile std::sig_atomic_t sigterm_captured = 0;
 void handle_sigterm(int signum) {
     std::cerr << "Received SIGTERM, stoping reconstruction..." << std::endl;
     sigterm_captured = signum;
+    // Kill running tasks
+    std::cerr << "Cleanning up by killing running tasks..." << std::endl;
+    for (auto& [task_id, task] : running_tasks) {
+        task.kill(sigterm_captured);
+    }
+    cleanup();
+    std::cerr << "Exiting..." << std::endl;
+    exit(signum);
 }
 
 int main(int argc, char **argv) {
@@ -67,10 +91,6 @@ int main(int argc, char **argv) {
     //     targets
     // );
 
-    std::unordered_map<int, ReconTask> running_tasks;
-    std::unordered_map<int, std::thread> running_threads;
-    std::vector<std::thread> stopped_threads;
-
     std::cout << "[Worker-" << config.worker_id << "] Listening for exchange information from DIST..." << std::endl;
 
     std::mutex ckpt_mutex;
@@ -79,6 +99,7 @@ int main(int argc, char **argv) {
     while (running) {
         // listen for action messages and initialize/terminate assigned reconstruction tasks.
         auto event = consumer.pull().wait();
+
         auto json_metadata = event.metadata().json();
         if (json_metadata["worker_id"].get<int>() != config.worker_index) {
             continue; // Ignore messages not meant for this worker
@@ -127,25 +148,8 @@ int main(int argc, char **argv) {
         }
     }
 
-    // std::cout << "[Worker-" << config.worker_id << "] Waiting for running tasks..." << std::endl; 
-
-    // // Stop running tasks
-    // for (auto& [task_id, task] : running_tasks) {
-    //     task.stop();
-    // }
-
-    std::cout << "[Worker-" << config.worker_id << "] Waiting for running threads to finish..." << std::endl;
-
-    for (auto& [task_id, thread] : running_threads) {
-        thread.join();
-        std::cout << "[Worker-" << config.worker_id << "] Task " << task_id << " stopped." << std::endl;
-    }
-    for (auto& thread : stopped_threads) {
-        if (thread.joinable()) {
-            thread.join();
-        }
-    }
-
-    std::cout << "[Worker-" << config.worker_id << "] All tasks stopped. Exiting..." << std::endl;
+    cleanup();
+    std::cout << "[Worker-" << config.worker_id << "] Exiting..." << std::endl;
+    return sigterm_captured;
 
 }
