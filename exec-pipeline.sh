@@ -58,6 +58,7 @@ echo bash run-sirt.sh ${sirt_ranks} ${logdir}
 
 # echo "Start Exp Control ----------------------------------------------------"
 bash run-exp-control.sh ${mtbf} ${logdir} 2> ${logdir}/exp-control.err | tee ${logdir}/exp-control.out &
+echo bash run-exp-control.sh ${mtbf} ${logdir}
 
 echo "Start DEN ------------------------------------------------------------"
 echo bash run-den.sh ${sirt_tasks} ${logdir}

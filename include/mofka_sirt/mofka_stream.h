@@ -15,6 +15,7 @@
 #include <utility>
 #include <nlohmann/json.hpp>
 #include "trace_data.h"
+#include <csignal>
 
 using json = nlohmann::json;
 namespace tl = thallium;
@@ -50,6 +51,8 @@ class MofkaStream
     mofka::Validator         validator;
     mofka::Serializer        serializer;
     mofka::PartitionSelector selector;
+
+    std::sig_atomic_t interrupt_signal = 0;
 
     mofka::DataSelector data_selector = [](const mofka::Metadata& metadata,
                                                 const mofka::DataDescriptor& descriptor) {
@@ -194,6 +197,9 @@ class MofkaStream
 
     bool isEndOfStream() { return end_of_stream; }
     void setEndOfStream(bool eos) { end_of_stream = eos; } // Update end of stream flag
+    
+    /* Interrupt mofka stream due to emergency reasons */
+    void interrupt(int signal=-1);
 
 };
 #endif // MOFKA_STREAM_H

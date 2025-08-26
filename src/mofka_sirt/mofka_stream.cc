@@ -1,4 +1,5 @@
 #include <mofka_stream.h>
+#include <thread>
 
 void MofkaStream::addTomoMsg(mofka::Event event){
   auto start_t = std::chrono::high_resolution_clock::now();
@@ -49,7 +50,8 @@ void MofkaStream::acknowledge() {
   while (!pending_events.empty()) {
     auto event = pending_events.begin();
     auto event_prog_id = event->metadata().json()["seq_n"].get<int>();
-    if (event_prog_id < current_proj_id) {
+    // if (event_prog_id < current_proj_id) {
+    if (event_prog_id < current_proj_id + (int)window_len) {
       event->acknowledge();
       std::cout << "[Task-" << getRank() << "]: Acknowledge: seq_id = " << event_prog_id << std::endl;
       pending_events.erase(event);
@@ -205,6 +207,10 @@ mofka::Consumer MofkaStream::getConsumer(std::string topic_name,
   return consumer;
 }
 
+void MofkaStream::interrupt(int signal) {
+  interrupt_signal = signal;
+}
+
 /* Create a data region from sliding window
   * @param recon_image Initial values of reconstructed image
   * @param step        Sliding step. Waits at least step projection
@@ -230,7 +236,17 @@ DataRegionBase<float, TraceMetadata>* MofkaStream::readSlidingWindow(
     // mofka messages
 
     auto start = std::chrono::high_resolution_clock::now();
-    auto event = consumer.pull().wait();
+    mofka::Future<mofka::Event> future_event = consumer.pull();
+    while (!future_event.completed()) {
+      // sleep for 1 ms to avoid busy waiting
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      if (interrupt_signal) {
+        std::cout << "[Task-" << getRank() << "]: Interrupt signal received, stopping pull." << std::endl;
+        return nullptr; // Exit if interrupt signal is received
+      }
+    }
+    auto event = future_event.wait();
+    // auto event = consumer.pull().wait();
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = end - start;
     setConsumerTimes("wait_t", 1, elapsed.count());

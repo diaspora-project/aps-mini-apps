@@ -74,14 +74,14 @@ mofkactl topic create sirt_dist_action \
 for i in $(seq 1 $sirt_tasks)
 do
 	mofkactl partition add dist_sirt \
-		--type memory \
+		--type default \
 		--rank 0 \
 		--groupfile mofka.json \
 		--metadata "${METADATA_PROVIDER}" \
 		--data "${DATA_PROVIDER}"
 	
 	mofkactl partition add handshake_d_s \
-		--type memory \
+		--type default \
 		--rank 0 \
 		--groupfile mofka.json \
 		--metadata "${METADATA_PROVIDER}" \
@@ -91,7 +91,7 @@ done
 for i in $(seq 1 $sirt_ranks)
 do
 	mofkactl partition add handshake_s_d \
-		--type memory \
+		--type default \
 		--rank 0 \
 		--groupfile mofka.json \
 		--metadata "${METADATA_PROVIDER}" \
@@ -99,14 +99,14 @@ do
 done
 
 mofkactl partition add sirt_dist_action \
-	--type memory \
+	--type default \
 	--rank 0 \
 	--groupfile mofka.json \
 	--metadata "${METADATA_PROVIDER}" \
 	--data "${DATA_PROVIDER}"
 
 mofkactl partition add dist_sirt_action \
-	--type memory \
+	--type default \
 	--rank 0 \
 	--groupfile mofka.json \
 	--metadata "${METADATA_PROVIDER}" \
@@ -117,7 +117,7 @@ mofkactl topic create sirt_den \
 
 
 mofkactl partition add sirt_den \
-	--type memory \
+	--type default \
 	--rank 0 \
 	--groupfile mofka.json \
 	--metadata "${METADATA_PROVIDER}" \

@@ -38,9 +38,9 @@ void handle_sigterm(int signum) {
     for (auto& [task_id, task] : running_tasks) {
         task.kill(sigterm_captured);
     }
-    cleanup();
-    std::cerr << "Exiting..." << std::endl;
-    exit(signum);
+    // cleanup();
+    // std::cerr << "Exiting..." << std::endl;
+    // exit(signum);
 }
 
 int main(int argc, char **argv) {
@@ -98,7 +98,21 @@ int main(int argc, char **argv) {
     bool running = true;
     while (running) {
         // listen for action messages and initialize/terminate assigned reconstruction tasks.
-        auto event = consumer.pull().wait();
+        // auto event = consumer.pull().wait();
+
+        auto future_event = consumer.pull();
+        while (!future_event.completed()) {
+            // sleep for 1 ms to avoid busy waiting
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            if (sigterm_captured) {
+                running = false;
+                break;
+            }
+        }
+        if (!running) {
+            break;
+        }
+        auto event = future_event.wait();
 
         auto json_metadata = event.metadata().json();
         if (json_metadata["worker_id"].get<int>() != config.worker_index) {
@@ -147,9 +161,9 @@ int main(int argc, char **argv) {
             break;
         }
     }
-
+    
     cleanup();
-    std::cout << "[Worker-" << config.worker_id << "] Exiting..." << std::endl;
+    std::cerr << "[Worker-" << config.worker_id << "] Exiting..." << std::endl;
     return sigterm_captured;
 
 }

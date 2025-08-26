@@ -4,6 +4,7 @@
 #include "trace_runtime_config.h"
 #include <atomic>
 #include <mofka/MofkaDriver.hpp>
+#include <mofka_sirt/mofka_stream.h>
 
 class ReconTask {
 
@@ -15,18 +16,21 @@ class ReconTask {
     std::atomic<int> kill_signal{0};
     std::function<void()> on_stop_callback = nullptr;
     mofka::MofkaDriver driver;
-
     std::mutex *ckpt_mutex;
+    MofkaStream ms;
 
     
   public:
     ReconTask(int task_id, mofka::MofkaDriver driver, std::mutex *ckpt_mutex, int argc, char **argv)
-    : config(argc, argv), task_id(task_id), driver(driver), ckpt_mutex(ckpt_mutex) {}
+    : config(argc, argv), task_id(task_id), driver(driver), ckpt_mutex(ckpt_mutex),
+      ms(driver, config.batchsize, static_cast<uint32_t>(config.window_len), task_id, 0) {}
 
     ReconTask(int task_id, mofka::MofkaDriver driver, const TraceRuntimeConfig &cfg, std::mutex *ckpt_mutex)
-    : config(cfg), task_id(task_id), driver(driver), ckpt_mutex(ckpt_mutex) {}
+    : config(cfg), task_id(task_id), driver(driver), ckpt_mutex(ckpt_mutex),
+      ms(driver, config.batchsize, static_cast<uint32_t>(config.window_len), task_id, 0) {}
 
-    ReconTask() : config(0, nullptr), task_id(0) {}
+    ReconTask() : config(0, nullptr), task_id(0),
+      ms(driver, config.batchsize, static_cast<uint32_t>(config.window_len), task_id, 0) {}
     
     ReconTask& operator=(ReconTask&& other) noexcept {
       if (this != &other) {

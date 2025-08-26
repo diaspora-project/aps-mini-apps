@@ -51,12 +51,12 @@ int saveAsHDF5(const char* fname, float* recon, hsize_t* output_dims) {
 
 int ReconTask::run() {
 
-  MofkaStream ms = MofkaStream{driver,
-    config.batchsize,
-    static_cast<uint32_t>(config.window_len),
-    task_id,
-    0
-  }; // Add the missing progress argument
+  // MofkaStream ms = MofkaStream{driver,
+  //   config.batchsize,
+  //   static_cast<uint32_t>(config.window_len),
+  //   task_id,
+  //   0
+  // }; // Add the missing progress argument
 
   std::cout << "[Task-" << task_id << "] Handshaking with DIST..." << std::endl;
   ms.handshake(task_id);
@@ -231,6 +231,13 @@ int ReconTask::run() {
         std::cout << "[Task-" << task_id << "] Cannot checkpoint. passes: " << passes << std::endl;
         throw std::runtime_error("Checkpointing failured");
       }
+
+      // Clean reconstruction image before restart
+      for(size_t i=0; i<recon_image.count(); ++i)
+        recon_image[i]=0.;
+      // reload checkpoint to ensure correctness
+      ckpt_client->restart(config.ckpt_name, passes);
+
       ms.acknowledge();
       std::cout << "[task-" << task_id << "]: Checkpointed version " << passes << ", progress = " << progress << std::endl;
       ckpt_mutex->unlock();
@@ -275,15 +282,15 @@ int ReconTask::run() {
             {"app_dims", app_dims},
             {"recon_slice_data_index", recon_slice_data_index}};
 
-        // if (passes % 4 == 0) {
-        //   std::stringstream iteration_stream;
-        //   iteration_stream << std::setfill('0') << std::setw(6) << passes;
-        //   std::string outputpath = config.kReconOutputDir + "/" + 
-        //     iteration_stream.str() + "-recon.h5";
-        //   saveAsHDF5(outputpath.c_str(), 
-        //       &recon[recon_slice_data_index], app_dims);
+        if (passes % 4 == 0) {
+          std::stringstream iteration_stream;
+          iteration_stream << ckpt_name << "-" << std::setfill('0') << std::setw(6) << passes;
+          std::string outputpath = config.kReconOutputDir + "/" + 
+            iteration_stream.str() + "-recon.h5";
+          saveAsHDF5(outputpath.c_str(), 
+              &recon[recon_slice_data_index], app_dims);
           
-        // }
+        }
 
         ms.publishImage(md, &recon[recon_slice_data_index], data_size, producer);
 
@@ -365,5 +372,6 @@ void ReconTask::stop(std::function<void()> callback) {
 
 void ReconTask::kill(int signal) {
   kill_signal.store(signal);
+  ms.interrupt(signal);
 }
 
