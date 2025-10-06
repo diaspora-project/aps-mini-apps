@@ -10,9 +10,9 @@ spack:
   - boost+serialization
   - veloc@main ^kvtree@1.4.0 ^axl@0.8.0 ^rankstr@0.3.0 ^shuffile@0.3.0 ^redset@0.3.0 ^er@0.4.0
   - py-parsl
-  - py-mochi-margo
   - py-numpy
   - py-scipy
+  - spdlog
   - swig # rm
   - py-tomopy@1.11.0
   - libzmq # rm
@@ -24,9 +24,7 @@ spack:
   - py-h5py
   - flatbuffers
   - py-flatbuffers
-  #- py-tensorflow
-  #- gdb
-  #- valgrind
+  # - py-tensorflow # it takes up to 8h to install :) comment if not needed
   view: true
   concretizer:
     unify: true
