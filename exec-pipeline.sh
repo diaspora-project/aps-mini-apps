@@ -36,6 +36,9 @@ DATE=$(date +"%Y-%m-%d-%Hh%Mmin%Ssec")
 logdir=build/logs/D${DATE}
 mkdir -p ${logdir}
 echo "Logging execution information at ${logdir}"
+ln -sfn "${logdir}" "${latest_link}"
+echo "Updated symlink: ${latest_link} -> ${logdir}"
+
 
 echo "Start Mofka server ---------------------------------------------------"
 bash run-mofka.sh > ${logdir}/mofka.out 2> ${logdir}/mofka.err &
