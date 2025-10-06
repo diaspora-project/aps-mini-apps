@@ -36,7 +36,7 @@ DATE=$(date +"%Y-%m-%d-%Hh%Mmin%Ssec")
 logdir=build/logs/D${DATE}
 mkdir -p ${logdir}
 echo "Logging execution information at ${logdir}"
-ln -sfn "${logdir}" "${latest_link}"
+ln -sfn "${logdir}" "latest"
 echo "Updated symlink: ${latest_link} -> ${logdir}"
 
 
