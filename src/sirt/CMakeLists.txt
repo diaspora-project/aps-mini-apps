@@ -62,8 +62,9 @@ find_package (mofka REQUIRED)
 # Find Boost libraries
 find_package(Boost REQUIRED COMPONENTS serialization CONFIG)
 
-# Just for local installation, adjust the path depending on your setup
-link_directories(/home/ndhai/src/spack-aps/var/spack/environments/APS/.spack-env/view/lib)
+# Spack VIEW, adjust the path depending on your setup
+# TODO: Fix the file to make cmake find the path automatically
+link_directories(/home/ndhai/diaspora/src/spack/var/spack/environments/APS/.spack-env/view/lib)
 
 include_directories(${Trace_SOURCE_DIR}/include)
 include_directories(${Trace_SOURCE_DIR}/include/tracelib)
