@@ -2,6 +2,34 @@
 
 This is APS mini-app that simulates the tomographic reconstruction on streaming tomography data. The reconstruction component provides a sliding window data structure to store (partial) data and a reconstruction process to reconstruct the data in the window. The reconstruction algorithm is based on the simultaneous iterative reconstruction technique (SIRT). This is a CPU-based code and is optimized for parallel and distributed memory. We plan to add the GPU-based version as well.
 
+## Instructions to Run Mini-App on a Single Computer
+
+### Setup
+
+Install dependencies using spack
+1. Clone spack (use this [repo](https://github.com/GueroudjiAmal/spack/tree/aps) for Polaris)
+2. Clone mochi spack packages [repo](https://github.com/mochi-hpc/mochi-spack-packages.git)
+3. Create a spack env, make sure you are in the root dir of this repo, try `spack env create APS spack.yaml`
+4. Activate the env `spack env activate APS`
+5. Add mochi spack packages to the env `spack repo add mochi-spack-packages`
+6. Concretize and install `spack concretize && spack install`
+
+Finally, compile and initialize the experiment workspace `bash setup.sh`
+
+### Run the mini-app
+
+Make sure you are in the root dir of this repos.
+1. Activate spack and the APS environment: `source activate-spack.sh`
+2. Execution: `bash exec-pipeline.sh <sirt_ranks> <sirt_tasks> <num_sinograms> <mtbf>`, where
+```
+    sirt_ranks: number of reconstruction processes
+    sirt_tasks: number of reconstruction tasks (for simplicity, this is equivalent to threads created by reconstruction processes to handle the workload)
+    num_sinograms: number of data flows can be processed in paralleled by the reconstruction tasks.
+    mtbf: mean time to failure of reconstruction processes
+```
+3. For testing, try `bash exec-pipeline.sh 1 2 2 10000`, the reconstruction results will be available under the `build/denoise` folder, you can check the execution log in `build/logs/latest`.
+
+
 ## Instructions to Run Mini-App on Polaris
 
 ### Instructions for installation with Spack:
