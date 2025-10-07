@@ -13,41 +13,31 @@ import parsl
 from parsl.app.app import bash_app
 from parsl.configs.local_threads import config as local_threads_config
 
-# -----------------------------------------------------------------------------
-# Config
-# -----------------------------------------------------------------------------
-# Use local_threads; bump retries if you want.
+# ---------------------------------------------------------------------------
+# Parsl config
+# ---------------------------------------------------------------------------
 local_threads_config.retries = 100000
 parsl.load(local_threads_config)
 
-# Paths relative to this script
 HERE = Path(__file__).resolve().parent
-BUILD_DIR = (HERE / "build").resolve()
-BIN_DIR = (BUILD_DIR / "bin").resolve()
-LIB_DIRS_DEFAULT = [
-    # local build/lib dirs
-    str((BUILD_DIR / "src").resolve()),
-    str((BUILD_DIR / "src" / "sirt").resolve()),
-]
-SIRT_BIN = str((BIN_DIR / "sirt_stream").resolve())
 
-# Regexes to parse ldd
+# Regexes for ldd parsing
 _LDD_MISSING = re.compile(r'\s*(\S+)\s*=>\s*not found')
 _LDD_FOUND   = re.compile(r'\s*\S+\s*=>\s*(/[^ ]+)/[^ ]+\s*\(0x[0-9a-fA-F]+\)')
 
-# -----------------------------------------------------------------------------
-# Helper: ldd parsing and SONAME shim creation
-# -----------------------------------------------------------------------------
-def run_cmd(cmd, env=None, check=True, capture=True):
-    if capture:
-        return subprocess.run(cmd, text=True, env=env,
-                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                              check=check).stdout
-    else:
-        return subprocess.run(cmd, text=True, env=env, check=check)
+# ---------------------------------------------------------------------------
+# Utilities
+# ---------------------------------------------------------------------------
+def run_cmd(cmd, env=None):
+    """Run a command, always capturing output and NEVER raising on non-zero."""
+    p = subprocess.run(
+        cmd, text=True, env=env,
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False
+    )
+    return p.returncode, p.stdout
 
 def ldd_missing_and_found_dirs(exe, env=None):
-    out = run_cmd(['ldd', exe], env=env)
+    rc, out = run_cmd(['ldd', exe], env=env)
     missing, found_dirs = set(), set()
     for line in out.splitlines():
         m1 = _LDD_FOUND.match(line)
@@ -57,7 +47,7 @@ def ldd_missing_and_found_dirs(exe, env=None):
         m2 = _LDD_MISSING.match(line)
         if m2:
             missing.add(m2.group(1))
-    return missing, found_dirs, out
+    return missing, found_dirs, out, rc
 
 def find_any_lib(basename, search_dirs):
     # exact basename first
@@ -65,7 +55,7 @@ def find_any_lib(basename, search_dirs):
         p = os.path.join(d, basename)
         if os.path.isfile(p):
             return p
-    # then any .so or .so.* variant
+    # then any .so / .so.* variant
     stem = basename.split('.so')[0]
     for d in search_dirs:
         for cand in glob.glob(os.path.join(d, f"{stem}.so*")):
@@ -75,24 +65,22 @@ def find_any_lib(basename, search_dirs):
 
 def make_soname_shims(missing_sonames, search_dirs):
     """
-    For each missing SONAME 'libX.so.N', if we only have 'libX.so' (or libX.so*M),
-    create 'libX.so.N -> libX.so*' symlink inside a temp dir.
-    Return (shim_dir_or_None, created_symlinks_list)
+    For each missing SONAME 'libX.so.N', create 'libX.so.N -> libX.so*' symlink
+    in a temp dir if we can find any suitable replacement.
     """
     tmpdir = tempfile.mkdtemp(prefix="ld_shims_")
     created = []
     for need in sorted(missing_sonames):
         if ".so" not in need:
             continue
-        # already present anywhere?
         if find_any_lib(need, search_dirs):
             continue
-        # fallback to any unversioned/other version we can find
         stem = need.split(".so")[0]
-        replacement = find_any_lib(f"{stem}.so", search_dirs)
-        if not replacement:
-            # maybe we only have libX.so.M (different M)
-            replacement = find_any_lib(f"{stem}.so", search_dirs) or find_any_lib(need.replace(".so.", ".so."), search_dirs)
+        # Try unversioned or any version we have
+        replacement = (
+            find_any_lib(f"{stem}.so", search_dirs) or
+            find_any_lib(need.replace(".so.", ".so."), search_dirs)
+        )
         if replacement:
             dst = os.path.join(tmpdir, need)
             try:
@@ -105,25 +93,16 @@ def make_soname_shims(missing_sonames, search_dirs):
     shutil.rmtree(tmpdir, ignore_errors=True)
     return None, []
 
-# -----------------------------------------------------------------------------
-# LD_LIBRARY_PATH builder (site-agnostic)
-# -----------------------------------------------------------------------------
 def unique_paths(paths):
-    seen = set()
-    out = []
+    seen, out = set(), []
     for p in paths:
-        if not p:
-            continue
-        if p not in seen:
+        if p and p not in seen:
             seen.add(p)
             out.append(p)
     return out
 
 def guess_spack_view_paths():
-    """
-    If the user provides SPACK_VIEW (path to .../.spack-env/view), use it.
-    Otherwise, do nothing. Keeping this optional preserves portability.
-    """
+    """If SPACK_VIEW=/path/to/.spack-env/view is set, add its lib paths."""
     paths = []
     view = os.environ.get("SPACK_VIEW", "").strip()
     if view:
@@ -133,17 +112,17 @@ def guess_spack_view_paths():
                 paths.append(p)
     return paths
 
-def build_ld_library_path(extra_paths=None):
+def build_ld_library_path(lib_dirs_base, extra_paths=None):
     base = os.environ.get("LD_LIBRARY_PATH", "")
     parts = base.split(":") if base else []
 
-    # Always add our build-time library directories
-    parts = LIB_DIRS_DEFAULT + parts
+    # Prepend our autodetected lib dirs
+    parts = list(lib_dirs_base) + parts
 
-    # Optional: include a user-specified Spack view (set SPACK_VIEW env var)
+    # Optional Spack view
     parts = guess_spack_view_paths() + parts
 
-    # Optional: add Cray HDF5 (already available via modules on many sites)
+    # Optional: HDF5 module roots (if defined at site)
     for env_var in ("HDF5_DIR", "CRAY_HDF5_PARALLEL_PREFIX", "CRAY_HDF5_PREFIX"):
         root = os.environ.get(env_var)
         if root:
@@ -152,17 +131,74 @@ def build_ld_library_path(extra_paths=None):
                 if os.path.isdir(p):
                     parts.insert(0, p)
 
-    # Allow caller to append anything else
     if extra_paths:
         parts = list(extra_paths) + parts
 
     return ":".join(unique_paths(parts))
 
-# -----------------------------------------------------------------------------
-# CLI args (your existing flags kept intact)
-# -----------------------------------------------------------------------------
+def discover_sirt_bin(cli_override: str | None) -> Path:
+    """Find sirt_stream. Priority: CLI override → common build locations."""
+    if cli_override:
+        p = Path(cli_override).expanduser().resolve()
+        if not p.exists():
+            raise FileNotFoundError(f"--sirt-bin points to missing file: {p}")
+        return p
+
+    # Start from script location and walk up a few levels
+    roots = [HERE, *HERE.parents[:4]]
+
+    candidates = []
+    for root in roots:
+        # Typical cmake build: <repo>/build/bin/sirt_stream
+        candidates.append(root / "build" / "bin" / "sirt_stream")
+        # Some trees use build/build/bin
+        candidates.append(root / "build" / "build" / "bin" / "sirt_stream")
+        # Direct sibling of script's build dir (what you had): HERE/../bin
+        candidates.append(root / "bin" / "sirt_stream")
+
+    for c in candidates:
+        if c.is_file() and os.access(c, os.X_OK):
+            return c.resolve()
+
+    raise FileNotFoundError(
+        "Could not auto-discover 'sirt_stream'. "
+        "Pass --sirt-bin /full/path/to/sirt_stream"
+    )
+
+def lib_dirs_near_binary(sirt_bin: Path):
+    """
+    Heuristics to add local build lib directories:
+    - <repo>/build/src
+    - <repo>/build/src/sirt
+    - the bin dir itself (rarely needed, but harmless)
+    """
+    lib_dirs = {str(sirt_bin.parent)}
+    # Try to detect "<repo>/build" root
+    # If binary path ends with ".../build/bin/sirt_stream", pick that "build".
+    # Otherwise, walk up to a dir literally named "build".
+    build_root = None
+    if sirt_bin.parent.name == "bin" and sirt_bin.parent.parent.name == "build":
+        build_root = sirt_bin.parent.parent
+    else:
+        for p in sirt_bin.parents:
+            if p.name == "build":
+                build_root = p
+                break
+    if build_root:
+        for extra in ("src", "src/sirt"):
+            d = build_root / extra
+            if d.is_dir():
+                lib_dirs.add(str(d))
+    return sorted(lib_dirs)
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
 def parse_arguments():
     parser = argparse.ArgumentParser(description='SIRT Iterative Image Reconstruction')
+
+    # Binary override
+    parser.add_argument('--sirt-bin', type=str, default=None, help='Full path to sirt_stream (optional)')
 
     parser.add_argument('--num-workers', type=int, default=1, help="Number of reconstruction workers")
     parser.add_argument('--protocol', default="na+sm", help='Mofka protocol')
@@ -183,91 +219,88 @@ def parse_arguments():
     parser.add_argument('--ckpt-name', type=str, default="sirt", help='Checkpoint name')
     parser.add_argument('--ckpt-config', type=str, default="veloc.cfg", help='Checkpoint configuration (VeLoC)')
 
-    # Optional: let user pass extra LD paths without touching the script
+    # Optional extra LD paths
     parser.add_argument('--extra-ld-paths', type=str, default="", help='Colon-separated extra library paths to prepend')
 
     return parser.parse_args()
 
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 # Parsl app
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 @bash_app
-def run_sirt(id, logdir=".", args=None, launcher_env=None):
+def run_sirt(id, logdir=".", args=None, launcher_env=None, sirt_bin_path=""):
     args = args or []
     stderr = os.path.join(logdir, f'sirt-{id}.err')
     stdout = os.path.join(logdir, f'sirt-{id}.out')
 
-    # Environment export inside the remote shell
-    env_exports = []
-    for k, v in (launcher_env or {}).items():
-        env_exports.append(f'export {k}="{v}"')
-
-    # Some helpful diagnostics (kept short; remove if noisy)
+    env_exports = [f'export {k}="{v}"' for k, v in (launcher_env or {}).items()]
     diag = [
         'echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"',
-        f'ldd {SIRT_BIN} || true'
+        f'ldd {sirt_bin_path} || true'
     ]
-
     cmd = " && ".join(
         env_exports
         + diag
-        + [f'{SIRT_BIN} --worker-id {id} ' + " ".join(args) + f' >> "{stdout}" 2>> "{stderr}"']
+        + [f'{sirt_bin_path} --worker-id {id} ' + " ".join(args) + f' >> "{stdout}" 2>> "{stderr}"']
     )
     return cmd
 
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 # Main
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 def main():
     p = parse_arguments()
 
-    # Build the argument vector you were using before (including all flags)
+    # Locate binary
+    sirt_bin = discover_sirt_bin(p.sirt_bin)
+    sirt_bin_str = str(sirt_bin)
+
+    # Build the forwarded argument vector (exclude helper flags)
+    helper_keys = {"num_workers", "extra_ld_paths", "sirt_bin"}
     all_args = []
-    kv = vars(p).copy()
-    # strip helper-only args from forwarding
-    helper_keys = {"num_workers", "extra_ld_paths"}
-    # argparse stored it as 'num_workers' when using '--num-workers'? Keep consistent:
-    # We'll build from the explicit flags above anyway:
-    for arg_name, value in kv.items():
+    for arg_name, value in vars(p).items():
         if arg_name in helper_keys:
             continue
-        # convert underscored name back to CLI flag
         flag = "--" + arg_name.replace("_", "-")
         all_args += [flag, str(value)]
 
-    # Construct LD_LIBRARY_PATH
+    # Lib dirs near the discovered binary
+    base_lib_dirs = lib_dirs_near_binary(sirt_bin)
+
+    # Optional extra paths
     extra_paths = []
     if p.extra_ld_paths:
         extra_paths = [x for x in p.extra_ld_paths.split(":") if x]
 
-    base_ld = build_ld_library_path(extra_paths=extra_paths)
+    # Compose LD_LIBRARY_PATH
+    base_ld = build_ld_library_path(base_lib_dirs, extra_paths=extra_paths)
 
-    # First pass: see what’s missing and where we already find libs
+    # First ldd pass
     env1 = dict(os.environ)
     env1["LD_LIBRARY_PATH"] = base_ld
-    missing1, found_dirs, ldd_out1 = ldd_missing_and_found_dirs(SIRT_BIN, env=env1)
+    missing1, found_dirs, ldd_out1, rc1 = ldd_missing_and_found_dirs(sirt_bin_str, env=env1)
 
-    # Create SONAME shims (e.g., libmargo.so.0 → libmargo.so) if needed
+    # SONAME shims for missing libs (e.g., libmargo.so.0)
     shim_dir, created = make_soname_shims(missing1, search_dirs=base_ld.split(":"))
     effective_ld = base_ld
     if shim_dir:
         effective_ld = shim_dir + (":" + effective_ld if effective_ld else "")
 
-    # (Optional) Check again after adding shims
+    # Second ldd pass (non-fatal)
     env2 = dict(os.environ)
     env2["LD_LIBRARY_PATH"] = effective_ld
-    missing2, _, ldd_out2 = ldd_missing_and_found_dirs(SIRT_BIN, env=env2)
+    missing2, _, ldd_out2, rc2 = ldd_missing_and_found_dirs(sirt_bin_str, env=env2)
 
-    # Logs / prints
+    # Logs
     print(f"Workers: {p.num_workers}")
     print("Args:", all_args)
     print("\nComputed LD_LIBRARY_PATH:\n", effective_ld)
-    print("\nldd BEFORE shims:\n", ldd_out1)
-    if shim_dir:
+    print("\nldd BEFORE shims (rc={}):\n".format(rc1), ldd_out1)
+    if created:
         print("Created SONAME shims:")
         for need, src, dst in created:
             print(f"  {need} -> {src}  (at {dst})")
-    print("\nldd AFTER shims:\n", ldd_out2)
+    print("\nldd AFTER shims (rc={}):\n".format(rc2), ldd_out2)
     if missing2:
         print("Still missing after shims:", ", ".join(sorted(missing2)))
 
@@ -278,7 +311,8 @@ def main():
             id=str(i),
             logdir=p.logdir,
             args=all_args,
-            launcher_env={"LD_LIBRARY_PATH": effective_ld}
+            launcher_env={"LD_LIBRARY_PATH": effective_ld},
+            sirt_bin_path=sirt_bin_str
         )
         futures.append(fut)
 
@@ -286,7 +320,6 @@ def main():
     for f in futures:
         print(f.result())
 
-    # Clean up shim dir on exit
     if shim_dir:
         shutil.rmtree(shim_dir, ignore_errors=True)
 
