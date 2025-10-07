@@ -32,6 +32,11 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror -Wno-unused-but-se
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 add_definitions(-DTIMERON)
 
+# Spack VIEW, adjust the path depending on your setup
+# TODO: Fix the file to make cmake find the path automatically
+link_directories(/home/ndhai/diaspora/src/spack/var/spack/environments/APS/.spack-env/view/lib)
+# link_directories(/home/ndhai/src/spack-aps/var/spack/environments/APS/.spack-env/view/lib)
+
 find_package(Flatbuffers REQUIRED)
 include_directories(${FLATBUFFERS_INCLUDE_DIR})
 
@@ -61,10 +66,6 @@ find_package (mofka REQUIRED)
 
 # Find Boost libraries
 find_package(Boost REQUIRED COMPONENTS serialization CONFIG)
-
-# Spack VIEW, adjust the path depending on your setup
-# TODO: Fix the file to make cmake find the path automatically
-link_directories(/home/ndhai/diaspora/src/spack/var/spack/environments/APS/.spack-env/view/lib)
 
 include_directories(${Trace_SOURCE_DIR}/include)
 include_directories(${Trace_SOURCE_DIR}/include/tracelib)
