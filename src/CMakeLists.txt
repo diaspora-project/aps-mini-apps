@@ -180,6 +180,42 @@ if(_SPACK_LIBDIRS)
   target_link_directories(sirt_stream PRIVATE ${_SPACK_LIBDIRS})
 endif()
 
+# --- RPATH so the binary can find Spack libs at runtime ---
+# Collect libdirs we already computed
+set(_RPATH_DIRS ${_SPACK_LIBDIRS})
+
+# Also add margo’s directory if we can discover it from the imported target
+get_target_property(_margo_loc mofka::client LOCATION)
+if(NOT _margo_loc)
+  # fall back: try to use the bedrock/margo dir we added above
+  if(BEDROCK_MODULE_API)
+    get_filename_component(_BEDROCK_DIR "${BEDROCK_MODULE_API}" DIRECTORY)
+    list(APPEND _RPATH_DIRS "${_BEDROCK_DIR}")
+  endif()
+endif()
+# Common Cray/Spack places (adjust if needed)
+list(APPEND _RPATH_DIRS
+  "/home/ndhai/diaspora/src/spack/var/spack/environments/APS/.spack-env/view/lib"
+  "/home/ndhai/diaspora/src/spack/var/spack/environments/APS/.spack-env/view/lib64"
+)
+
+list(REMOVE_DUPLICATES _RPATH_DIRS)
+
+# Use RPATH in the build tree and when installed
+set(CMAKE_SKIP_BUILD_RPATH FALSE)
+set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+set(CMAKE_BUILD_RPATH "${_RPATH_DIRS}")
+set(CMAKE_INSTALL_RPATH "${_RPATH_DIRS}")
+
+# Also set per-target in case wrappers ignore globals
+set_target_properties(sirt_stream PROPERTIES BUILD_RPATH "${_RPATH_DIRS}")
+set_target_properties(mofka_stream PROPERTIES BUILD_RPATH "${_RPATH_DIRS}")
+set_target_properties(trace_utils  PROPERTIES BUILD_RPATH "${_RPATH_DIRS}")
+set_target_properties(trace_h5io   PROPERTIES BUILD_RPATH "${_RPATH_DIRS}")
+set_target_properties(sirt         PROPERTIES BUILD_RPATH "${_RPATH_DIRS}")
+set_target_properties(recon_engine PROPERTIES BUILD_RPATH "${_RPATH_DIRS}")
+
 # ---------------- Status ----------------
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "C compiler: ${CMAKE_C_COMPILER}")
