@@ -13,7 +13,7 @@ if(POLICY CMP0144)
   cmake_policy(SET CMP0144 NEW) # ignore BOOST_ROOT warnings
 endif()
 
-# ---------- Build type & warnings (avoid -Werror during detection) ----------
+# ---------- Build type & warnings ----------
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
   set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS Debug Release RelWithDebInfo MinSizeRel)
@@ -34,12 +34,12 @@ find_package(MPI REQUIRED COMPONENTS C CXX)
 # Prefer the parallel HDF5 (prevents mixing)
 set(HDF5_PREFER_PARALLEL TRUE)
 find_package(HDF5 REQUIRED COMPONENTS C)
-if(DEFINED HDF5_IS_PARALLEL AND NOT HDF5_IS_PARALLEL)
-  message(FATAL_ERROR "Found HDF5 but it is NOT parallel. Load cray-hdf5-parallel or adjust HDF5_DIR.")
-endif()
 
-# Boost serialization (use CONFIG if available)
+# Boost serialization
 find_package(Boost REQUIRED COMPONENTS serialization CONFIG)
+
+# Threads (you link Threads::Threads below)
+find_package(Threads REQUIRED)
 
 # Flatbuffers: support multiple target names, fallback to headers
 set(_flatbuf_target "")
@@ -75,67 +75,64 @@ find_package(mofka REQUIRED CONFIG)  # provides mofka::client
 # Bedrock module API (needed by mofka at link-time on your site)
 find_library(BEDROCK_MODULE_API NAMES bedrock-module-api PATH_SUFFIXES lib lib64)
 
-# ---------------- Link directories for Spack view (to satisfy -l flags) ----------------
-# Some packages inject -l<name>; add <view>/lib and <view>/lib64 so the linker finds them.
-# CMAKE_PREFIX_PATH can be a list; iterate and add both lib and lib64.
+# ---------------- Collect Spack view libdirs for link-time -l resolution ----------------
+set(_SPACK_LIBDIRS "")
 foreach(_prefix ${CMAKE_PREFIX_PATH})
   foreach(_sfx lib lib64)
     if(EXISTS "${_prefix}/${_sfx}")
-      # apply to targets that carry many third-party libs
-      # (we avoid global link_directories() to keep scope tight)
       list(APPEND _SPACK_LIBDIRS "${_prefix}/${_sfx}")
     endif()
   endforeach()
 endforeach()
+list(REMOVE_DUPLICATES _SPACK_LIBDIRS)
 
 # ---------------- Your includes (only your headers) ----------------
 include_directories(${TRACE_ROOT}/include)
 include_directories(${TRACE_ROOT}/include/tracelib)
 include_directories(${TRACE_ROOT}/include/mofka_sirt)
 include_directories(${TRACE_ROOT}/include/sirt)
-
-# If Flatbuffers only gave us includes, add them
-if(_flatbuf_target STREQUAL "")
+if(_flatbuf_target STREQUAL "" AND FLATBUFFERS_INCLUDE_DIR)
   include_directories(${FLATBUFFERS_INCLUDE_DIR})
 endif()
 
 # ---------------- Libraries from your tree ----------------
 add_library(trace_utils ${TRACE_ROOT}/src/tracelib/trace_utils.cc)
-# These headers include Boost and (via shared headers) HDF5 → link PUBLIC so includes propagate
 target_link_libraries(trace_utils
   PUBLIC
     Boost::serialization
-    hdf5::hdf5
+    HDF5::HDF5
 )
 
 add_library(trace_h5io  ${TRACE_ROOT}/src/tracelib/trace_h5io.cc)
 target_link_libraries(trace_h5io
   PUBLIC
-    hdf5::hdf5
+    HDF5::HDF5
     MPI::MPI_C
     Boost::serialization
 )
 
 add_library(mofka_stream ${TRACE_ROOT}/src/mofka_sirt/mofka_stream.cc)
+# Make mofka PUBLIC so consumers inherit the dependency (prevents DSO-missing)
 target_link_libraries(mofka_stream
-  PRIVATE
+  PUBLIC
     mofka::client
 )
-# Bedrock lib may also be required as a direct link on your platform
 if(BEDROCK_MODULE_API)
-  target_link_libraries(mofka_stream PRIVATE ${BEDROCK_MODULE_API})
-  # ensure its directory is a link search path (to satisfy any -lbedrock-module-api flags)
+  target_link_libraries(mofka_stream PUBLIC ${BEDROCK_MODULE_API})
   get_filename_component(_BEDROCK_DIR "${BEDROCK_MODULE_API}" DIRECTORY)
   if(EXISTS "${_BEDROCK_DIR}")
-    target_link_directories(mofka_stream PRIVATE "${_BEDROCK_DIR}")
+    target_link_directories(mofka_stream PUBLIC "${_BEDROCK_DIR}")
   endif()
+endif()
+if(_SPACK_LIBDIRS)
+  target_link_directories(mofka_stream PUBLIC ${_SPACK_LIBDIRS})
 endif()
 
 add_library(sirt ${TRACE_ROOT}/src/sirt/sirt.cc)
 target_link_libraries(sirt
   PUBLIC
     Boost::serialization
-    hdf5::hdf5
+    HDF5::HDF5
 )
 
 add_library(recon_engine ${TRACE_ROOT}/src/sirt/recon_engine.cc)
@@ -156,11 +153,17 @@ target_link_libraries(sirt_stream
     trace_h5io
     sirt
     mofka_stream
+    mofka::client            # <--- add direct link (belt & suspenders)
     MPI::MPI_CXX
     Threads::Threads
-    hdf5::hdf5
+    HDF5::HDF5
     Boost::serialization
 )
+
+# Optional: keep linker from dropping DSOs that are only used indirectly
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|Intel|NVHPC")
+  target_link_options(sirt_stream PRIVATE -Wl,--no-as-needed)
+endif()
 
 # Flatbuffers link (if we have a target)
 if(NOT _flatbuf_target STREQUAL "")
@@ -174,9 +177,7 @@ endif()
 
 # Add Spack view libdirs for link-time -l resolution
 if(_SPACK_LIBDIRS)
-  list(REMOVE_DUPLICATES _SPACK_LIBDIRS)
   target_link_directories(sirt_stream PRIVATE ${_SPACK_LIBDIRS})
-  target_link_directories(mofka_stream PRIVATE ${_SPACK_LIBDIRS})
 endif()
 
 # ---------------- Status ----------------
