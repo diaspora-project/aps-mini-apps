@@ -6,7 +6,7 @@
 spack:
   # add package specs to the `specs` list
   specs:
-  - mofka@0.6.4+mpi+python ^json-c@0.13.0 ^libfabric@1.19.1 ^mercury~boostsys~checksum ^mpich@3.4
+  - mofka@0.6.4+mpi+python ^json-c@0.13.0 ^mercury~boostsys~checksum
   - boost+serialization
   - veloc@main ^kvtree@1.4.0 ^axl@0.8.0 ^rankstr@0.3.0 ^shuffile@0.3.0 ^redset@0.3.0 ^er@0.4.0
   - py-parsl
@@ -24,6 +24,8 @@ spack:
   - py-h5py
   - flatbuffers
   - py-flatbuffers
+  - bzip2
+  - zlib
   # - py-tensorflow # it takes up to 8h to install :) comment if not needed
   view: true
   concretizer:
@@ -137,11 +139,14 @@ spack:
       externals:
       - spec: m4@1.4.18
         prefix: /usr
+    #zlib:
+    #  buildable: false
+    #  externals:
+    #  - spec: zlib@1.2.11
+    #    prefix: /usr
     zlib:
-      buildable: false
-      externals:
-      - spec: zlib@1.2.11
-        prefix: /usr
+      buildable: true
+      externals: []
     pkg-config:
       buildable: false
       externals:
@@ -153,15 +158,19 @@ spack:
       - spec: git@2.35.3
         prefix: /usr
     bzip2:
-      buildable: false
-      externals:
-      - spec: bzip2@1.0.8
-        prefix: /usr
+      buildable: true
+      externals: []  
+    #bzip2:
+    #  buildable: false
+    #  externals:
+    #  - spec: bzip2@1.0.8
+    #    prefix: /usr
     tar:
       buildable: false
       externals:
       - spec: tar@1.34
         prefix: /usr
   repos:
+  # TODO: change this to the path to mochi-spack-packages, can be found at:
   # git clone https://github.com/mochi-hpc/mochi-spack-packages.git
   - /path/to/mochi-spack-packages
