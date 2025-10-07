@@ -13,8 +13,14 @@ flatc -c trace_prot.fbs
 cd ${app_dir}
 mkdir -p build
 cd build
-cmake ..
-make
+#cmake ..
+cmake -S .. -B build \
+  -DCMAKE_C_COMPILER=cc \
+  -DCMAKE_CXX_COMPILER=CC \
+  -DCMAKE_Fortran_COMPILER=ftn \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DCMAKE_PREFIX_PATH=/home/ndhai/diaspora/src/spack/var/spack/environments/APS/.spack-env/view
+cmake --build build -j
 mkdir -p python/streamer-sirt
 cp ../python/streamer-sirt/* python/streamer-sirt
 
