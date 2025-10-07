@@ -232,11 +232,11 @@ int ReconTask::run() {
         throw std::runtime_error("Checkpointing failured");
       }
 
-      // Clean reconstruction image before restart
-      for(size_t i=0; i<recon_image.count(); ++i)
-        recon_image[i]=0.;
-      // reload checkpoint to ensure correctness
-      ckpt_client->restart(config.ckpt_name, passes);
+      // // Clean reconstruction image before restart
+      // for(size_t i=0; i<recon_image.count(); ++i)
+      //   recon_image[i]=0.;
+      // // reload checkpoint to ensure correctness
+      // ckpt_client->restart(config.ckpt_name, passes);
 
       ms.acknowledge();
       std::cout << "[task-" << task_id << "]: Checkpointed version " << passes << ", progress = " << progress << std::endl;
@@ -282,15 +282,15 @@ int ReconTask::run() {
             {"app_dims", app_dims},
             {"recon_slice_data_index", recon_slice_data_index}};
 
-        if (passes % 4 == 0) {
-          std::stringstream iteration_stream;
-          iteration_stream << ckpt_name << "-" << std::setfill('0') << std::setw(6) << passes;
-          std::string outputpath = config.kReconOutputDir + "/" + 
-            iteration_stream.str() + "-recon.h5";
-          saveAsHDF5(outputpath.c_str(), 
-              &recon[recon_slice_data_index], app_dims);
+        // if (passes % 4 == 0) {
+        //   std::stringstream iteration_stream;
+        //   iteration_stream << ckpt_name << "-" << std::setfill('0') << std::setw(6) << passes;
+        //   std::string outputpath = config.kReconOutputDir + "/" + 
+        //     iteration_stream.str() + "-recon.h5";
+        //   saveAsHDF5(outputpath.c_str(), 
+        //       &recon[recon_slice_data_index], app_dims);
           
-        }
+        // }
 
         ms.publishImage(md, &recon[recon_slice_data_index], data_size, producer);
 
