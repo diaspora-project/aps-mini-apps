@@ -171,7 +171,7 @@ class MofkaDist:
         self.buffer.append(msgs)
         mofka_t = []
         # Send data to workers
-        print(f"Split data and send to workers, seq id = {metadata['seq_n']}")
+        print(f"Split data and send to workers, seq id = {sequence_id}")
         for i in range(self.ntasks):
             ts = time.perf_counter()
             f = producer.push(self.buffer[self.counter][i][0], self.buffer[self.counter][i][1])
