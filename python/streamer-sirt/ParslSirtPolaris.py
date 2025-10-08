@@ -12,6 +12,7 @@ from pathlib import Path
 import parsl
 from parsl.app.app import bash_app
 from parsl.configs.local_threads import config as local_threads_config
+from parsl.executors import ThreadPoolExecutor
 
 # PBSPro is the right provider for Polaris:
 from parsl.providers import PBSProProvider
