@@ -132,6 +132,7 @@ endif()
 add_library(sirt ${TRACE_ROOT}/src/sirt/sirt.cc)
 target_link_libraries(sirt
   PUBLIC
+    trace_utils
     Boost::serialization
     HDF5::HDF5
 )
