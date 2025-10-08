@@ -188,7 +188,7 @@ class MofkaDist:
         self.counter += 1
         if self.counter == self.batch:
             # ts = time.perf_counter()
-            # producer.flush()
+            producer.flush()
             # mofka_t.append(["flush_after", projection_id, ts, time.perf_counter(), time.perf_counter() - ts, self.ntasks*len(self.buffer)* sys.getsizeof(self.buffer[self.counter-1][0][0]), self.ntasks*len(self.buffer)*len(self.buffer[self.counter-1][0][1])])
             self.buffer = []
             self.counter = 0
