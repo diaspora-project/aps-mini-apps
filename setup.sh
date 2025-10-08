@@ -20,7 +20,7 @@ cmake -S .. -B build \
   -DCMAKE_C_COMPILER=cc \
   -DCMAKE_CXX_COMPILER=CC \
   -DCMAKE_Fortran_COMPILER=ftn \
-  -DCMAKE_CXX_FLAGS_RELEASE \
+  -DCMAKE_CXX_FLAGS_RELEASE=Release \
   -DCMAKE_PREFIX_PATH=/home/ndhai/diaspora/src/spack/var/spack/environments/APS/.spack-env/view
 cmake --build build -j
 mkdir -p python/streamer-sirt
