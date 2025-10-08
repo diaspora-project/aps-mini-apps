@@ -27,9 +27,9 @@ from parsl.utils import get_all_checkpoints
 # Parsl config
 # ---------------------------------------------------------------------------
 local_threads_config.retries = 100000
-local_threads_config.executors = [
-            ThreadPoolExecutor(max_threads=16, label="local_threads")
-        ]
+# local_threads_config.executors = [
+#             ThreadPoolExecutor(max_threads=16, label="local_threads")
+#         ]
 parsl.load(local_threads_config)
 
 HERE = Path(__file__).resolve().parent
