@@ -76,7 +76,7 @@ trap "echo 'Ctrl+C pressed. Terminating...'; exit 1" SIGINT SIGTERM
     --reconDatasetPath /data \
     --pub-freq 10000 \
     --center 1427 \
-    --thread 4 \
+    --thread 8 \
     --write-freq 4 \
     --window-length 4 \
     --window-step 4 \
