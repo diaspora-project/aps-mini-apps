@@ -192,7 +192,7 @@ def main():
       #to send from mofka:
       mofka_sub = sub.flatten()
       ncols = sub.shape[2]
-      print(f"Sending image seq_id {sequence_id} to sirt")
+      # print(f"Sending image seq_id {sequence_id} to sirt")
       tt = mofka_dist.push_image(mofka_sub, sequence_id, args.num_sinograms, ncols, rotation,
                       mofka_read_image.UniqueId(), mofka_read_image.Center(), producer=producer)
 

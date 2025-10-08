@@ -167,11 +167,11 @@ class MofkaDist:
                                     center,
                                     sequence_id)
                                     # self.seq)
-        print("Pushing images")
+        # print("Pushing images")
         self.buffer.append(msgs)
         mofka_t = []
         # Send data to workers
-        print(f"Split data and send to workers, seq id = {sequence_id}")
+        # print(f"Split data and send to workers, seq id = {sequence_id}")
         for i in range(self.ntasks):
             ts = time.perf_counter()
             f = producer.push(self.buffer[self.counter][i][0], self.buffer[self.counter][i][1])
@@ -182,7 +182,7 @@ class MofkaDist:
             #f.wait()
             mofka_t.append(["push", projection_id, ts, time.perf_counter(), time.perf_counter() - ts, sys.getsizeof(self.buffer[self.counter][i][0]) ,len(self.buffer[self.counter][i][1])])
 
-        print("Flusing images")
+        # print("Flusing images")
 
         # self.seq += 1
         self.counter += 1
