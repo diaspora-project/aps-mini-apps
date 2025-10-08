@@ -56,7 +56,7 @@ echo bash run-dist.sh ${num_sinograms} ${sirt_tasks} ${logdir}
 # sleep 10
 
 echo "Start SIRT -----------------------------------------------------------"
-bash run-sirt.sh ${sirt_ranks} ${logdir} > ${logdir}/sirt.out 2> ${logdir}/sirt.err &
+bash run-sirt-polaris.sh ${sirt_ranks} ${logdir} > ${logdir}/sirt.out 2> ${logdir}/sirt.err &
 echo bash run-sirt.sh ${sirt_ranks} ${logdir}
 
 # echo "Start Exp Control ----------------------------------------------------"
