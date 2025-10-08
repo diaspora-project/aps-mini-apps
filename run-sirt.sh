@@ -63,4 +63,5 @@ python -u ./build/python/streamer-sirt/ParslSirt.py \
     --ckpt-freq 4 \
     --ckpt-name sirt \
     --ckpt-config veloc.cfg \
+    --recon-output-dir ./build/denoise \
     --logdir ${logdir}

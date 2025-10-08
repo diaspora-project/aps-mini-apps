@@ -282,15 +282,12 @@ int ReconTask::run() {
             {"app_dims", app_dims},
             {"recon_slice_data_index", recon_slice_data_index}};
 
-        // if (passes % 4 == 0) {
-        //   std::stringstream iteration_stream;
-        //   iteration_stream << ckpt_name << "-" << std::setfill('0') << std::setw(6) << passes;
-        //   std::string outputpath = config.kReconOutputDir + "/" + 
-        //     iteration_stream.str() + "-recon.h5";
-        //   saveAsHDF5(outputpath.c_str(), 
-        //       &recon[recon_slice_data_index], app_dims);
-          
-        // }
+        std::stringstream iteration_stream;
+        iteration_stream << ckpt_name << "-" << std::setfill('0') << std::setw(6) << passes;
+        std::string outputpath = config.kReconOutputDir + "/" + 
+          iteration_stream.str() + "-recon.h5";
+        saveAsHDF5(outputpath.c_str(), 
+            &recon[recon_slice_data_index], app_dims);
 
         ms.publishImage(md, &recon[recon_slice_data_index], data_size, producer);
 
