@@ -7,6 +7,8 @@ source activate-spack.sh
 
 app_dir=`pwd`
 
+export CRAYPE_LINK_TYPE=dynamic
+
 echo "SETTING UP SIRT ------------------------ "
 cd include/tracelib
 flatc -c trace_prot.fbs
