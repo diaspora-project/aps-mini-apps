@@ -123,7 +123,7 @@ mofkactl partition add sirt_den \
 	--metadata "${METADATA_PROVIDER}" \
 	--data "${DATA_PROVIDER}"
 
-python ./build/python/streamer-daq/DAQStream.py \
+python -u ./build/python/streamer-daq/DAQStream.py \
 	--mode 1 \
 	--simulation_file ./data/tomo_00058_all_subsampled1p_s1079s1081.h5 \
 	--d_iteration 1 \
