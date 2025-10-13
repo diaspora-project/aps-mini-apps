@@ -55,9 +55,6 @@ for num_sirt in "${num_sirts[@]}"; do
         $failure_period \
         > test-log-num-sirt-$num_sirt-failure-period-$failure_period.out 2> test-log-num-sirt-$num_sirt-failure-period-$failure_period.err
 
-
-        
-
     echo "Stop Flink cluster"
     cd "$WORKSPACE"
     bash stop-all.sh
