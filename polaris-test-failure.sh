@@ -55,7 +55,7 @@ for num_sirt in "${num_sirts[@]}"; do
     mkdir -p "$WORKSPACE"
     cd "$WORKSPACE"
 
-    echo "num_sirt: $num_sirt  failure_period: $failure_period ====================================="
+    echo "num_sirt: $num_sirt failure_mode $failure_mode failure_period: $failure_period ====================================="
     echo "Copy execution scripts from $DIR to workspace $WORKSPACE"
     rsync -av --filter='- /*.h5' "$DIR/" "$WORKSPACE/" > /dev/null
 
