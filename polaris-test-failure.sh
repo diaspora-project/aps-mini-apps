@@ -42,6 +42,10 @@ cleanup_cluster() {
 }
 trap cleanup_cluster EXIT
 
+# Set up compoenents
+cd $DIR
+bash setup.sh
+
 count=0
 for num_sirt in "${num_sirts[@]}"; do
   for failure_period in "${failure_periods[@]}"; do
@@ -53,7 +57,7 @@ for num_sirt in "${num_sirts[@]}"; do
 
     echo "num_sirt: $num_sirt  failure_period: $failure_period ====================================="
     echo "Copy execution scripts from $DIR to workspace $WORKSPACE"
-    rsync "$DIR/" "$WORKSPACE/" > /dev/null
+    rsync -av --filter='- /*.h5' "$DIR/" "$WORKSPACE/" > /dev/null
 
     num_task=$num_sirt
     num_sinogram=$num_sirt
