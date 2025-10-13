@@ -19,18 +19,20 @@ rm -rf /tmp/scratch/*
 rm -rf /tmp/persistent/*
 
 # Check if the number of arguments is corre
-if [ "$#" -ne 4 ]; then
+if [ "$#" -ne 5s ]; then
     echo "Usage: exec-pipeline.sh <sirt_ranks> <num_sinograms>"
     echo "  <sirt_ranks>    Number of SIRT workers/processes"
     echo "  <sirt_tasks>    Number of SIRT tasks/threads"
     echo "  <num_sinograms> Number of sinograms to process"
-    echo "  <mtbf>         Mean time between failures (in seconds)"
+    echo "  <failure_mode>  single|periodic|random"
+    echo "  <mtbf>          Mean time between failures (in seconds)"
     exit 1
 fi
 sirt_ranks=$1
 sirt_tasks=$2
 num_sinograms=$3
-mtbf=$4
+failure_mode=$4
+mtbf=$5
 
 DATE=$(date +"%Y-%m-%d-%Hh%Mmin%Ssec")
 logdir=build/logs/D${DATE}
@@ -60,7 +62,7 @@ bash run-sirt-polaris.sh ${sirt_ranks} ${logdir} > ${logdir}/sirt.out 2> ${logdi
 echo bash run-sirt.sh ${sirt_ranks} ${logdir}
 
 # echo "Start Exp Control ----------------------------------------------------"
-bash run-exp-control.sh ${mtbf} ${logdir} 2> ${logdir}/exp-control.err | tee ${logdir}/exp-control.out &
+bash run-exp-control.sh ${failure_mode} ${mtbf} ${logdir} 2> ${logdir}/exp-control.err | tee ${logdir}/exp-control.out &
 echo bash run-exp-control.sh ${mtbf} ${logdir}
 
 echo "Start DEN ------------------------------------------------------------"

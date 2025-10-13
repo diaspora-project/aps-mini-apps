@@ -1,15 +1,9 @@
-DIR=$PWD
-echo $DIR
+#!/bin/bash
 
-RUNS=10
+DATE=$(date +"%Y-%m-%d-%Hh%Mmin%Ssec")
+TOP=/lus/eagle/projects/Diaspora/ndhai/aps-mini-apps/failure-injection/periodic/D${DATE}/
+mkdir -p $TOP
+echo $TOP > recent-run
+cd $TOP
+qsub -o $TOP $HOME/diaspora/src/aps-mini-apps/polaris-test-failure.sh
 
-for R in  1 #$(seq 1 $RUNS)
-do
-    DATE=$(date +"%Y-%m-%d_%T")
-    WORKSPACE=/eagle/radix-io/agueroudji/FULL_ASYNC_1/64/D${DATE}/
-    mkdir  -p $WORKSPACE
-    cd $WORKSPACE
-    cp -r  $DIR/* .
-    echo Running in $WORKSPACE
-    qsub -o $WORKSPACE polaris.sh
-done
