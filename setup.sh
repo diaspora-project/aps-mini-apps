@@ -7,6 +7,8 @@ source activate-spack.sh
 
 app_dir=`pwd`
 
+export CRAYPE_LINK_TYPE=dynamic
+
 echo "SETTING UP SIRT ------------------------ "
 cd include/tracelib
 flatc -c trace_prot.fbs
@@ -18,7 +20,7 @@ cmake -S .. -B build \
   -DCMAKE_C_COMPILER=cc \
   -DCMAKE_CXX_COMPILER=CC \
   -DCMAKE_Fortran_COMPILER=ftn \
-  -DCMAKE_BUILD_TYPE=Debug \
+  -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_PREFIX_PATH=/home/ndhai/diaspora/src/spack/var/spack/environments/APS/.spack-env/view
 cmake --build build -j
 mkdir -p python/streamer-sirt

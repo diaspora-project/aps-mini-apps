@@ -15,12 +15,11 @@ endif()
 
 # ---------- Build type & warnings ----------
 if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
-  set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS Debug Release RelWithDebInfo MinSizeRel)
+  set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the build type (Debug, Release, RelWithDebInfo, MinSizeRel)" FORCE)
 endif()
-set(CMAKE_BUILD_TYPE Debug CACHE STRING "" FORCE)
+set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS Debug Release RelWithDebInfo MinSizeRel)
 
-set(CMAKE_CXX_FLAGS_DEBUG   "${CMAKE_CXX_FLAGS_DEBUG} -g -O0 -Wall -Wextra")
+set(CMAKE_CXX_FLAGS_DEBUG   "${CMAKE_CXX_FLAGS_DEBUG} -g -O3 -Wall -Wextra")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 add_definitions(-DTIMERON)
 
@@ -131,6 +130,7 @@ endif()
 add_library(sirt ${TRACE_ROOT}/src/sirt/sirt.cc)
 target_link_libraries(sirt
   PUBLIC
+    trace_utils
     Boost::serialization
     HDF5::HDF5
 )
