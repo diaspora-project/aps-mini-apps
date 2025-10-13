@@ -30,16 +30,20 @@ def get_running_sirt_streamers():
     except (subprocess.CalledProcessError, FileNotFoundError):
         return []
 
-def inject_failure(mtbf):
+def inject_failure(failure_mode, mtbf):
     """
     Inject failure into sirt-stream based on a Poisson process.
     :param mtbf: Mean time between failures (MTBF) in seconds.
     """
+    injected_failures = 0
     lambda_rate = 1 / mtbf  # Convert MTBF to failure rate (lambda)
     while True:
         # Generate the next failure time using an exponential distribution
-        # next_failure_time = random.expovariate(lambda_rate)
         next_failure_time = mtbf
+        if failure_mode == "random":
+            next_failure_time = random.expovariate(lambda_rate)
+        if injected_failures > 0 and failure_mode == "single":
+            break
         time.sleep(next_failure_time)
 
         # Get the list of running sirt-streamer processes
@@ -49,22 +53,24 @@ def inject_failure(mtbf):
             pid_to_kill = random.choice(running_processes)
             os.kill(pid_to_kill, signal.SIGTERM)  # Send SIGTERM to the selected process
             print(f"[WARNING] ===========> Failure injected: Killed sirt-streamer process with PID {pid_to_kill}")
+            inject_failures += 1
         else:
             print("No running sirt-streamer processes found to kill.")
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: python FailureInjector.py <mtbf>")
+    if len(sys.argv) != 3:
+        print("Usage: python FailureInjector.py <failure_mode> <mtbf>")
         sys.exit(1)
 
     try:
-        mtbf = float(sys.argv[1])
+        failure_mode=sys.argv[1]
+        mtbf = float(sys.argv[2])
         if mtbf <= 0:
             raise ValueError("MTBF must be positive.")
     except ValueError as e:
         print(f"Invalid MTBF: {e}")
         sys.exit(1)
     print(f"Starting failure injection with MTBF: {mtbf} seconds")
-    inject_failure(mtbf)
+    inject_failure(failure_mode, mtbf)
 
 
