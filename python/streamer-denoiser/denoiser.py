@@ -119,7 +119,11 @@ def main(input_path, recon_path, model_path, protocol, group_file, batchsize, np
                 dd = event.data[0]
                 mofka_times.append([t_wait - ts, t_meta - t_wait, sys.getsizeof(m), time.perf_counter() - t_data, len(dd)])
                 dd = np.frombuffer(dd, dtype=np.float32)
-                dd = dd.reshape(metadata[i]["rank_dims"])
+                try:
+                    dd = dd.reshape(metadata[i]["rank_dims"])
+                except ValueError:
+                    shape = tuple(metadata[i]["rank_dims"])
+                    dd = np.zeros(shape, dtype=dd.dtype)
                 data.append(dd)
         if len(metadata) > 0:
             correct_order_meta = [
