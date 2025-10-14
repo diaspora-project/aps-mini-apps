@@ -65,7 +65,8 @@ echo "bash run-mofka.sh"
 sleep 10
 
 echo "Start DAQ ------------------------------------------------------------"
-bash run-daq.sh "${sirt_ranks}" "${sirt_tasks}" "${num_sinograms}" "${logdir}" > "${logdir}/daq.out" 2> "${logdir}/daq.err" &
+# bash run-daq.sh "${sirt_ranks}" "${sirt_tasks}" "${num_sinograms}" "${logdir}" > "${logdir}/daq.out" 2> "${logdir}/daq.err" &
+bash run-daq.sh "${sirt_ranks}" "${sirt_tasks}" "${num_sinograms}" "${logdir}" > "${logdir}/daq.log" 2> "${logdir}/daq.log" &
 echo "bash run-daq.sh ${sirt_ranks} ${sirt_tasks} ${num_sinograms} ${logdir}"
 sleep 10
 
