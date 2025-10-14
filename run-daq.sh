@@ -124,6 +124,8 @@ mofkactl partition add dist_sirt_action \
 	--metadata "${METADATA_PROVIDER}" \
 	--data "${DATA_PROVIDER}"
 
+sleep 10
+
 echo create sirt_den topic
 
 mofkactl topic create sirt_den \
