@@ -59,7 +59,7 @@ for num_sirt in "${num_sirts[@]}"; do
     rsync -av --filter='- /*.h5' "$DIR/" "$WORKSPACE/" > /dev/null
 
     num_task=$num_sirt
-    num_sinogram=$num_sirt
+    num_sinogram=$(( num_task * 2 ))
     echo "Run the test"
     bash polaris-exec-pipeline.sh \
         $num_sirt \
