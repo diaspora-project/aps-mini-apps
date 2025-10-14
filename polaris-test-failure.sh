@@ -68,10 +68,6 @@ for num_sirt in "${num_sirts[@]}"; do
         $failure_mode \
         $failure_period \
         > $WORKSPACE/test-log.out 2> $WORKSPACE/test-log.err
-
-    echo "Stop Flink cluster"
-    cd "$WORKSPACE"
-    bash stop-all.sh
     sleep 1
 
     count=$((count + 1))
