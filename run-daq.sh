@@ -38,6 +38,8 @@ DATA_PROVIDER=$(
             --config.create_if_missing true
         )
 
+echo create daq_dist topic and partition
+
 mofkactl topic create daq_dist \
 	--groupfile mofka.json
 
@@ -47,6 +49,8 @@ mofkactl partition add daq_dist \
 	--groupfile mofka.json \
 	--metadata "${METADATA_PROVIDER}" \
 	--data "${DATA_PROVIDER}"
+
+echo create dist topics and partitions for handshakes and data
 
 #DIST topics
 mofkactl topic create dist_sirt \
@@ -65,11 +69,15 @@ mofkactl partition add handshake_s_d \
 	--metadata "${METADATA_PROVIDER}" \
 	--data "${DATA_PROVIDER}"
 
+echo create dist partitions for sirt action control
+
 # Action channel for flow control and load balancing
 mofkactl topic create dist_sirt_action \
 	--groupfile mofka.json
 mofkactl topic create sirt_dist_action \
 	--groupfile mofka.json
+
+echo create sirt topics for handshakes with dist
 
 for i in $(seq 1 $sirt_tasks)
 do
@@ -88,6 +96,8 @@ do
 		--data "${DATA_PROVIDER}"
 done
 
+echo create sirt topics for returning handshakes
+
 for i in $(seq 1 $sirt_ranks)
 do
 	mofkactl partition add handshake_s_d \
@@ -97,6 +107,8 @@ do
 		--metadata "${METADATA_PROVIDER}" \
 		--data "${DATA_PROVIDER}"
 done
+
+echo create sirt partitions for action control
 
 mofkactl partition add sirt_dist_action \
 	--type default \
@@ -112,6 +124,8 @@ mofkactl partition add dist_sirt_action \
 	--metadata "${METADATA_PROVIDER}" \
 	--data "${DATA_PROVIDER}"
 
+echo create sirt_den topic and partition
+
 mofkactl topic create sirt_den \
 	--groupfile mofka.json
 
@@ -122,6 +136,8 @@ mofkactl partition add sirt_den \
 	--groupfile mofka.json \
 	--metadata "${METADATA_PROVIDER}" \
 	--data "${DATA_PROVIDER}"
+
+echo "Starting DAQ ..."
 
 python -u ./build/python/streamer-daq/DAQStream.py \
 	--mode 1 \

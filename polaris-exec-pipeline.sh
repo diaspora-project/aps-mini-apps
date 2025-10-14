@@ -62,7 +62,7 @@ start_iso=$(date -Iseconds)
 echo "Start Mofka server ---------------------------------------------------"
 bash run-mofka.sh > "${logdir}/mofka.out" 2> "${logdir}/mofka.err" &
 echo "bash run-mofka.sh"
-sleep 20
+sleep 10
 
 echo "Start DAQ ------------------------------------------------------------"
 bash run-daq.sh "${sirt_ranks}" "${sirt_tasks}" "${num_sinograms}" "${logdir}" > "${logdir}/daq.out" 2> "${logdir}/daq.err" &
