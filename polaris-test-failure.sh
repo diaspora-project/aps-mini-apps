@@ -1,5 +1,5 @@
 #!/bin/bash
-#PBS -l select=2:system=polaris
+#PBS -l select=1:system=polaris
 #PBS -l walltime=01:00:00
 #PBS -N Flink
 #PBS -q debug-scaling
