@@ -122,8 +122,7 @@ def main(input_path, recon_path, model_path, protocol, group_file, batchsize, np
                 try:
                     dd = dd.reshape(metadata[i]["rank_dims"])
                 except ValueError:
-                    shape = tuple(metadata[i]["rank_dims"])
-                    dd = np.zeros(shape, dtype=dd.dtype)
+                    dd = np.zeros(metadata[i]["rank_dims"], dtype=dd.dtype)
                 data.append(dd)
         if len(metadata) > 0:
             correct_order_meta = [
