@@ -53,7 +53,7 @@ def inject_failure(failure_mode, mtbf):
             pid_to_kill = random.choice(running_processes)
             os.kill(pid_to_kill, signal.SIGTERM)  # Send SIGTERM to the selected process
             print(f"[WARNING] ===========> Failure injected: Killed sirt-streamer process with PID {pid_to_kill}")
-            inject_failures += 1
+            injected_failures += 1
         else:
             print("No running sirt-streamer processes found to kill.")
 
