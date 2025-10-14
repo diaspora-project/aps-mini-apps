@@ -61,7 +61,7 @@ for num_sirt in "${num_sirts[@]}"; do
     num_task=$num_sirt
     num_sinogram=$num_sirt
     echo "Run the test"
-    time polaris-exec-pipeline.sh \
+    bash polaris-exec-pipeline.sh \
         $num_sirt \
         $num_task \
         $num_sinogram \
