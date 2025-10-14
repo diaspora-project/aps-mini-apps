@@ -60,7 +60,7 @@ start_ns=$(date +%s%N)
 start_iso=$(date -Iseconds)
 
 echo "Start Mofka server ---------------------------------------------------"
-bash run-mofka.sh > "${logdir}/mofka.out" 2> "${logdir}/mofka.err" &
+bash run-mofka-polaris.sh > "${logdir}/mofka.out" 2> "${logdir}/mofka.err" &
 echo "bash run-mofka.sh"
 sleep 10
 
