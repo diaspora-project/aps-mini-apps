@@ -124,10 +124,12 @@ mofkactl partition add dist_sirt_action \
 	--metadata "${METADATA_PROVIDER}" \
 	--data "${DATA_PROVIDER}"
 
-echo create sirt_den topic and partition
+echo create sirt_den topic
 
 mofkactl topic create sirt_den \
 	--groupfile mofka.json
+
+echo create sirt_den partition
 
 
 mofkactl partition add sirt_den \
