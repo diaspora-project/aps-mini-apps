@@ -84,7 +84,8 @@ start_iso=$(date -Iseconds)
 
 echo "Start Mofka server ---------------------------------------------------"
 # mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_mofka bash $exec_dir/run-mofka-polaris.sh > "${logdir}/mofka.out" 2> "${logdir}/mofka.err" &
-mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_mofka bedrock cxi -v trace -c config.json > "${logdir}/mofka.out" 2> "${logdir}/mofka.err" &
+# mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_mofka bedrock cxi -v trace -c config.json > "${logdir}/mofka.out" 2> "${logdir}/mofka.err" &
+mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_mofka bedrock na+sm -c config.json > "${logdir}/mofka.out" 2> "${logdir}/mofka.err" &
 echo "mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_mofka bash $exec_dir/run-mofka-polaris.sh"
 sleep 10
 
