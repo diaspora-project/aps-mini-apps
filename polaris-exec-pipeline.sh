@@ -55,39 +55,51 @@ echo "Logging execution information at ${logdir}"
 ln -sfn "$(pwd)/${logdir}" "build/logs/latest"
 echo "Updated symlink: build/logs/latest -> ${logdir}"
 
+
+# TODO: Assign tasks to nodes here
+nodes=$(cat "$PBS_NODEFILE")
+nodes_array=($nodes)
+
+node_daq=${nodes_array[0]}
+node_dist=${nodes_array[0]}
+node_sirts=${nodes_array[0]}
+node_den=${nodes_array[0]}
+node_mofka=${nodes_array[0]}
+
+
 # --- Start timing just before orchestration ---
 start_ns=$(date +%s%N)
 start_iso=$(date -Iseconds)
 
 echo "Start Mofka server ---------------------------------------------------"
-bash run-mofka-polaris.sh > "${logdir}/mofka.out" 2> "${logdir}/mofka.err" &
-echo "bash run-mofka.sh"
+mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_mofka run-mofka-polaris.sh > "${logdir}/mofka.out" 2> "${logdir}/mofka.err" &
+echo "mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_mofka run-mofka-polaris.sh"
 sleep 10
 
 echo "Start DAQ ------------------------------------------------------------"
 # bash run-daq.sh "${sirt_ranks}" "${sirt_tasks}" "${num_sinograms}" "${logdir}" > "${logdir}/daq.out" 2> "${logdir}/daq.err" &
-bash run-daq.sh "${sirt_ranks}" "${sirt_tasks}" "${num_sinograms}" "${logdir}" >> "${logdir}/daq.log" 2>> "${logdir}/daq.log" &
-echo "bash run-daq.sh ${sirt_ranks} ${sirt_tasks} ${num_sinograms} ${logdir}"
+mpiexec  --no-vni -n 1 -ppn 1 -d 16 --hosts $node_daq run-daq.sh "${sirt_ranks}" "${sirt_tasks}" "${num_sinograms}" "${logdir}" >> "${logdir}/daq.log" 2>> "${logdir}/daq.log" &
+echo "mpiexec  --no-vni -n 1 -ppn 1 -d 16 --hosts $node_daq run-daq.sh ${sirt_ranks} ${sirt_tasks} ${num_sinograms} ${logdir}"
 sleep 20
 
 echo "Start DIST -----------------------------------------------------------"
-bash run-dist.sh "${num_sinograms}" "${sirt_tasks}" "${logdir}" > "${logdir}/dist.out" 2> "${logdir}/dist.err" &
-echo "bash run-dist.sh ${num_sinograms} ${sirt_tasks} ${logdir}"
+mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_dist run-dist.sh "${num_sinograms}" "${sirt_tasks}" "${logdir}" > "${logdir}/dist.out" 2> "${logdir}/dist.err" &
+echo "mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_dist run-dist.sh ${num_sinograms} ${sirt_tasks} ${logdir}"
 # sleep 10  # intentionally not sleeping to avoid extra idle time
 
 echo "Start SIRT -----------------------------------------------------------"
-bash run-sirt-polaris.sh "${sirt_ranks}" "${logdir}" > "${logdir}/sirt.out" 2> "${logdir}/sirt.err" &
-echo "bash run-sirt-polaris.sh ${sirt_ranks} ${logdir}"
+mpiexec --no-vni -n $sirt_ranks -ppn $sirt_ranks -d 16 --hosts $node_sirt run-sirt-polaris.sh "${sirt_ranks}" "${logdir}" > "${logdir}/sirt.out" 2> "${logdir}/sirt.err" &
+echo "mpiexec --no-vni -n $sirt_ranks -ppn $sirt_ranks -d 16 --hosts $node_sirt run-sirt-polaris.sh ${sirt_ranks} ${logdir}"
 
 echo "Start Exp Control ----------------------------------------------------"
 # Note: runs in background; tee ensures logs are written and exit codes propagate via -o pipefail
-bash run-exp-control.sh "${failure_mode}" "${mtbf}" "${logdir}" 2> "${logdir}/exp-control.err" | tee "${logdir}/exp-control.out" &
-echo "bash run-exp-control.sh ${failure_mode} ${mtbf} ${logdir}"
+mpiexec --no-vni -n $sirt_ranks -ppn $sirt_ranks -d 16 --hosts $node_sirt run-exp-control.sh "${failure_mode}" "${mtbf}" "${logdir}" 2> "${logdir}/exp-control.err" | tee "${logdir}/exp-control.out" &
+echo "mpiexec --no-vni -n $sirt_ranks -ppn $sirt_ranks -d 16 --hosts $node_sirt run-exp-control.sh ${failure_mode} ${mtbf} ${logdir}"
 
 echo "Start DEN ------------------------------------------------------------"
-echo "bash run-den.sh ${sirt_tasks} ${logdir}"
+echo "mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_den run-den.sh ${sirt_tasks} ${logdir}"
 # IMPORTANT: DEN is the foreground block until pipeline finishes
-bash run-den.sh "${sirt_tasks}" "${logdir}" 2> "${logdir}/den.err" | tee "${logdir}/den.out"
+mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_den run-den.sh "${sirt_tasks}" "${logdir}" 2> "${logdir}/den.err" | tee "${logdir}/den.out"
 
 # --- If we reached here, DEN completed; mark end time BEFORE cleanup ---
 end_ns=$(date +%s%N)
