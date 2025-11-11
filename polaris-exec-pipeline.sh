@@ -69,6 +69,13 @@ node_sirts=${nodes_array[0]}
 node_den=${nodes_array[0]}
 node_mofka=${nodes_array[0]}
 
+export MARGO_ENABLE_MONITORING=1
+export MARGO_MONITORING_FILENAME_PREFIX=mofka
+export MARGO_MONITORING_DISABLE_TIME_SERIES=true
+
+export HG_LOG_LEVEL=error
+export FI_LOG_LEVEL=Trace
+
 exec_dir=`pwd`
 
 # --- Start timing just before orchestration ---
@@ -84,7 +91,7 @@ sleep 10
 echo "Start DAQ ------------------------------------------------------------"
 # bash run-daq.sh "${sirt_ranks}" "${sirt_tasks}" "${num_sinograms}" "${logdir}" > "${logdir}/daq.out" 2> "${logdir}/daq.err" &
 mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_daq bash $exec_dir/run-daq.sh "${sirt_ranks}" "${sirt_tasks}" "${num_sinograms}" "${logdir}" >> "${logdir}/daq.log" 2>> "${logdir}/daq.log" &
-echo "mpiexec  --no-vni -n 1 -ppn 1 -d 16 --hosts $node_daq bash $exec_dir/run-daq.sh ${sirt_ranks} ${sirt_tasks} ${num_sinograms} ${logdir}"
+echo "mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_daq bash $exec_dir/run-daq.sh ${sirt_ranks} ${sirt_tasks} ${num_sinograms} ${logdir}"
 sleep 20
 
 echo "Start DIST -----------------------------------------------------------"
