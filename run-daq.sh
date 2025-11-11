@@ -38,7 +38,7 @@ DATA_PROVIDER=$(
             --config.create_if_missing true
         )
 
-echo create daq_dist topic and partition
+echo create daq_dist topic and partitions
 
 mofkactl topic create daq_dist \
 	--groupfile mofka.json
@@ -50,11 +50,14 @@ mofkactl partition add daq_dist \
 	--metadata "${METADATA_PROVIDER}" \
 	--data "${DATA_PROVIDER}"
 
-echo create dist topics and partitions for handshakes and data
+
+echo create dist_sirt topics
 
 #DIST topics
 mofkactl topic create dist_sirt \
 	--groupfile mofka.json
+
+echo create dist-sirt handshakes topics
 
 mofkactl topic create handshake_s_d \
 	--groupfile mofka.json
@@ -62,22 +65,7 @@ mofkactl topic create handshake_s_d \
 mofkactl topic create handshake_d_s \
 	--groupfile mofka.json
 
-mofkactl partition add handshake_s_d \
-	--type default \
-	--rank 0 \
-	--groupfile mofka.json \
-	--metadata "${METADATA_PROVIDER}" \
-	--data "${DATA_PROVIDER}"
-
-echo create dist partitions for sirt action control
-
-# Action channel for flow control and load balancing
-mofkactl topic create dist_sirt_action \
-	--groupfile mofka.json
-mofkactl topic create sirt_dist_action \
-	--groupfile mofka.json
-
-echo create sirt topics for handshakes with dist
+echo create sirt partitions for dist-sirt and their handshake
 
 for i in $(seq 1 $sirt_tasks)
 do
@@ -94,12 +82,7 @@ do
 		--groupfile mofka.json \
 		--metadata "${METADATA_PROVIDER}" \
 		--data "${DATA_PROVIDER}"
-done
 
-echo create sirt topics for returning handshakes
-
-for i in $(seq 1 $sirt_ranks)
-do
 	mofkactl partition add handshake_s_d \
 		--type default \
 		--rank 0 \
@@ -107,6 +90,14 @@ do
 		--metadata "${METADATA_PROVIDER}" \
 		--data "${DATA_PROVIDER}"
 done
+
+echo create dist-irt action control topics
+
+# Action channel for flow control and load balancing
+mofkactl topic create dist_sirt_action \
+	--groupfile mofka.json
+mofkactl topic create sirt_dist_action \
+	--groupfile mofka.json
 
 echo create sirt partitions for action control
 
@@ -124,15 +115,12 @@ mofkactl partition add dist_sirt_action \
 	--metadata "${METADATA_PROVIDER}" \
 	--data "${DATA_PROVIDER}"
 
-sleep 20
-
-echo create sirt_den topic
+echo create sirt-den topics and partitions
 
 mofkactl topic create sirt_den \
 	--groupfile mofka.json
 
 echo create sirt_den partition
-
 
 mofkactl partition add sirt_den \
 	--type default \
