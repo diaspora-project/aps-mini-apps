@@ -65,7 +65,8 @@ nodes_array=($nodes)
 
 node_daq=${nodes_array[0]}
 node_dist=${nodes_array[0]}
-node_sirts=${nodes_array[0]}
+# node_sirts=${nodes_array[0]}
+node_sirts=$nodes_array
 node_den=${nodes_array[0]}
 node_mofka=${nodes_array[0]}
 
@@ -101,8 +102,8 @@ echo "mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_dist bash $exec_dir/run-d
 # sleep 10  # intentionally not sleeping to avoid extra idle time
 
 echo "Start SIRT -----------------------------------------------------------"
-mpiexec --no-vni -n $sirt_ranks -ppn $sirt_ranks -d 16 --hosts bash $node_sirt $exec_dir/run-sirt-polaris.sh "${sirt_ranks}" "${logdir}" > "${logdir}/sirt.out" 2> "${logdir}/sirt.err" &
-echo "mpiexec --no-vni -n $sirt_ranks -ppn $sirt_ranks -d 16 --hosts bash $node_sirt $exec_dir/run-sirt-polaris.sh ${sirt_ranks} ${logdir}"
+mpiexec --no-vni -n $sirt_ranks -ppn $sirt_ranks -d 16 --hosts $node_sirts bash $node_sirt $exec_dir/run-sirt-polaris.sh "${sirt_ranks}" "${logdir}" > "${logdir}/sirt.out" 2> "${logdir}/sirt.err" &
+echo "mpiexec --no-vni -n $sirt_ranks -ppn $sirt_ranks -d 16 --hosts $node_sirts bash $node_sirt $exec_dir/run-sirt-polaris.sh ${sirt_ranks} ${logdir}"
 
 echo "Start Exp Control ----------------------------------------------------"
 # Note: runs in background; tee ensures logs are written and exit codes propagate via -o pipefail
