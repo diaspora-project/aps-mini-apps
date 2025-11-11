@@ -73,8 +73,8 @@ start_ns=$(date +%s%N)
 start_iso=$(date -Iseconds)
 
 echo "Start Mofka server ---------------------------------------------------"
-mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_mofka $exec_dir/run-mofka-polaris.sh > "${logdir}/mofka.out" 2> "${logdir}/mofka.err" &
-echo "mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_mofka $exec_dir/run-mofka-polaris.sh"
+mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_mofka bash $exec_dir/run-mofka-polaris.sh > "${logdir}/mofka.out" 2> "${logdir}/mofka.err" &
+echo "mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_mofka bash $exec_dir/run-mofka-polaris.sh"
 sleep 10
 
 echo "Start DAQ ------------------------------------------------------------"
