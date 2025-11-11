@@ -82,6 +82,7 @@ parsl_config = Config(
     app_cache=True
 )
 
+parsl.load(parsl_config)
 
 
 HERE = Path(__file__).resolve().parent
