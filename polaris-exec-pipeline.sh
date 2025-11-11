@@ -66,9 +66,9 @@ sleep 10
 
 echo "Start DAQ ------------------------------------------------------------"
 # bash run-daq.sh "${sirt_ranks}" "${sirt_tasks}" "${num_sinograms}" "${logdir}" > "${logdir}/daq.out" 2> "${logdir}/daq.err" &
-bash run-daq.sh "${sirt_ranks}" "${sirt_tasks}" "${num_sinograms}" "${logdir}" >> "${logdir}/daq.log" 2>> "${logdir}/daq.log" &
+bash run-daq.sh "${sirt_ranks}" "${sirt_tasks}" "${num_sinograms}" "${logdir}" >> "${logdir}/daq.out" 2>> "${logdir}/daq.err" &
 echo "bash run-daq.sh ${sirt_ranks} ${sirt_tasks} ${num_sinograms} ${logdir}"
-sleep 10
+sleep 20
 
 echo "Start DIST -----------------------------------------------------------"
 bash run-dist.sh "${num_sinograms}" "${sirt_tasks}" "${logdir}" > "${logdir}/dist.out" 2> "${logdir}/dist.err" &
