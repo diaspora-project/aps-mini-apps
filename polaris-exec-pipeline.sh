@@ -3,6 +3,9 @@
 # --- Safety ---
 set -eE -o pipefail
 
+# Load modules and activate spack env
+source activate-spack.sh
+
 # Kill all related processes on error/ctrl-c
 cleanup_on_error() {
   echo "!! Aborting, cleaning up processes..." >&2
