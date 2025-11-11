@@ -63,8 +63,8 @@ parsl_config = Config(
             heartbeat_period=15,
             heartbeat_threshold=120,
             worker_debug=True,
-            available_accelerators=user_opts["available_accelerators"],
-            max_workers_per_node=user_opts["available_accelerators"],
+            # available_accelerators=user_opts["available_accelerators"],
+            # max_workers_per_node=user_opts["available_accelerators"],
             # This give optimal binding of threads to GPUs on a Polaris node
             cpu_affinity="list:24-31,56-63:16-23,48-55:8-15,40-47:0-7,32-39",
             prefetch_capacity=0,
