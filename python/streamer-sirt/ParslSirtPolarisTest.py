@@ -104,8 +104,8 @@ def main():
     for i in range(int(2)):
         fut = run_sirt(
             id=str(i),
-            logdir=p.logdir,
-            args=all_args,
+            logdir="",
+            args={},
             launcher_env={"LD_LIBRARY_PATH": effective_ld},
             sirt_bin_path=sirt_bin_str
         )
