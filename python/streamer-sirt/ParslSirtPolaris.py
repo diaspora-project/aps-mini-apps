@@ -24,6 +24,9 @@ from parsl.launchers import MpiExecLauncher
 # For checkpointing:
 from parsl.utils import get_all_checkpoints
 
+
+print("Parsl version:", parsl.__version__)
+
 # # ---------------------------------------------------------------------------
 # # Parsl config
 # # ---------------------------------------------------------------------------
