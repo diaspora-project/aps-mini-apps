@@ -47,9 +47,11 @@ with open(node_file,"r") as f:
     node_list = f.readlines()
     num_nodes = len(node_list)
 
+ed = "/home/ndhai/diaspora/src/aps-mini-apps"
+
 user_opts = {
     # "worker_init":      f"source /path/to/your/virtualenv/bin/activate; cd {run_dir}", # load the environment where parsl is installed
-    "worker_init":      f"cd {run_dir}", # load the environment where parsl is installed
+    "worker_init":      f"cd {ed}; source activate-spack.sh; source pyvenv/bin/activate; cd {run_dir}", # load the environment where parsl is installed
     "scheduler_options":"#PBS -l filesystems=home:eagle" , # specify any PBS options here, like filesystems
     "account":          "diaspora",
     "queue":            "debug-scaling",
@@ -58,25 +60,26 @@ user_opts = {
     "cpus_per_node":    32, # Up to 64 with multithreading
     "available_accelerators": 4, # Each Polaris node has 4 GPUs, setting this ensures one worker per GPU
 }
+print("User options:", user_opts)
 
 parsl_config = Config(
     executors=[
         HighThroughputExecutor(
             label="htex",
-            heartbeat_period=15,
-            heartbeat_threshold=120,
+            # heartbeat_period=15,
+            # heartbeat_threshold=120,
             worker_debug=True,
             # available_accelerators=user_opts["available_accelerators"],
             # max_workers_per_node=user_opts["available_accelerators"],
             # # This give optimal binding of threads to GPUs on a Polaris node
             # cpu_affinity="list:24-31,56-63:16-23,48-55:8-15,40-47:0-7,32-39",
-            prefetch_capacity=0,
             provider=LocalProvider(
                 # Number of nodes job
                 nodes_per_block=num_nodes,
                 launcher=MpiExecLauncher(bind_cmd="--cpu-bind", overrides="--ppn 1"),
                 init_blocks=1,
                 max_blocks=1,
+                worker_init=user_opts["worker_init"],
             ),
         ),
     ],
