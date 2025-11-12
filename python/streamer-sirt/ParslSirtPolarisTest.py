@@ -15,6 +15,8 @@ from parsl.configs.local_threads import config as local_threads_config
 from parsl.executors import ThreadPoolExecutor
 from parsl.config import Config
 
+from parsl.addresses import address_by_interface
+
 # PBSPro is the right provider for Polaris:
 from parsl.providers import LocalProvider
 # The high throughput executor is for scaling to HPC systems:
@@ -66,6 +68,7 @@ parsl_config = Config(
     executors=[
         HighThroughputExecutor(
             label="htex",
+            address=address_by_interface('bond0'),
             # heartbeat_period=15,
             # heartbeat_threshold=120,
             worker_debug=True,
