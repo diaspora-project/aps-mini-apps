@@ -106,7 +106,7 @@ def main():
             id=str(i),
             logdir="",
             args={},
-            launcher_env={"LD_LIBRARY_PATH": effective_ld},
+            launcher_env="",
             sirt_bin_path=sirt_bin_str
         )
         futures.append(fut)
