@@ -107,16 +107,13 @@ def main():
             logdir="",
             args={},
             launcher_env="",
-            sirt_bin_path=sirt_bin_str
+            sirt_bin_path=""
         )
         futures.append(fut)
 
     # Wait & print
     for f in futures:
         print(f.result())
-
-    if shim_dir:
-        shutil.rmtree(shim_dir, ignore_errors=True)
 
 if __name__ == "__main__":
     main()
