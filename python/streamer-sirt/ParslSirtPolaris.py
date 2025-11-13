@@ -57,8 +57,8 @@ if node_file and os.path.isfile(node_file):
 else:
     num_nodes = 1
 
-# ed = "/home/ndhai/diaspora/src/aps-mini-apps"
-ed = f"{run_dir}/../../../"
+ed = "/home/ndhai/diaspora/src/aps-mini-apps"
+# ed = f"{run_dir}/../../../"
 
 user_opts = {
     "worker_init": (
