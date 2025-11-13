@@ -114,8 +114,8 @@ echo "mpiexec --no-vni -n $sirt_ranks -ppn $sirt_ranks -d 16 --hosts $node_sirts
 
 echo "Start Exp Control ----------------------------------------------------"
 # Note: runs in background; tee ensures logs are written and exit codes propagate via -o pipefail
-mpiexec --no-vni -n $sirt_ranks -ppn $sirt_ranks -d 16 --hosts $node_control bash $node_sirt $exec_dir/run-exp-control.sh "${failure_mode}" "${mtbf}" "${logdir}" 2> "${logdir}/exp-control.err" | tee "${logdir}/exp-control.out" &
-echo "mpiexec --no-vni -n $sirt_ranks -ppn $sirt_ranks -d 16 --hosts $node_control bash $node_sirt $exec_dir/run-exp-control.sh ${failure_mode} ${mtbf} ${logdir}"
+bash $exec_dir/run-exp-control.sh "${failure_mode}" "${mtbf}" "${logdir}" 2> "${logdir}/exp-control.err" | tee "${logdir}/exp-control.out" &
+echo "mpiexec --no-vni -n $sirt_ranks -ppn $sirt_ranks -d 16 --hosts $node_control bash $exec_dir/run-exp-control.sh ${failure_mode} ${mtbf} ${logdir}"
 
 echo "Start DEN ------------------------------------------------------------"
 echo "mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_den $exec_dir/run-den.sh bash ${sirt_tasks} ${logdir}"
