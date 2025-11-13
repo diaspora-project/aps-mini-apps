@@ -38,29 +38,42 @@ print("Parsl version:", parsl.__version__)
 # #         ]
 # parsl.load(local_threads_config)
 
-tile_names = [f'{gid}.{tid}' for gid in range(6) for tid in range(2)]
+# --- Short temp/log roots to avoid AF_UNIX path length issues ---
+USER = os.environ.get("USER", "user")
+SHORT_TMP = f"/tmp/{USER}/parsl-tmp"
+SHORT_LOG = f"/tmp/{USER}/parsl-logs"
+os.makedirs(SHORT_TMP, exist_ok=True)
+os.makedirs(SHORT_LOG, exist_ok=True)
+os.environ["TMPDIR"] = SHORT_TMP            # make Python's temp sockets short
 
-# The config will launch workers from this directory
+# The config will launch workers from this directory (can be long; that’s OK now)
 run_dir = os.getcwd()
 
-# Get the number of nodes:
+# Get number of nodes (gracefully handle login node runs)
 node_file = os.getenv("PBS_NODEFILE")
-with open(node_file,"r") as f:
-    node_list = f.readlines()
-    num_nodes = len(node_list)
+if node_file and os.path.isfile(node_file):
+    with open(node_file, "r") as f:
+        num_nodes = len(f.readlines())
+else:
+    num_nodes = 1
 
-ed = "/home/ndhai/diaspora/src/aps-mini-apps"
+# ed = "/home/ndhai/diaspora/src/aps-mini-apps"
+ed = f"{run_dir}/../../../"
 
 user_opts = {
-    # "worker_init":      f"source /path/to/your/virtualenv/bin/activate; cd {run_dir}", # load the environment where parsl is installed
-    "worker_init":      f"cd {ed}; source activate-spack.sh; source pyvenv/bin/activate; cd {run_dir}", # load the environment where parsl is installed
-    "scheduler_options":"#PBS -l filesystems=home:eagle" , # specify any PBS options here, like filesystems
-    "account":          "diaspora",
-    "queue":            "debug-scaling",
-    "walltime":         "1:00:00",
-    "nodes_per_block":  3, # think of a block as one job on polaris, so to run on the main queues, set this >= 10
-    "cpus_per_node":    32, # Up to 64 with multithreading
-    "available_accelerators": 4, # Each Polaris node has 4 GPUs, setting this ensures one worker per GPU
+    "worker_init": (
+        # ensure worker processes inherit short TMPDIR and have envs
+        f"export TMPDIR={SHORT_TMP}; mkdir -p $TMPDIR; "
+        f"cd {ed}; source activate-spack.sh; source pyvenv/bin/activate; "
+        f"cd {run_dir}"
+    ),
+    "scheduler_options": "#PBS -l filesystems=home:eagle",
+    "account": "diaspora",
+    "queue": "debug-scaling",
+    "walltime": "1:00:00",
+    "nodes_per_block": 3,
+    "cpus_per_node": 32,
+    "available_accelerators": 4,
 }
 print("User options:", user_opts)
 
@@ -69,17 +82,17 @@ parsl_config = Config(
         HighThroughputExecutor(
             label="htex",
             address=address_by_interface('bond0'),
-            # heartbeat_period=15,
-            # heartbeat_threshold=120,
             worker_debug=True,
-            # available_accelerators=user_opts["available_accelerators"],
-            # max_workers_per_node=user_opts["available_accelerators"],
-            # # This give optimal binding of threads to GPUs on a Polaris node
-            # cpu_affinity="list:24-31,56-63:16-23,48-55:8-15,40-47:0-7,32-39",
+            # keep ports as you had them; not related to this error
+            worker_port_range=(54000, 55000),
+            interchange_port_range=(55000, 56000),
+            # CRUCIAL: write worker logs under short path to keep Manager sockets short
+            worker_logdir_root=SHORT_LOG,
+            # Optional: explicitly pick 'spawn' (usually default on 3.8+)
+            start_method="spawn",
             provider=LocalProvider(
-                # Number of nodes job
                 nodes_per_block=num_nodes,
-                launcher=MpiExecLauncher(bind_cmd="--cpu-bind", overrides="--ppn 1"),
+                launcher=MpiExecLauncher(bind_cmd="--cpu-bind", overrides="--ppn 1", debug=True),
                 init_blocks=1,
                 max_blocks=1,
                 worker_init=user_opts["worker_init"],
@@ -88,11 +101,10 @@ parsl_config = Config(
     ],
     run_dir=run_dir,
     retries=2,
-    app_cache=True
+    app_cache=True,
 )
 
 print("Parsl config:", parsl_config)
-
 parsl.load(parsl_config)
 
 
