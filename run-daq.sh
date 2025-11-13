@@ -80,35 +80,35 @@ for i in $(seq 1 $sirt_tasks)
 do
 	mofkactl partition add dist_sirt \
 		--type default \
-		--rank 0 \
+		--rank ${i} \
 		--groupfile mofka.json \
 		--metadata "${METADATA_PROVIDER}" \
 		--data "${DATA_PROVIDER}"
 	
 	mofkactl partition add handshake_d_s \
 		--type default \
-		--rank 0 \
+		--rank ${i} \
 		--groupfile mofka.json \
 		--metadata "${METADATA_PROVIDER}" \
 		--data "${DATA_PROVIDER}"
 
 	mofkactl partition add handshake_s_d \
 		--type default \
-		--rank 0 \
+		--rank ${i} \
 		--groupfile mofka.json \
 		--metadata "${METADATA_PROVIDER}" \
 		--data "${DATA_PROVIDER}"
 
 	mofkactl partition add sirt_dist_action \
 		--type default \
-		--rank 0 \
+		--rank ${i} \
 		--groupfile mofka.json \
 		--metadata "${METADATA_PROVIDER}" \
 		--data "${DATA_PROVIDER}"
 
 	mofkactl partition add dist_sirt_action \
 		--type default \
-		--rank 0 \
+		--rank ${i} \
 		--groupfile mofka.json \
 		--metadata "${METADATA_PROVIDER}" \
 		--data "${DATA_PROVIDER}"
