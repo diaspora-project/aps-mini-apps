@@ -116,6 +116,7 @@ int main(int argc, char **argv) {
 
         auto json_metadata = event.metadata().json();
         if (json_metadata["worker_id"].get<int>() != config.worker_index) {
+            std::cout << "[Worker-" << config.worker_id << "] Receive event from DIST for " << json_metadata["worker_id"].get<int>() << std::endl;
             continue; // Ignore messages not meant for this worker
         }
         std::string event_type = json_metadata["Type"].get<std::string>();
