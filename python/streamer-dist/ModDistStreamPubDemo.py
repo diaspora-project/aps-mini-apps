@@ -103,7 +103,7 @@ def main():
           "worker_id": w,
           "task_id": task_to_worker[w][t]
       }
-      action_producer.push(assign_info, bytearray(1), w)
+      action_producer.push(assign_info, bytearray(1), partition=w)
       print(f"Send info to sirt: {assign_info}")
   action_producer.flush()
 
