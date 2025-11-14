@@ -99,11 +99,7 @@ do
 		--metadata "${METADATA_PROVIDER}" \
 		--data "${DATA_PROVIDER}"
 
-done
-
-echo create dist/sirt action patitions
-
-mofkactl partition add sirt_dist_action \
+	mofkactl partition add sirt_dist_action \
 		--type default \
 		--rank 0 \
 		--groupfile mofka.json \
@@ -116,6 +112,10 @@ mofkactl partition add sirt_dist_action \
 		--groupfile mofka.json \
 		--metadata "${METADATA_PROVIDER}" \
 		--data "${DATA_PROVIDER}"
+
+done
+
+echo create dist/sirt action patitions
 
 echo create sirt-den topics and partitions
 
