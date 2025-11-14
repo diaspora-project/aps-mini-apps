@@ -74,7 +74,7 @@ int main(int argc, char **argv) {
     mofka::TopicHandle producing_topic = driver.openTopic("sirt_dist_action");
     mofka::Producer producer = producing_topic.producer("sirt", 1, 1, mofka::Ordering::Strict);
     // std::vector<size_t> targets = {static_cast<size_t>(config.worker_index)};
-    std::vector<size_t> targets = {static_cast<size_t>(0)};
+    std::vector<size_t> targets = {static_cast<size_t>(config.worker_index)};
     mofka::Consumer consumer = consuming_topic.consumer("sirt", 1, 1, targets);
     // mofka::Consumer consumer = consuming_topic.consumer(
     //     "sirt",

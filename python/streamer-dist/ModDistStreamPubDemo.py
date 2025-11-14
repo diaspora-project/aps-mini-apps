@@ -95,7 +95,7 @@ def main():
   task_to_worker = [[] for _ in range(num_workers)]
   for t in range(num_tasks):
     task_to_worker[t % num_workers].append(t)
-  for w in reversed(range(num_workers)):
+  for w in range(num_workers):
     print(f"Worker {w} assigned tasks: {task_to_worker[w]}")
     for t in range(len(task_to_worker[w])):
       assign_info = {
@@ -103,7 +103,7 @@ def main():
           "worker_id": w,
           "task_id": task_to_worker[w][t]
       }
-      action_producer.push(assign_info, bytearray(1))
+      action_producer.push(assign_info, bytearray(1), w)
       print(f"Send info to sirt: {assign_info}")
   action_producer.flush()
 

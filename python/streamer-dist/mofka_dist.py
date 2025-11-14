@@ -174,7 +174,7 @@ class MofkaDist:
         # print(f"Split data and send to workers, seq id = {sequence_id}")
         for i in range(self.ntasks):
             ts = time.perf_counter()
-            f = producer.push(self.buffer[self.counter][i][0], self.buffer[self.counter][i][1])
+            f = producer.push(self.buffer[self.counter][i][0], self.buffer[self.counter][i][1], i)
             
             metadata = self.buffer[self.counter][i][0]
             print(f"Task {i}: seq_id {metadata['seq_n']} proj_id {metadata['projection_id']}, theta: {metadata['theta']} center: {metadata['center']}")
