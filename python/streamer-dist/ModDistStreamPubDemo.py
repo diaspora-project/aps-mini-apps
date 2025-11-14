@@ -95,7 +95,7 @@ def main():
   task_to_worker = [[] for _ in range(num_workers)]
   for t in range(num_tasks):
     task_to_worker[t % num_workers].append(t)
-  for w in range(num_workers):
+  for w in reversed(range(num_workers)):
     print(f"Worker {w} assigned tasks: {task_to_worker[w]}")
     for t in range(len(task_to_worker[w])):
       assign_info = {
