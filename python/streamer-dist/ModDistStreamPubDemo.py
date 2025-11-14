@@ -104,6 +104,7 @@ def main():
           "task_id": task_to_worker[w][t]
       }
       action_producer.push(assign_info)
+      print(f"Send info to sirt: {assign_info}")
   action_producer.flush()
 
 
