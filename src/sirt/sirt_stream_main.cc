@@ -115,7 +115,7 @@ int main(int argc, char **argv) {
         auto event = future_event.wait();
 
         auto json_metadata = event.metadata().json();
-        std::cout << "[Worker-" << config.worker_id << "] Receive event from DIST for " << json_metadata["worker_id"].get<int>() << std::endl;
+        std::cout << "[Worker-" << config.worker_id << "] Receive event from DIST: for " << json_metadata.dump() << std::endl;
         if (json_metadata["worker_id"].get<int>() != config.worker_index) {
             continue; // Ignore messages not meant for this worker
         }
