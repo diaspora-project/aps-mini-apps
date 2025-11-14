@@ -74,7 +74,7 @@ mofkactl topic create dist_sirt_action \
 mofkactl topic create sirt_dist_action \
 	--groupfile mofka.json
 
-echo create sirt partitions for dist-sirt, their action, and their handshake
+echo create sirt partitions for dist-sirt and their handshake
 
 for i in $(seq 1 $sirt_tasks)
 do
@@ -99,7 +99,11 @@ do
 		--metadata "${METADATA_PROVIDER}" \
 		--data "${DATA_PROVIDER}"
 
-	mofkactl partition add sirt_dist_action \
+done
+
+echo create dist/sirt action patitions
+
+mofkactl partition add sirt_dist_action \
 		--type default \
 		--rank 0 \
 		--groupfile mofka.json \
@@ -112,8 +116,6 @@ do
 		--groupfile mofka.json \
 		--metadata "${METADATA_PROVIDER}" \
 		--data "${DATA_PROVIDER}"
-
-done
 
 echo create sirt-den topics and partitions
 
