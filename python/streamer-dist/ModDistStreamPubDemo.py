@@ -103,21 +103,21 @@ def main():
           "worker_id": w,
           "task_id": task_to_worker[w][t]
       }
-      action_producer.push(assign_info)
+      action_producer.push(assign_info, bytearray(1))
       print(f"Send info to sirt: {assign_info}")
-      action_producer.flush()
+  action_producer.flush()
 
-  for w in range(num_workers):
-    print(f"Worker {w} assigned tasks: {task_to_worker[w]}")
-    for t in range(len(task_to_worker[w])):
-      assign_info = {
-          "Type": "START_TASK",
-          "worker_id": w,
-          "task_id": task_to_worker[w][t]
-      }
-      action_producer.push(assign_info)
-      print(f"Send info to sirt: {assign_info}")
-      action_producer.flush()
+  # for w in range(num_workers):
+  #   print(f"Worker {w} assigned tasks: {task_to_worker[w]}")
+  #   for t in range(len(task_to_worker[w])):
+  #     assign_info = {
+  #         "Type": "START_TASK",
+  #         "worker_id": w,
+  #         "task_id": task_to_worker[w][t]
+  #     }
+  #     action_producer.push(assign_info)
+  #     print(f"Send info to sirt: {assign_info}")
+  #     action_producer.flush()
 
 
   mofka_producing_time = []
