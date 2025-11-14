@@ -105,7 +105,7 @@ def main():
       }
       action_producer.push(assign_info)
       print(f"Send info to sirt: {assign_info}")
-  action_producer.flush()
+      action_producer.flush()
 
 
   mofka_producing_time = []
@@ -262,7 +262,7 @@ def main():
         "worker_id": w
     }
     action_producer.push(action_info)
-  action_producer.flush()
+    action_producer.flush()
   
   del action_producer
   del action_consumer
