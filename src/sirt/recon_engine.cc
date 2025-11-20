@@ -144,6 +144,7 @@ int ReconTask::run() {
     std::cout << "[Task-" << task_id << "] Checkpoint found at " << passes << ". Restarting from checkpoint" << std::endl;
     ckpt_client->restart(ckpt_name, passes);
     ms.updateProgress(progress);
+    this->checkpointed_progress = progress;
     std::cout << "[Task-" << task_id << "] Restarted from checkpoint at iteration " << passes << ", progress = " << progress << std::endl;
   }else{
     std::cout << "[Task-" << task_id << "] No checkpoint found. Starting from scratch" << std::endl;
@@ -242,6 +243,7 @@ int ReconTask::run() {
       // ckpt_client->restart(config.ckpt_name, passes);
 
       ms.acknowledge();
+      this->checkpointed_progress = progress;
       std::cout << "[task-" << task_id << "]: Checkpointed version " << passes << ", progress = " << progress << std::endl;
       ckpt_mutex->unlock();
     }

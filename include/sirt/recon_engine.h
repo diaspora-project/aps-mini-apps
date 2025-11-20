@@ -18,6 +18,7 @@ class ReconTask {
     mofka::MofkaDriver driver;
     std::mutex *ckpt_mutex;
     MofkaStream ms;
+    int checkpointed_progress = 0;
 
     
   public:
@@ -64,6 +65,10 @@ class ReconTask {
      * Kill the RetCon task immediately (non-graceful shutdown).
      */
     void kill(int signal = -1);
+
+    int getCheckpointedProgress() const {
+      return checkpointed_progress;
+    }
 };
 
 #endif // SIRT_RETCON_ENGINE_H

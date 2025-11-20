@@ -13,6 +13,7 @@
 #include <thread>
 
 std::unordered_map<int, ReconTask> running_tasks;
+std::unordered_map<int, int> task_progresses;
 std::unordered_map<int, std::thread> running_threads;
 std::vector<std::thread> stopped_threads;
 
@@ -100,10 +101,38 @@ int main(int argc, char **argv) {
         // listen for action messages and initialize/terminate assigned reconstruction tasks.
         // auto event = consumer.pull().wait();
 
+        // Check if reconstruction task made, progress
+        // If so, notify DIST
+        for (auto& [task_id, task] : running_tasks) {
+            int progress = task.getCheckpointedProgress();
+            if (progress > task_progresses[task_id]) {
+                json progress_md = {
+                    {"Type", "PROGRESS"},
+                    {"task_id", task_id},
+                    {"progress", progress}
+                };
+                producer.push(progress_md).wait();
+            }
+        }
+
         auto future_event = consumer.pull();
         while (!future_event.completed()) {
             // sleep for 1 ms to avoid busy waiting
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
+
+            // Also check progress if needed while waiting
+            for (auto& [task_id, task] : running_tasks) {
+                int progress = task.getCheckpointedProgress();
+                if (progress > task_progresses[task_id]) {
+                    json progress_md = {
+                        {"Type", "PROGRESS"},
+                        {"task_id", task_id},
+                        {"progress", progress}
+                    };
+                    producer.push(progress_md).wait();
+                }
+            }
+
             if (sigterm_captured) {
                 running = false;
                 break;
@@ -134,25 +163,27 @@ int main(int argc, char **argv) {
                 running_tasks.erase(task_id);
                 stopped_threads.push_back(std::move(running_threads[task_id]));
                 running_threads.erase(task_id);
+                task_progresses.erase(task_id);
             }
         }else if (event_type == "START_TASK") {
           int task_id = json_metadata["task_id"].get<int>();
           if (running_tasks.find(task_id) != running_tasks.end()) {
               std::cerr << "[Worker-" << config.worker_id << "] Task " << task_id << " is already running. Ignoring START_TASK command." << std::endl;
           }else{
-              std::cout << "[Worker-" << config.worker_id << "] Starting Task " << task_id << std::endl;
-              running_tasks.emplace(
+            std::cout << "[Worker-" << config.worker_id << "] Starting Task " << task_id << std::endl;
+            running_tasks.emplace(
                 std::piecewise_construct,
                 std::forward_as_tuple(task_id),
                 std::forward_as_tuple(task_id, driver, &ckpt_mutex, argc, argv)
-              );
-              running_threads.emplace(
+            );
+            running_threads.emplace(
                 std::piecewise_construct,
                 std::forward_as_tuple(task_id),
                 std::forward_as_tuple([&, task_id] {
                     running_tasks.at(task_id).run();
                 })
             );
+            task_progresses[task_id] = 0;
           }
         }else if (event_type == "SHUTDOWN") {
             std::cout << "[Worker-" << config.worker_id << "] End of stream. Exiting..." << std::endl;

@@ -16,10 +16,27 @@ cd ${app_dir}
 mkdir -p build
 cd build
 #cmake ..
+# cmake -S .. -B build \
+#   -DCMAKE_C_COMPILER=cc \
+#   -DCMAKE_CXX_COMPILER=CC \
+#   -DCMAKE_Fortran_COMPILER=ftn \
+#   -DCMAKE_BUILD_TYPE=Release \
+#   -DCMAKE_PREFIX_PATH=/home/ndhai/diaspora/src/spack/var/spack/environments/APS/.spack-env/view
+# cmake --build build -j
+# detect C/C++/Fortran compilers
+CC_PATH=$(command -v cc || command -v gcc || command -v clang || true)
+CXX_PATH=$(command -v c++ || command -v g++ || command -v clang++ || true)
+FC_PATH=$(command -v gfortran || command -v ifort || true)
+
+if [ -z "$CC_PATH" ] || [ -z "$CXX_PATH" ]; then
+  echo "No C/C++ compiler found in PATH. Load compiler module or install gcc/clang."
+  exit 1
+fi
+
 cmake -S .. -B build \
-  -DCMAKE_C_COMPILER=cc \
-  -DCMAKE_CXX_COMPILER=CC \
-  -DCMAKE_Fortran_COMPILER=ftn \
+  -DCMAKE_C_COMPILER="$CC_PATH" \
+  -DCMAKE_CXX_COMPILER="$CXX_PATH" \
+  -DCMAKE_Fortran_COMPILER="$FC_PATH" \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_PREFIX_PATH=/home/ndhai/diaspora/src/spack/var/spack/environments/APS/.spack-env/view
 cmake --build build -j
