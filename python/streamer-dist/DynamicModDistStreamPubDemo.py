@@ -14,6 +14,7 @@ import csv
 import signal
 #from memory_profiler import profile
 import threading
+import multiprocessing
 
 def parse_arguments():
   parser = argparse.ArgumentParser( description='Data Distributor Process')
@@ -66,10 +67,15 @@ def parse_arguments():
   return parser.parse_args()
 
 
-def task_to_worker_assignment(producer, consumer, args, mofka_dist):
+# def task_to_worker_assignment(action_producer, action_consumer, args, action_mofka_dist):
+def task_to_worker_assignment(args, num_workers):
+
+  action_mofka_dist = MofkaDist(group_file=args.group_file, batchsize=args.batchsize)
+  action_consumer = action_mofka_dist.consumer(topic_name="sirt_dist_action", consumer_name="dist")
+  action_producer = action_mofka_dist.producer(topic_name="dist_sirt_action", producer_name="dist")
+
   print("Assigning tasks to workers ...")
   num_tasks = args.ntask_sirt
-  num_workers = mofka_dist.nworkers
   # assign tasks to workers in round-robin fashion
   task_to_worker = {}
   worker_to_task = [[] for _ in range(num_workers)]
@@ -84,9 +90,9 @@ def task_to_worker_assignment(producer, consumer, args, mofka_dist):
           "worker_id": w,
           "task_id": worker_to_task[w][t]
       }
-      producer.push(assign_info, bytearray(1), partition=0)
+      action_producer.push(assign_info, bytearray(1), partition=0)
       print(f"Send info to sirt: {assign_info}")
-  producer.flush()
+  action_producer.flush()
 
   task_progress = [0 for _ in range(num_tasks)]
   worker_progress = [0 for _ in range(num_workers)]
@@ -95,7 +101,7 @@ def task_to_worker_assignment(producer, consumer, args, mofka_dist):
 
   # Listen from consumer and take actions if needed
   while True:
-    f = consumer.pull()
+    f = action_consumer.pull()
     event = f.wait()
     metadata = json.loads(event.metadata)
     if metadata["Type"] == "PROGRESS":
@@ -103,6 +109,7 @@ def task_to_worker_assignment(producer, consumer, args, mofka_dist):
       worker_id = task_to_worker[task_id]
       progress = metadata["progress"]
       improved_progress = max(0, progress - task_progress[task_id])
+      print(f"Received progress update: task {task_id} on worker {worker_id} progress {progress - improved_progress} --> {progress}")
       task_progress[task_id] = progress
       worker_progress[worker_id] += improved_progress
       total_progress += improved_progress
@@ -111,7 +118,7 @@ def task_to_worker_assignment(producer, consumer, args, mofka_dist):
       continue
     
     # Make reassignment only if total progress is large enough to reflect performance
-    if total_progress < args.num_tasks * 2:
+    if total_progress < num_tasks * 2:
       continue
       
     
@@ -121,7 +128,7 @@ def task_to_worker_assignment(producer, consumer, args, mofka_dist):
     max_progress = sorted_tasks[-1]
     if min_progress == max_progress:
       continue  # all tasks are at the same progress, no need to reassign
-    task_lag = [(max_progress[i] - task_progress[i]/min_progress[i] for i in range(num_tasks))]
+    task_lag = [(max_progress - task_progress[i])/(max_progress - min_progress) for i in range(num_tasks)]
     sum_lag = sum(task_lag)
     task_weights = [task_lag[i]*num_tasks/sum_lag for i in range(num_tasks)]
     
@@ -129,15 +136,15 @@ def task_to_worker_assignment(producer, consumer, args, mofka_dist):
     worker_caps = [worker_progress[i]*num_tasks/sum_worker_progress for i in range(num_workers)]
     
     # reassign tasks based on weights and capacities
-    worker_weights = [sum(task_weights[t]) for t in worker_to_task[w] for w in range(num_workers)]
-    surplus_worker_caps = worker_caps - worker_weights
-    surplus_worker_caps = sorted(surplus_worker_caps)
+    worker_weights = [sum(task_weights[t] for t in worker_to_task[w]) for w in range(num_workers)]
+    surplus_worker_caps = np.array(worker_caps) - np.array(worker_weights)
+    sorted_surplus_worker_caps = sorted(range(num_workers), key=lambda x: surplus_worker_caps[x])
 
     task_assigned = False
 
     # Move task from worker with negative surplus to worker with positive surplus
     to_move_tasks = []
-    for w in range(num_workers):
+    for w in sorted_surplus_worker_caps:
       while surplus_worker_caps[w] < 0:
         # find task with largest weight to move
         tasks = worker_to_task[w]
@@ -150,7 +157,7 @@ def task_to_worker_assignment(producer, consumer, args, mofka_dist):
     # find workers with positive surplus to receive tasks
     for task in to_move_tasks:
       task_id, from_worker = task
-      for w in range(num_workers):
+      for w in sorted_surplus_worker_caps:
         if surplus_worker_caps[w] > task_weights[task_id]:
           # stop the max weight task on from_worker
           surplus_worker_caps[from_worker] += task_weights[task_id]
@@ -161,7 +168,7 @@ def task_to_worker_assignment(producer, consumer, args, mofka_dist):
               "worker_id": from_worker,
               "task_id": task_id
           }
-          producer.push(stop_info, bytearray(1), partition=0)
+          action_producer.push(stop_info, bytearray(1), partition=0)
           print(f"Stopping task {max_weight_task} on worker {w} for reassignment")
           # move task to this worker
           assign_info = {
@@ -170,13 +177,15 @@ def task_to_worker_assignment(producer, consumer, args, mofka_dist):
               "to_worker_id": w,
               "task_id": task_id
           }
-          producer.push(assign_info, bytearray(1), partition=0)
+          action_producer.push(assign_info, bytearray(1), partition=0)
           print(f"Reassigning task {task_id} from worker {from_worker} to worker {w}")
           surplus_worker_caps[w] -= task_weights[task_id]
           worker_to_task[w].append(task_id)
           task_assigned = True
-          producer.flush()
+          action_producer.flush()
           break
+      # reorder worker by surplus capacity after new assignments
+      sorted_surplus_worker_caps = sorted(range(num_workers), key=lambda x: surplus_worker_caps[x])
     
     if task_assigned:
       # reset progress tracking after reassignment to make sure their performance is updated
@@ -206,31 +215,32 @@ def main():
   print("Setting up consumer and producer ...")
   consumer = mofka_dist.consumer(topic_name="daq_dist", consumer_name="dist")
   producer = mofka_dist.producer(topic_name="dist_sirt", producer_name="dist")
-  action_consumer = mofka_dist.consumer(topic_name="sirt_dist_action", consumer_name="dist")
-  action_producer = mofka_dist.producer(topic_name="dist_sirt_action", producer_name="dist")
 
-  # Create a new thread to handle incoming actions from SIRT if needed,
-  # leaving the main thread to handle data distribution.
-  assignment_thread = threading.Thread(
-    target=task_to_worker_assignment,
-    args=(action_producer, action_consumer, args, mofka_dist),
+  # print("Setting up consumer and producer for actions ...")
+  # # action_mofka_dist = MofkaDist(group_file=args.group_file, batchsize=args.batchsize)
+  # action_mofka_dist = mofka_dist
+  # action_consumer = action_mofka_dist.consumer(topic_name="sirt_dist_action", consumer_name="dist")
+  # action_producer = action_mofka_dist.producer(topic_name="dist_sirt_action", producer_name="dist")
+
+  # # Create a new thread to handle incoming actions from SIRT if needed,
+  # # leaving the main thread to handle data distribution.
+  # assignment_thread = threading.Thread(
+  #   target=task_to_worker_assignment,
+  #   args=(action_producer, action_consumer, args, action_mofka_dist),
+  #   daemon=True
+  # )
+  # assignment_thread.start() 
+
+  # Create a new process to run task to worker assignment
+  num_workers = mofka_dist.nworkers
+  assignment_process = multiprocessing.Process(
+    target=task_to_worker_assignment_wrapper,
+    args=(args, num_workers),
     daemon=True
   )
-  assignment_thread.start()
-  print("Task assignment thread started")
+  assignment_process.start()
 
-  # for w in range(num_workers):
-  #   print(f"Worker {w} assigned tasks: {task_to_worker[w]}")
-  #   for t in range(len(task_to_worker[w])):
-  #     assign_info = {
-  #         "Type": "START_TASK",
-  #         "worker_id": w,
-  #         "task_id": task_to_worker[w][t]
-  #     }
-  #     action_producer.push(assign_info)
-  #     print(f"Send info to sirt: {assign_info}")
-  #     action_producer.flush()
-
+  print("Task assignment process started")
 
   mofka_producing_time = []
   mofka_consuming_time = []
@@ -379,19 +389,32 @@ def main():
   del producer
   del consumer
   
-  print("Notifying SIRT that we are done ...")
-  for w in range(num_workers):
-    action_info = {
-        "Type": "SHUTDOWN",
-        "worker_id": w
-    }
-    action_producer.push(action_info)
-    action_producer.flush()
+  # print("Notifying SIRT that we are done ...")
+  # for w in range(mofka_dist.nworkers):
+  #   action_info = {
+  #       "Type": "SHUTDOWN",
+  #       "worker_id": w
+  #   }
+  #   action_producer.push(action_info)
+  #   action_producer.flush()
   
-  del action_producer
-  del action_consumer
+  # del action_producer
+  # del action_consumer
+
+  # Wait for the assignment process to finish
+  assignment_process.join(timeout=5)
+  if assignment_process.is_alive():
+    assignment_process.terminate()
 
   print("Exiting ...")
+
+def task_to_worker_assignment_wrapper(args, num_workers):
+  """Wrapper to ensure output is flushed to the parent process"""
+  sys.stdout.flush()
+  sys.stderr.flush()
+  task_to_worker_assignment(args, num_workers)
+  sys.stdout.flush()
+  sys.stderr.flush()
 
 if __name__ == '__main__':
   main()
