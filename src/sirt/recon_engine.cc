@@ -24,6 +24,7 @@
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/archive/text_iarchive.hpp>
 #include "mofka_stream.h"
+#include "sst_stream.h"
 
 // Define an alias for the instantiated template class
 using DISPEngineReductionSIRT = DISPEngineReduction<SIRTReconSpace, float>;
@@ -106,6 +107,13 @@ int ReconTask::run() {
   h5md.dims[2] = tmetadata["n_rays_per_proj_row"].get<int64_t>();
   size_t data_size = 0;
 
+
+  SSTStream sst_stream = SSTStream{
+    "sirt_stream",
+    task_id,
+    h5md.dims[1]
+  };
+
   /***********************/
   /* Initiate middleware */
   /* Prepare main reduction space and its objects */
@@ -169,7 +177,7 @@ int ReconTask::run() {
     #ifdef TIMERON
     auto datagen_beg = std::chrono::system_clock::now();
     #endif
-    curr_slices = ms.readSlidingWindow(recon_image, config.window_step, consumer);
+    curr_slices = ms.readSlidingWindow(recon_image, config.window_step, consumer, sst_stream);
     
     if(config.center!=0 && curr_slices!=nullptr)
       curr_slices->metadata().center(config.center);

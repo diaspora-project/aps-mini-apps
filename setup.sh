@@ -52,8 +52,7 @@ echo "SETTING UP DIST ------------------------ "
 cd ${app_dir}
 mkdir -p build/python/streamer-dist
 cd build/python/streamer-dist
-cp ../../../python/streamer-dist/ModDistStreamPubDemo.py .
-cp ../../../python/streamer-dist/mofka_dist.py .
+cp ../../../python/streamer-dist/*.py .
 cp -r ../../../python/common ../
 
 echo "SETTING UP DENOISER -------------------- "

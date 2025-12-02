@@ -1,6 +1,9 @@
 source activate-spack.sh
 # source envpy/bin/activate
 
+adios2_path=`find $(spack location -i adios2) -maxdepth 4 -type d -name "site-packages"`
+export PYTHONPATH=${adios2_path}:${PYTHONPATH}
+
 # Check if the number of parameters is correct
 if [ "$#" -ne 3 ]; then
     echo "Illegal number of parameters"
@@ -14,7 +17,9 @@ logdir=$3
 
 trap "echo 'Ctrl+C pressed. Terminating...'; exit 1" SIGINT SIGTERM
 
-python -u ./build/python/streamer-dist/ModDistStreamPubDemo.py \
+# python -u ./build/python/streamer-dist/ModDistStreamPubDemo.py \
+which python
+python -u ./build/python/streamer-dist/DirectModDistStreamPubDemo.py \
     --cast_to_float32 \
     --normalize \
     --ntask_sirt ${num_tasks} \

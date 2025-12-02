@@ -175,7 +175,7 @@ class MofkaDist:
         for i in range(self.ntasks):
             ts = time.perf_counter()
             f = producer.push(self.buffer[self.counter][i][0], self.buffer[self.counter][i][1], partition=i)
-            
+
             metadata = self.buffer[self.counter][i][0]
             print(f"Task {i}: seq_id {metadata['seq_n']} proj_id {metadata['projection_id']}, theta: {metadata['theta']} center: {metadata['center']}")
 
@@ -192,6 +192,8 @@ class MofkaDist:
             # mofka_t.append(["flush_after", projection_id, ts, time.perf_counter(), time.perf_counter() - ts, self.ntasks*len(self.buffer)* sys.getsizeof(self.buffer[self.counter-1][0][0]), self.ntasks*len(self.buffer)*len(self.buffer[self.counter-1][0][1])])
             self.buffer = []
             self.counter = 0
+        
+        # producer.flush()
         
         # print("Finish flushing")
 

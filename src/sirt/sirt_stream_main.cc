@@ -111,9 +111,12 @@ int main(int argc, char **argv) {
                     {"task_id", task_id},
                     {"progress", progress}
                 };
-                producer.push(progress_md).wait();
+                std::cout << "[Worker-" << config.worker_id << "] Report progress for Task " << task_id << ": Progress: " << task_progresses[task_id] << " --> " << progress << std::endl;
+                task_progresses[task_id] = progress;
+                producer.push(progress_md);
             }
         }
+        producer.flush();
 
         auto future_event = consumer.pull();
         while (!future_event.completed()) {
@@ -129,9 +132,12 @@ int main(int argc, char **argv) {
                         {"task_id", task_id},
                         {"progress", progress}
                     };
-                    producer.push(progress_md).wait();
+                    std::cout << "[Worker-" << config.worker_id << "] Report progress for Task " << task_id << ": Progress: " << task_progresses[task_id] << " --> " << progress << std::endl;
+                    task_progresses[task_id] = progress;
+                    producer.push(progress_md);
                 }
             }
+            producer.flush();
 
             if (sigterm_captured) {
                 running = false;

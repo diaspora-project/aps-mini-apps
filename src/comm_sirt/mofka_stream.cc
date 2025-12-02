@@ -1,35 +1,47 @@
 #include <mofka_stream.h>
 #include <thread>
 
-void MofkaStream::addTomoMsg(mofka::Event event){
-  auto start_t = std::chrono::high_resolution_clock::now();
-  mofka::Metadata metadata = event.metadata();
-  auto end_t = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double> elapsed = end_t - start_t;
-  setConsumerTimes("mata_t", metadata.string().size(), elapsed.count());
-  start_t = std::chrono::high_resolution_clock::now();
-  mofka::Data data = event.data();
-  end_t = std::chrono::high_resolution_clock::now();
-  elapsed = end_t - start_t;
-  setConsumerTimes("data_t", data.segments()[0].size, elapsed.count());
-  // event.acknowledge(); // acknowledge event
-  pending_events.push_back(event);
-  vmeta.push_back(metadata.json()); /// Setup metadata
-  vtheta.push_back(metadata.json()["theta"].get<float_t>());
-  // spdlog::info("Received data {}", metadata.string());
+void MofkaStream::addTomoMsg(StreamEvent event){
+  if (event.isFromSST()) {
+    SSTPayload sst_payload = event.getSSTPayload();
+    vmeta.push_back(json::parse(sst_payload.metadata)); /// Setup metadata
+    vtheta.push_back(vmeta.back()["theta"].get<float_t>());
+    size_t n_rays_per_proj =
+      getInfo()["n_sinograms"].get<int64_t>() *
+      getInfo()["n_rays_per_proj_row"].get<int64_t>();
+    assert(sst_payload.data.size() == n_rays_per_proj && "Pointer size does not match n_rays_per_projection");
+    vproj.insert(vproj.end(), sst_payload.data.begin(), sst_payload.data.end());
+  }else{
+    auto start_t = std::chrono::high_resolution_clock::now();
+    mofka::Event mofka_event = event.getMofkaEvent();
+    mofka::Metadata metadata = mofka_event.metadata();
+    auto end_t = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = end_t - start_t;
+    setConsumerTimes("mata_t", metadata.string().size(), elapsed.count());
+    start_t = std::chrono::high_resolution_clock::now();
+    mofka::Data data = mofka_event.data();
+    end_t = std::chrono::high_resolution_clock::now();
+    elapsed = end_t - start_t;
+    setConsumerTimes("data_t", data.segments()[0].size, elapsed.count());
+    // event.acknowledge(); // acknowledge event
+    pending_events.push_back(mofka_event);
+    vmeta.push_back(metadata.json()); /// Setup metadata
+    vtheta.push_back(metadata.json()["theta"].get<float_t>());
+    // spdlog::info("Received data {}", metadata.string());
 
-  size_t n_rays_per_proj =
-  getInfo()["n_sinograms"].get<int64_t>() *
-  getInfo()["n_rays_per_proj_row"].get<int64_t>();
-  size_t ptr_size = data.segments()[0].size / sizeof(float);
-  assert(n_rays_per_proj == ptr_size && "Pointer size does not match n_rays_per_projection");
+    size_t n_rays_per_proj =
+    getInfo()["n_sinograms"].get<int64_t>() *
+    getInfo()["n_rays_per_proj_row"].get<int64_t>();
+    size_t ptr_size = data.segments()[0].size / sizeof(float);
+    assert(n_rays_per_proj == ptr_size && "Pointer size does not match n_rays_per_projection");
 
-  float* start = static_cast<float*>(data.segments()[0].ptr);
-  float* end = static_cast<float*>(data.segments()[0].ptr)+ n_rays_per_proj;
-  if (start == nullptr || end == nullptr) {
-    throw std::runtime_error("Invalid pointer arithmetic in insertion");
+    float* start = static_cast<float*>(data.segments()[0].ptr);
+    float* end = static_cast<float*>(data.segments()[0].ptr)+ n_rays_per_proj;
+    if (start == nullptr || end == nullptr) {
+      throw std::runtime_error("Invalid pointer arithmetic in insertion");
+    }
+    vproj.insert(vproj.end(), start, end);
   }
-  vproj.insert(vproj.end(), start, end);
 }
 
 /* Erase streaming message to buffers
@@ -224,16 +236,20 @@ void MofkaStream::interrupt(int signal) {
 DataRegionBase<float, TraceMetadata>* MofkaStream::readSlidingWindow(
   DataRegionBareBase<float> &recon_image,
   int step,
-  mofka::Consumer consumer){
+  mofka::Consumer consumer,
+  SSTStream& sst_stream){
   // Dynamically meet sizes
   while(vtheta.size()> window_len)
     eraseBegTraceMsg();
 
   // Receive new message
-  std::vector<mofka::Event> mofka_events;
+  // std::vector<mofka::Event> mofka_events;
+  std::vector<StreamEvent> stream_events;
 
   for(int i=0; i<step; ++i) {
     // mofka messages
+
+    bool loaded_from_sst = false;
 
     auto start = std::chrono::high_resolution_clock::now();
     mofka::Future<mofka::Event> future_event = consumer.pull();
@@ -244,26 +260,41 @@ DataRegionBase<float, TraceMetadata>* MofkaStream::readSlidingWindow(
         std::cout << "[Task-" << getRank() << "]: Interrupt signal received, stopping pull." << std::endl;
         return nullptr; // Exit if interrupt signal is received
       }
-    }
-    auto event = future_event.wait();
-    // auto event = consumer.pull().wait();
-    auto end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> elapsed = end - start;
-    setConsumerTimes("wait_t", 1, elapsed.count());
+      // Check SST stream for fast data
+      SSTPayload sst_payload;
+      if (sst_stream.pull_data(sst_payload)) {
+        std::cout << "[Task-" << getRank() << "]: Received data from SST stream, stepIndex: " << sst_payload.stepIndex << std::endl;
+        loaded_from_sst = true;
+        // Process
 
-    //if endMsg break
-    if (event.metadata().json()["Type"].get<std::string>() == "FIN") {
-      setEndOfStream(true);
-      std::cout << "[Task-" << getRank() << "]: End of stream detected" << std::endl;
-      return nullptr;
+        // Add to stream events
+        stream_events.push_back(StreamEvent(sst_payload));
+        break;
+      }
+    }
+    if (!loaded_from_sst) {
+      auto event = future_event.wait();
+      // auto event = consumer.pull().wait();
+      auto end = std::chrono::high_resolution_clock::now();
+      std::chrono::duration<double> elapsed = end - start;
+      setConsumerTimes("wait_t", 1, elapsed.count());
+
+      //if endMsg break
+      if (event.metadata().json()["Type"].get<std::string>() == "FIN") {
+        setEndOfStream(true);
+        std::cout << "[Task-" << getRank() << "]: End of stream detected" << std::endl;
+        return nullptr;
+      }
+      
+      int sequence_id = event.metadata().json()["seq_n"].get<int>();
+      int proj_id = event.metadata().json()["projection_id"].get<int>();
+      double theta = event.metadata().json()["theta"].get<float>();
+      double center = event.metadata().json()["center"].get<float>();
+      
+      std::cout << "[Task-" << getRank() << "]: seq_id: " << sequence_id << " projection_id: " << proj_id << " theta: " << theta << " center: " << center << ", progress = " << progress << std::endl;
+      stream_events.push_back(StreamEvent(event));
     }
     
-    int sequence_id = event.metadata().json()["seq_n"].get<int>();
-    int proj_id = event.metadata().json()["projection_id"].get<int>();
-    double theta = event.metadata().json()["theta"].get<float>();
-    double center = event.metadata().json()["center"].get<float>();
-    
-    std::cout << "[Task-" << getRank() << "]: seq_id: " << sequence_id << " projection_id: " << proj_id << " theta: " << theta << " center: " << center << ", progress = " << progress << std::endl;
     // float* data = static_cast<float*>(event.data().segments()[0].ptr);
     // auto p = reinterpret_cast<const unsigned char*>(data);
     // std::cout << "[Task-" << getRank() << "] -- Processing window with " 
@@ -278,17 +309,16 @@ DataRegionBase<float, TraceMetadata>* MofkaStream::readSlidingWindow(
     //   std::cout << "[Task-" << getRank() << "]: Skipping seq_id: " << sequence_id << " < " << progress << " = progress" << std::endl;
     //   continue; // Skip this event
     // }
-    mofka_events.push_back(event);
   }
   // TODO: After receiving message corrections might need to be applied
 
   /// End of the processing
-  if(mofka_events.size()==0 && vtheta.size()==0){
+  if(stream_events.size()==0 && vtheta.size()==0){
     //std::cout << "End of the processing: " << vtheta.size() << std::endl;
     return nullptr;
   }
   /// End of messages, but there is data to be processed in window
-  else if(mofka_events.size()==0 && vtheta.size()>0){
+  else if(stream_events.size()==0 && vtheta.size()>0){
     for(int i=0; i<step; ++i){  // Delete step size element
       if(vtheta.size()>0) eraseBegTraceMsg();
       else break;
@@ -297,22 +327,22 @@ DataRegionBase<float, TraceMetadata>* MofkaStream::readSlidingWindow(
     if(vtheta.size()==0) return nullptr;
   }
   /// New message(s) arrived, there is space in window
-  else if(mofka_events.size()>0 && vtheta.size()<window_len){
+  else if(stream_events.size()>0 && vtheta.size()<window_len){
     //std::cout << "New message(s) arrived, there is space in window: " << window_len_ - vtheta.size() << std::endl;
-    for(auto msg : mofka_events){
+    for(auto msg : stream_events){
       addTomoMsg(msg);
       ++counter;
     }
     std::cout << "After adding # items in window: " << vtheta.size() << std::endl;
   }
   /// New message arrived, there is no space in window
-  else if(mofka_events.size()>0 && vtheta.size()>=window_len){
+  else if(stream_events.size()>0 && vtheta.size()>=window_len){
     //std::cout << "New message arrived, there is no space in window: " << vtheta.size() << std::endl;
     for(int i=0; i<step; ++i) {
       if(vtheta.size()>0) eraseBegTraceMsg();
       else break;
     }
-    for(auto msg : mofka_events){
+    for(auto msg : stream_events){
       addTomoMsg(msg);
       ++counter;
     }
@@ -320,7 +350,7 @@ DataRegionBase<float, TraceMetadata>* MofkaStream::readSlidingWindow(
   else std::cerr << "Unknown state in ReadWindow!" << std::endl;
 
   /// Clean-up vector
-  mofka_events.clear();
+  stream_events.clear();
 
   /// Generate new data and metadata
   DataRegionBase<float, TraceMetadata>* data_region =

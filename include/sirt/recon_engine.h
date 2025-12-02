@@ -4,7 +4,7 @@
 #include "trace_runtime_config.h"
 #include <atomic>
 #include <mofka/MofkaDriver.hpp>
-#include <mofka_sirt/mofka_stream.h>
+#include <comm_sirt/mofka_stream.h>
 
 class ReconTask {
 

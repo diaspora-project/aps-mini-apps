@@ -40,6 +40,9 @@ find_package(Boost REQUIRED COMPONENTS serialization CONFIG)
 # Threads (you link Threads::Threads below)
 find_package(Threads REQUIRED)
 
+# Adios for SST
+find_package(ADIOS2 REQUIRED CONFIG)
+
 # Flatbuffers: support multiple target names, fallback to headers
 set(_flatbuf_target "")
 find_package(Flatbuffers QUIET CONFIG)
@@ -88,7 +91,7 @@ list(REMOVE_DUPLICATES _SPACK_LIBDIRS)
 # ---------------- Your includes (only your headers) ----------------
 include_directories(${TRACE_ROOT}/include)
 include_directories(${TRACE_ROOT}/include/tracelib)
-include_directories(${TRACE_ROOT}/include/mofka_sirt)
+include_directories(${TRACE_ROOT}/include/comm_sirt)
 include_directories(${TRACE_ROOT}/include/sirt)
 if(_flatbuf_target STREQUAL "" AND FLATBUFFERS_INCLUDE_DIR)
   include_directories(${FLATBUFFERS_INCLUDE_DIR})
@@ -110,11 +113,12 @@ target_link_libraries(trace_h5io
     Boost::serialization
 )
 
-add_library(mofka_stream ${TRACE_ROOT}/src/mofka_sirt/mofka_stream.cc)
+add_library(mofka_stream ${TRACE_ROOT}/src/comm_sirt/mofka_stream.cc)
 # Make mofka PUBLIC so consumers inherit the dependency (prevents DSO-missing)
 target_link_libraries(mofka_stream
   PUBLIC
     mofka::client
+    adios2::cxx
 )
 if(BEDROCK_MODULE_API)
   target_link_libraries(mofka_stream PUBLIC ${BEDROCK_MODULE_API})
@@ -133,6 +137,7 @@ target_link_libraries(sirt
     trace_utils
     Boost::serialization
     HDF5::HDF5
+    adios2::cxx
 )
 
 add_library(recon_engine ${TRACE_ROOT}/src/sirt/recon_engine.cc)

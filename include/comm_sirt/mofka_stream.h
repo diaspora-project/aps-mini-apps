@@ -16,9 +16,42 @@
 #include <nlohmann/json.hpp>
 #include "trace_data.h"
 #include <csignal>
+#include "sst_stream.h"
 
 using json = nlohmann::json;
 namespace tl = thallium;
+
+class StreamEvent {
+  public:
+    StreamEvent(mofka::Event event)
+      : event{event} {}
+
+    StreamEvent(SSTPayload sst_payload)
+      : sst_payload{sst_payload}, from_sst{true} {}
+
+    bool isFromSST() const {
+      return from_sst;
+    }
+
+    mofka::Event getMofkaEvent() const {
+      if (from_sst) {
+        throw std::runtime_error("This StreamEvent is from SST, no mofka event available.");
+      }
+      return event;
+    }
+
+    SSTPayload getSSTPayload() const {
+      if (!from_sst) {
+        throw std::runtime_error("This StreamEvent is from mofka, no SST payload available.");
+      }
+      return sst_payload;
+    }
+
+  private:
+    mofka::Event event;
+    SSTPayload sst_payload;
+    bool from_sst = false;
+};
 
 class MofkaStream
 {
@@ -86,7 +119,7 @@ class MofkaStream
     /* Add streaming message to buffers
     * @param event: mofka event containing data and metadata
     */
-    void addTomoMsg(mofka::Event event);
+    void addTomoMsg(StreamEvent event);
 
 
     /* Erase streaming message to buffers
@@ -164,7 +197,8 @@ class MofkaStream
     DataRegionBase<float, TraceMetadata>* readSlidingWindow(
       DataRegionBareBase<float> &recon_image,
       int step,
-      mofka::Consumer consumer);
+      mofka::Consumer consumer,
+      SSTStream& sst_stream);
 
     json getInfo();
 
