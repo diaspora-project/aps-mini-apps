@@ -42,6 +42,24 @@ find_package(Threads REQUIRED)
 
 # Adios for SST
 find_package(ADIOS2 REQUIRED CONFIG)
+# Pick an appropriate ADIOS2 C++ target (version / build dependent)
+set(_adios2_cxx_target "")
+if(TARGET adios2::cxx_mpi)
+  set(_adios2_cxx_target adios2::cxx_mpi)
+elseif(TARGET adios2::cxx11_mpi)
+  set(_adios2_cxx_target adios2::cxx11_mpi)
+elseif(TARGET adios2::cxx11)
+  set(_adios2_cxx_target adios2::cxx11)
+elseif(TARGET adios2::cxx)
+  # fallback if some older build actually exports this
+  set(_adios2_cxx_target adios2::cxx)
+else()
+  message(FATAL_ERROR
+    "Could not find an ADIOS2 C++ target. Tried: "
+    "adios2::cxx_mpi, adios2::cxx11_mpi, adios2::cxx11, adios2::cxx. "
+    "Check that ADIOS2 was built with C++ bindings and that "
+    "CMAKE_PREFIX_PATH / ADIOS2_DIR points to the right install.")
+endif()
 
 # Flatbuffers: support multiple target names, fallback to headers
 set(_flatbuf_target "")
@@ -113,12 +131,18 @@ target_link_libraries(trace_h5io
     Boost::serialization
 )
 
+add_library(sst_stream ${TRACE_ROOT}/src/comm_sirt/sst_stream.cc)
+target_link_libraries(sst_stream
+  PUBLIC
+    ${_adios2_cxx_target}
+)
+
 add_library(mofka_stream ${TRACE_ROOT}/src/comm_sirt/mofka_stream.cc)
 # Make mofka PUBLIC so consumers inherit the dependency (prevents DSO-missing)
 target_link_libraries(mofka_stream
   PUBLIC
     mofka::client
-    adios2::cxx
+    ${_adios2_cxx_target}
 )
 if(BEDROCK_MODULE_API)
   target_link_libraries(mofka_stream PUBLIC ${BEDROCK_MODULE_API})
@@ -137,7 +161,7 @@ target_link_libraries(sirt
     trace_utils
     Boost::serialization
     HDF5::HDF5
-    adios2::cxx
+    ${_adios2_cxx_target}
 )
 
 add_library(recon_engine ${TRACE_ROOT}/src/sirt/recon_engine.cc)
@@ -158,6 +182,7 @@ target_link_libraries(sirt_stream
     trace_h5io
     sirt
     mofka_stream
+    sst_stream
     mofka::client            # <--- add direct link (belt & suspenders)
     MPI::MPI_CXX
     Threads::Threads
