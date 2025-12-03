@@ -16,27 +16,40 @@ SSTStream::SSTStream(const std::string &streamName,
         throw std::runtime_error("Invalid partitionId for SSTStream");
     }
 
+    std::cout << "[Task " << m_partitionId << "] Initializing SSTStream for stream '"
+              << m_streamName << "' with " << m_numPartitions << " partitions."
+              << std::endl;
+
     m_adios = std::make_unique<adios2::ADIOS>();
     m_io    = std::make_unique<adios2::IO>(
         m_adios->DeclareIO("SSTScatterConsumerIO_" + std::to_string(m_partitionId)));
 
     m_io->SetEngine("SST");
 
+    std::cout << "[Task " << m_partitionId << "] Opening SST stream '" << m_streamName
+              << "' for reading." << std::endl;
+
     // You can set SST parameters here, e.g.:
     // m_io->SetParameters({{"OpenTimeoutSecs", "30"}});
 
     m_engine = std::make_unique<adios2::Engine>(
         m_io->Open(m_streamName, adios2::Mode::Read));
+
+    std::cout << "[Task " << m_partitionId << "] SSTStream initialized." << std::endl;
+
 }
 
 SSTStream::~SSTStream()
 {
     try {
-        if (m_engine && m_engine->Good()) {
+        if (m_engine) {
+            // In older ADIOS2 versions there is no Engine::Good().
+            // Close() is safe to call once; if it's already closed
+            // ADIOS2 will generally just ignore it or handle internally.
             m_engine->Close();
         }
     } catch (...) {
-        // do nothing (destructor must not throw)
+        // Destructors must not throw
     }
 }
 
@@ -49,7 +62,7 @@ bool SSTStream::pull_data(SSTPayload &out)
 
     // Non-blocking polling
     auto status =
-        m_engine->BeginStep(adios2::StepMode::NextAvailable, 0.0 /*timeout sec*/);
+    m_engine->BeginStep(adios2::StepMode::Read, 0.0 /*timeout sec*/);
 
     if (status == adios2::StepStatus::EndOfStream) {
         m_eos.store(true);
@@ -72,8 +85,8 @@ bool SSTStream::pull_data(SSTPayload &out)
 
     // Variables from Python producer
     auto varData        = m_io->InquireVariable<float>("data");
-    auto varMetaBytes   = m_io->InquireVariable<uint8_t>("meta_bytes");
-    auto varMetaOffsets = m_io->InquireVariable<long long>("meta_offsets");
+auto varMetaBytes   = m_io->InquireVariable<std::uint8_t>("meta_bytes");
+auto varMetaOffsets = m_io->InquireVariable<std::int64_t>("meta_offsets");
 
     if (!varData || !varMetaBytes || !varMetaOffsets) {
         std::cerr << "[Partition " << m_partitionId
@@ -128,12 +141,12 @@ bool SSTStream::pull_data(SSTPayload &out)
     m_engine->Get(varData, dataBuf.data(), adios2::Mode::Sync);
 
     // -- Read metadata offsets --
-    std::vector<long long> offsets(offsetsSize);
+    std::vector<std::int64_t> offsets(offsetsSize);
     varMetaOffsets.SetSelection(adios2::Box<adios2::Dims>({0}, {offsetsSize}));
     m_engine->Get(varMetaOffsets, offsets.data(), adios2::Mode::Sync);
 
-    long long metaBegin = offsets[m_partitionId];
-    long long metaEnd   = offsets[m_partitionId + 1];
+    std::int64_t metaBegin = offsets[m_partitionId];
+    std::int64_t metaEnd   = offsets[m_partitionId + 1];
 
     if (metaBegin < 0 || metaEnd < metaBegin) {
         std::cerr << "[Partition " << m_partitionId

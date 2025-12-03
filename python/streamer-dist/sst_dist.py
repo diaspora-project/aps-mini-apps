@@ -50,10 +50,16 @@ class SSTDist:
         self.total_size = self.num_sinograms * self.chunk_size
         self.max_meta_bytes = int(max_meta_bytes)
 
+        print(f"Initializing SSTDist: num_sinograms={self.num_sinograms}, "
+              f"chunk_size={self.chunk_size}, total_size={self.total_size}, "
+              f"max_meta_bytes={self.max_meta_bytes}")
+
         # ADIOS2 SST setup
         self.ad = adios2.ADIOS()
         self.io = self.ad.DeclareIO("SST_sirt_IO")
         self.io.SetEngine("SST")
+
+        print("SSTDist: defining variables...")
 
         # 1) Data variable: all chunks concatenated in one 1D array
         self.var_data = self.io.DefineVariable(
@@ -83,8 +89,12 @@ class SSTDist:
             [self.num_sinograms + 1],
         )
 
+        print("SSTDist: opening SST writer...")
+
         # Open SST writer once
         self.writer = self.io.Open(stream_name, adios2.Mode.Write)
+
+        print("SSTDist: initialized.")
 
     def push_image(
         self,

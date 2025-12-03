@@ -211,12 +211,12 @@ def main():
       ncols = sub.shape[2]
       # print(f"Sending image seq_id {sequence_id} to sirt")
       tt = sst_dist.push_image(mofka_sub, sequence_id, args.num_sinograms, ncols, rotation,
-                      mofka_read_image.UniqueId(), mofka_read_image.Center)
+                      mofka_read_image.UniqueId(), mofka_read_image.Center())
 
-      if all(isinstance(item, list) for item in tt):
-        mofka_producing_time.extend(tt)
-      else:
-        mofka_producing_time.append(tt)
+      # if all(isinstance(item, list) for item in tt):
+      #   mofka_producing_time.extend(tt)
+      # else:
+      #   mofka_producing_time.append(tt)
 
     # If incoming data is white field
     if mofka_read_image.Itype() is serializer.ITypes.White:
