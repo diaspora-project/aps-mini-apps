@@ -115,6 +115,8 @@ class SSTDist:
                       used to build per-task JSON metadata.
         """
 
+        print("Preparing data for SST push_image...")
+
         # Flatten and cast to float32
         flat = np.asarray(data, dtype=np.float32).ravel()
         if flat.size != self.total_size:
@@ -145,6 +147,8 @@ class SSTDist:
             }
             chunk_jsons.append(json.dumps(meta))
 
+        print("Packing metadata for SST push_image...")
+
         # Pack metadata into a single byte buffer + offsets
         encoded = [m.encode("utf-8") for m in chunk_jsons]
         offsets = [0]
@@ -168,12 +172,17 @@ class SSTDist:
 
         meta_offsets = np.array(offsets, dtype=np.int64)
 
+        print(f"Pushing SST step: sequence_id={sequence_id}, projection_id={projection_id}, "
+              f"theta={theta}, center={center_val}")
+
         # ---- Atomic SST step: data + metadata together ----
         self.writer.BeginStep()
         self.writer.Put(self.var_data, flat)
         self.writer.Put(self.var_meta_bytes, meta_bytes)
         self.writer.Put(self.var_meta_offsets, meta_offsets)
         self.writer.EndStep()
+
+        print("SST step pushed.")
 
     def close(self) -> None:
         """Close the SST writer when done."""

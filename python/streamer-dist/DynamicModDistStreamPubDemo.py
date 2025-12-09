@@ -10,6 +10,7 @@ import TraceSerializer
 import tomopy as tp
 import json
 from mofka_dist import MofkaDist
+from sst_dist import SSTDist
 import csv
 import signal
 #from memory_profiler import profile
@@ -19,6 +20,8 @@ import multiprocessing
 def parse_arguments():
   parser = argparse.ArgumentParser( description='Data Distributor Process')
   parser.add_argument('--protocol', default="na+sm", help='Mofka protocol')
+
+  parser.add_argument('--dynamic_loadbalancing', default="false", help='Enable dynamic load balancing')
 
   parser.add_argument('--group_file', type=str, default="mofka.json",
                       help='Group file for the mofka server')
@@ -100,7 +103,7 @@ def task_to_worker_assignment(args, num_workers):
   total_progress = 0
 
   # Listen from consumer and take actions if needed
-  while True:
+  while args.dynamic_loadbalancing.lower() == "true":
     f = action_consumer.pull()
     event = f.wait()
     metadata = json.loads(event.metadata)
@@ -261,6 +264,9 @@ def main():
   seq=0
   time0 = time.time()
 
+  sst_dist = SSTDist(num_sinograms=args.num_sinograms, chunk_size=args.num_columns, 
+                             stream_name="sirt_stream", max_meta_bytes=65536)
+
   print("Starting to receive images ...")
 
   while True:
@@ -327,7 +333,10 @@ def main():
       #to send from mofka:
       mofka_sub = sub.flatten()
       ncols = sub.shape[2]
-      # print(f"Sending image seq_id {sequence_id} to sirt")
+      print(f"Sending image seq_id {sequence_id} to sirt through SST")
+      tt = sst_dist.push_image(mofka_sub, sequence_id, args.num_sinograms, ncols, rotation,
+                      mofka_read_image.UniqueId(), mofka_read_image.Center())
+      print(f"Sending image seq_id {sequence_id} to sirt through Mofka")
       tt = mofka_dist.push_image(mofka_sub, sequence_id, args.num_sinograms, ncols, rotation,
                       mofka_read_image.UniqueId(), mofka_read_image.Center(), producer=producer)
 
@@ -405,6 +414,13 @@ def main():
   assignment_process.join(timeout=5)
   if assignment_process.is_alive():
     assignment_process.terminate()
+
+  print("Complete data disitribution, sleeping until  to exit ...")
+  while True:
+    time.sleep(1)
+
+  sst_dist.close()
+    
 
   print("Exiting ...")
 

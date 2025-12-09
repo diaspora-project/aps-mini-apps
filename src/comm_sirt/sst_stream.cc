@@ -16,26 +16,35 @@ SSTStream::SSTStream(const std::string &streamName,
         throw std::runtime_error("Invalid partitionId for SSTStream");
     }
 
-    std::cout << "[Task " << m_partitionId << "] Initializing SSTStream for stream '"
+    try {
+        std::cout << "[Task " << m_partitionId << "] Initializing SSTStream for stream '"
               << m_streamName << "' with " << m_numPartitions << " partitions."
               << std::endl;
 
-    m_adios = std::make_unique<adios2::ADIOS>();
-    m_io    = std::make_unique<adios2::IO>(
-        m_adios->DeclareIO("SSTScatterConsumerIO_" + std::to_string(m_partitionId)));
+        m_adios = std::make_unique<adios2::ADIOS>();
+        m_io    = std::make_unique<adios2::IO>(
+            m_adios->DeclareIO("SSTScatterConsumerIO_" + std::to_string(m_partitionId)));
 
-    m_io->SetEngine("SST");
+        m_io->SetEngine("SST");
 
-    std::cout << "[Task " << m_partitionId << "] Opening SST stream '" << m_streamName
-              << "' for reading." << std::endl;
 
-    // You can set SST parameters here, e.g.:
-    // m_io->SetParameters({{"OpenTimeoutSecs", "30"}});
+        std::cout << "[Task " << m_partitionId << "] Opening SST stream '" << m_streamName
+                << "' for reading." << std::endl;
 
-    m_engine = std::make_unique<adios2::Engine>(
-        m_io->Open(m_streamName, adios2::Mode::Read));
+        // You can set SST parameters here, e.g.:
+        // m_io->SetParameters({{"OpenTimeoutSecs", "30"}});
+        m_io->SetParameter("RendezvousReaderCount", "1");
+        m_io->SetParameter("QueueLimit", "1");
 
-    std::cout << "[Task " << m_partitionId << "] SSTStream initialized." << std::endl;
+        m_engine = std::make_unique<adios2::Engine>(
+            m_io->Open(m_streamName, adios2::Mode::Read));
+
+        std::cout << "[Task " << m_partitionId << "] SSTStream initialized." << std::endl;
+        m_is_active.store(true);
+    }catch (const std::exception &ex) {
+        std::cout << "SSTStream initialization failed: " << ex.what();
+        m_is_active.store(false);
+    }
 
 }
 
@@ -55,14 +64,30 @@ SSTStream::~SSTStream()
 
 bool SSTStream::pull_data(SSTPayload &out)
 {
+    if (!is_active()) {
+        return false;
+    }
+
     if (m_eos.load()) {
         out.endOfStream = true;
         return false;
     }
 
-    // Non-blocking polling
-    auto status =
-    m_engine->BeginStep(adios2::StepMode::Read, 0.0 /*timeout sec*/);
+    adios2::StepStatus status;
+
+    try {
+        // Non-blocking polling
+        status = m_engine->BeginStep(adios2::StepMode::Read, 0.0 /*timeout sec*/);
+    } catch (const std::exception &ex) {
+        // This is where your std::runtime_error is coming from
+        std::cerr << "[Partition " << m_partitionId
+                  << "] BeginStep() failed: " << ex.what() << std::endl;
+
+        // Treat this as end-of-stream (or a fatal error, your choice)
+        m_eos.store(true);
+        out.endOfStream = true;
+        return false;
+    }
 
     if (status == adios2::StepStatus::EndOfStream) {
         m_eos.store(true);
@@ -76,17 +101,16 @@ bool SSTStream::pull_data(SSTPayload &out)
     }
 
     if (status != adios2::StepStatus::OK) {
-        // Unexpected, but treat as no data
+        // Unexpected, but treat as no data / soft error
         return false;
     }
 
-    // -- We have a valid step --
+    // --- We have a valid step ---
     ++m_stepIndex;
 
-    // Variables from Python producer
     auto varData        = m_io->InquireVariable<float>("data");
-auto varMetaBytes   = m_io->InquireVariable<std::uint8_t>("meta_bytes");
-auto varMetaOffsets = m_io->InquireVariable<std::int64_t>("meta_offsets");
+    auto varMetaBytes   = m_io->InquireVariable<std::uint8_t>("meta_bytes");
+    auto varMetaOffsets = m_io->InquireVariable<std::int64_t>("meta_offsets");
 
     if (!varData || !varMetaBytes || !varMetaOffsets) {
         std::cerr << "[Partition " << m_partitionId
@@ -131,16 +155,13 @@ auto varMetaOffsets = m_io->InquireVariable<std::int64_t>("meta_offsets");
         return false;
     }
 
-    // -- Read data slice --
     std::size_t chunkSize = totalSize / m_numPartitions;
     std::size_t start     = m_partitionId * chunkSize;
 
     varData.SetSelection(adios2::Box<adios2::Dims>({start}, {chunkSize}));
-
     std::vector<float> dataBuf(chunkSize);
     m_engine->Get(varData, dataBuf.data(), adios2::Mode::Sync);
 
-    // -- Read metadata offsets --
     std::vector<std::int64_t> offsets(offsetsSize);
     varMetaOffsets.SetSelection(adios2::Box<adios2::Dims>({0}, {offsetsSize}));
     m_engine->Get(varMetaOffsets, offsets.data(), adios2::Mode::Sync);
@@ -171,13 +192,11 @@ auto varMetaOffsets = m_io->InquireVariable<std::int64_t>("meta_offsets");
 
     m_engine->EndStep();
 
-    // Fill output
     out.data        = std::move(dataBuf);
     out.metadata    = std::move(jsonStr);
     out.stepIndex   = m_stepIndex;
     out.endOfStream = false;
 
-    // parse_metadata_json(out.metadata_json, out.metadata);
-
     return true;
 }
+

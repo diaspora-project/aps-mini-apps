@@ -283,6 +283,8 @@ def main():
   del action_producer
   del action_consumer
 
+  sst_dist.close()
+
   print("Exiting ...")
 
 if __name__ == '__main__':

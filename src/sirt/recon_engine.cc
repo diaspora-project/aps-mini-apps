@@ -152,6 +152,7 @@ int ReconTask::run() {
     std::cout << "[Task-" << task_id << "] Checkpoint found at " << passes << ". Restarting from checkpoint" << std::endl;
     ckpt_client->restart(ckpt_name, passes);
     ms.updateProgress(progress);
+    ms.updateSeqNext(progress + 1);
     this->checkpointed_progress = progress;
     std::cout << "[Task-" << task_id << "] Restarted from checkpoint at iteration " << passes << ", progress = " << progress << std::endl;
   }else{
@@ -165,6 +166,9 @@ int ReconTask::run() {
   #endif
 
   std::cout << "[Task-" << task_id << "] Start reconstruction passes = " << passes << std::endl;
+
+  auto msthread = ms.receiveEventInBackground(consumer);
+  msthread.detach();
 
   for(; passes < config.num_passes; ++passes){
 
@@ -252,7 +256,7 @@ int ReconTask::run() {
 
       ms.acknowledge();
       this->checkpointed_progress = progress;
-      std::cout << "[task-" << task_id << "]: Checkpointed version " << passes << ", progress = " << progress << std::endl;
+      std::cout << "[task-" << task_id << "]: Checkpointed version " << passes << "/" << config.num_passes << ", progress = " << progress << std::endl;
       ckpt_mutex->unlock();
     }
     #ifdef TIMERON
@@ -301,7 +305,9 @@ int ReconTask::run() {
         //   iteration_stream.str() + "-recon.h5";
         // saveAsHDF5(outputpath.c_str(), 
         //     &recon[recon_slice_data_index], app_dims);
-
+        
+        std::cout << "[Task-" << task_id << "] Publishing reconstructed image for iteration " 
+                  << passes << ", progress = " << progress << std::endl;
         ms.publishImage(md, &recon[recon_slice_data_index], data_size, producer);
 
       } catch(const mofka::Exception& ex) {

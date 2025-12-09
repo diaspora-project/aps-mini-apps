@@ -44,6 +44,77 @@ void MofkaStream::addTomoMsg(StreamEvent event){
   }
 }
 
+std::thread MofkaStream::receiveEventInBackground(mofka::Consumer consumer)
+{
+  return std::thread([this, consumer = std::move(consumer)]() mutable {
+
+    std::cout << "[Task-" << getRank()
+              << "]: Starting background thread to receive Mofka events..."
+              << std::endl;
+
+    while (!isEndOfStream()) {
+      auto start = std::chrono::high_resolution_clock::now();
+      mofka::Future<mofka::Event> future_event = consumer.pull();
+
+      // Poll until event is ready (or EOS)
+      while (!future_event.completed() && !isEndOfStream()) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+
+        {
+          std::lock_guard<std::mutex> lock(this->mofka_buffer_mutex);
+          while (!mofka_buffered_events.empty()) {
+            auto &event = mofka_buffered_events.front();
+            if (event.metadata().json()["Type"] != "MSG_DATA_REP") {
+              std::cout << "[Task-" << getRank()
+                        << "]: Received non-DATA event: " << event.metadata().json()["Type"]
+                        << std::endl;
+              break;
+            }
+            if (event.metadata().json()["seq_n"].get<int>() < this->getProgress()) {
+              event.acknowledge();
+              std::cout << "[Task-" << getRank()
+                        << "]: Acknowledge (buffered): seq_id = "
+                        << event.metadata().json()["seq_n"].get<int>()
+                        << std::endl;
+              mofka_buffered_events.erase(mofka_buffered_events.begin());
+            } else {
+              break;
+            }
+          }
+        } // lock_guard released here
+      }
+
+      if (isEndOfStream()) {
+        break;
+      }
+
+      if (future_event.completed()) {
+        auto event = future_event.wait();
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsed = end - start;
+        setConsumerTimes("wait_t", 1, elapsed.count());
+
+        std::lock_guard<std::mutex> lock(this->mofka_buffer_mutex);
+        mofka_buffered_events.push_back(event);
+      }
+    }
+  });
+}
+
+
+bool MofkaStream::getMofkaBufferedEvent(mofka::Event &event) {
+  std::lock_guard<std::mutex> lock(this->mofka_buffer_mutex);
+  if (mofka_buffered_events.size() > 0) {
+    event = std::move(mofka_buffered_events.front());
+    mofka_buffered_events.erase(mofka_buffered_events.begin());
+    return true;
+  }else{
+    return false;
+  }
+}
+
+
+
 /* Erase streaming message to buffers
 */
 void MofkaStream::eraseBegTraceMsg(){
@@ -119,6 +190,7 @@ MofkaStream::MofkaStream(mofka::MofkaDriver driver,
   comm_rank {rank},
   // comm_size {size},
   progress {progress},
+  next_seq {progress+1},
   driver {driver}
   {}
 
@@ -249,50 +321,96 @@ DataRegionBase<float, TraceMetadata>* MofkaStream::readSlidingWindow(
   for(int i=0; i<step; ++i) {
     // mofka messages
 
-    bool loaded_from_sst = false;
+    bool added_new_data = false;
 
-    auto start = std::chrono::high_resolution_clock::now();
-    mofka::Future<mofka::Event> future_event = consumer.pull();
-    while (!future_event.completed()) {
-      // sleep for 1 ms to avoid busy waiting
-      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    while (!added_new_data) {
+
       if (interrupt_signal) {
         std::cout << "[Task-" << getRank() << "]: Interrupt signal received, stopping pull." << std::endl;
         return nullptr; // Exit if interrupt signal is received
       }
+
+      // Clean up SST payloads before getting new data
+      if (!this->pending_sst_payloads.empty() && pending_sst_payloads[0].stepIndex == this->next_seq) {
+        std::cout << "[Task-" << getRank() << "]: Processing pending SST stepIndex: " << this->pending_sst_payloads[0].stepIndex << std::endl;
+        // Add to stream events
+        stream_events.push_back(StreamEvent(this->pending_sst_payloads[0]));
+        this->pending_sst_payloads.erase(this->pending_sst_payloads.begin());
+        this->next_seq++;
+        continue;
+      }
+
+      if (sst_stream.is_eos() && this->pending_sst_payloads.empty()) {
+        std::cout << "[Task-" << getRank() << "]: SST stream has ended and no pending SST payloads." << std::endl;
+        setEndOfStream(true);
+        return nullptr;
+      }
+
+      // std::cout << "[Task-" << getRank() << "]: Checking for new data from SST stream..." << std::endl;
+
       // Check SST stream for fast data
       SSTPayload sst_payload;
       if (sst_stream.pull_data(sst_payload)) {
-        std::cout << "[Task-" << getRank() << "]: Received data from SST stream, stepIndex: " << sst_payload.stepIndex << std::endl;
-        loaded_from_sst = true;
-        // Process
 
-        // Add to stream events
-        stream_events.push_back(StreamEvent(sst_payload));
-        break;
-      }
-    }
-    if (!loaded_from_sst) {
-      auto event = future_event.wait();
-      // auto event = consumer.pull().wait();
-      auto end = std::chrono::high_resolution_clock::now();
-      std::chrono::duration<double> elapsed = end - start;
-      setConsumerTimes("wait_t", 1, elapsed.count());
+        if (sst_payload.stepIndex > this->next_seq) {
+          std::cout << "[Task-" << getRank() << "]: Delay processing SST stepIndex: " << sst_payload.stepIndex
+                    << " > " << this->next_seq << " = next_seq" << std::endl;
+          this->pending_sst_payloads.push_back(sst_payload);
+        }else if (sst_payload.stepIndex < this->next_seq) {
+          std::cout << "[Task-" << getRank() << "]: Skipping SST stepIndex: " << sst_payload.stepIndex
+                    << " < " << this->next_seq << " = next_seq" << std::endl;
+        }else{
 
-      //if endMsg break
-      if (event.metadata().json()["Type"].get<std::string>() == "FIN") {
-        setEndOfStream(true);
-        std::cout << "[Task-" << getRank() << "]: End of stream detected" << std::endl;
-        return nullptr;
+          std::cout << "[Task-" << getRank() << "]: Received data from SST stream, stepIndex: " << sst_payload.stepIndex << std::endl;
+          this->next_seq = sst_payload.stepIndex + 1;
+          // Add to stream events
+          stream_events.push_back(StreamEvent(sst_payload));
+          added_new_data = true;
+        }
+      }else{
+        // If no SST data, pull from mofka
+        // auto start = std::chrono::high_resolution_clock::now();
+        // mofka::Future<mofka::Event> future_event = consumer.pull();
+        // if (!future_event.completed()) {
+        //   // sleep for 1 ms to avoid busy waiting
+        //   std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        // }
+        // if (future_event.completed()) {
+          // auto event = future_event.wait();
+          // // auto event = consumer.pull().wait();
+
+        // std::cout << "[Task-" << getRank() << "]: Checking for new data from Mofka..." << std::endl;
+
+        mofka::Event event;
+        if (getMofkaBufferedEvent(event)) {
+          //if endMsg break
+          if (event.metadata().json()["Type"].get<std::string>() == "FIN") {
+            setEndOfStream(true);
+            std::cout << "[Task-" << getRank() << "]: End of stream detected" << std::endl;
+            return nullptr;
+          }
+          
+          int sequence_id = event.metadata().json()["seq_n"].get<int>();
+          int proj_id = event.metadata().json()["projection_id"].get<int>();
+          double theta = event.metadata().json()["theta"].get<float>();
+          double center = event.metadata().json()["center"].get<float>();
+          
+          if (this->next_seq > sequence_id+1) {
+            std::cout << "[Task-" << getRank() << "]: Mofka: Skipping seq_id: " << sequence_id
+                      << " < " << this->next_seq - 1 << " = (next_seq - 1)" << std::endl;
+            // Skip this event
+            this->pending_events.push_back(event);
+          }else{
+            this->next_seq = sequence_id + 1;
+            std::cout << "[Task-" << getRank() << "]: Received data from Mofka: seq_id: " << sequence_id << " projection_id: " << proj_id << " theta: " << theta << " center: " << center << ", progress = " << progress << std::endl;
+            stream_events.push_back(StreamEvent(event));
+            added_new_data = true;
+          }
+        }else{
+          // sleep for 1 ms to avoid busy waiting
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
       }
-      
-      int sequence_id = event.metadata().json()["seq_n"].get<int>();
-      int proj_id = event.metadata().json()["projection_id"].get<int>();
-      double theta = event.metadata().json()["theta"].get<float>();
-      double center = event.metadata().json()["center"].get<float>();
-      
-      std::cout << "[Task-" << getRank() << "]: seq_id: " << sequence_id << " projection_id: " << proj_id << " theta: " << theta << " center: " << center << ", progress = " << progress << std::endl;
-      stream_events.push_back(StreamEvent(event));
     }
     
     // float* data = static_cast<float*>(event.data().segments()[0].ptr);

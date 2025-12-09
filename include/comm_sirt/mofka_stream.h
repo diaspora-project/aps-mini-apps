@@ -17,6 +17,7 @@
 #include "trace_data.h"
 #include <csignal>
 #include "sst_stream.h"
+#include <thread>
 
 using json = nlohmann::json;
 namespace tl = thallium;
@@ -63,8 +64,13 @@ class MofkaStream
     // int comm_size;
 
     int progress;
+    int next_seq;
     std::vector<mofka::Event> pending_events;
+    std::vector<SSTPayload> pending_sst_payloads;
     bool end_of_stream = false;
+
+    std::vector<mofka::Event> mofka_buffered_events;
+    std::mutex mofka_buffer_mutex;
 
     std::vector<float> vproj;
     std::vector<float> vtheta;
@@ -216,6 +222,9 @@ class MofkaStream
 
     void acknowledge();
 
+    std::thread receiveEventInBackground(mofka::Consumer consumer);
+    bool getMofkaBufferedEvent(mofka::Event& event);
+
     std::vector<std::tuple<std::string, uint64_t, float>> getConsumerTimes();
 
     void setConsumerTimes(std::string op, uint64_t size, float time);
@@ -228,6 +237,7 @@ class MofkaStream
 
     int getProgress() { return progress; }
     void updateProgress(int progress) { this->progress = progress; } // Update progress for streaming control
+    void updateSeqNext(int next_seq) { this->next_seq = next_seq; } // Update next_seq for streaming control
 
     bool isEndOfStream() { return end_of_stream; }
     void setEndOfStream(bool eos) { end_of_stream = eos; } // Update end of stream flag

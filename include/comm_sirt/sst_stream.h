@@ -38,6 +38,14 @@ public:
     // If end-of-stream happens, payload.endOfStream == true.
     bool pull_data(SSTPayload &out);
 
+    bool is_eos() const {
+        return m_eos.load();
+    }
+
+    bool is_active() const {
+        return m_is_active.load();
+    }
+
 private:
     std::string m_streamName;
     int m_partitionId;
@@ -49,6 +57,8 @@ private:
 
     std::atomic<bool> m_eos;
     std::uint64_t     m_stepIndex;
+
+    std::atomic<bool> m_is_active;
 
     // void parse_metadata_json(
     //         const std::string &json,

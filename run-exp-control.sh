@@ -17,4 +17,5 @@ logdir=$3
 
 trap "echo 'Ctrl+C pressed. Terminating...'; exit 1" SIGINT SIGTERM
 
+echo python -u ./build/python/streamer-sirt/FailureInjector.py ${failure_mode} ${mtbf}
 python -u ./build/python/streamer-sirt/FailureInjector.py ${failure_mode} ${mtbf}
