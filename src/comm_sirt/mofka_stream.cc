@@ -352,17 +352,22 @@ DataRegionBase<float, TraceMetadata>* MofkaStream::readSlidingWindow(
       SSTPayload sst_payload;
       if (sst_stream.pull_data(sst_payload)) {
 
-        if (sst_payload.stepIndex > this->next_seq) {
-          std::cout << "[Task-" << getRank() << "]: Delay processing SST stepIndex: " << sst_payload.stepIndex
+        auto metadata_json = json::parse(sst_payload.metadata);
+        auto stepIndex = metadata_json["seq_n"].get<uint64_t>();
+        sst_payload.stepIndex = stepIndex;
+
+        if (stepIndex > this->next_seq) {
+          std::cout << "[Task-" << getRank() << "]: Delay processing SST stepIndex: " << stepIndex
                     << " > " << this->next_seq << " = next_seq" << std::endl;
+          sst_payload.stepIndex = stepIndex;
           this->pending_sst_payloads.push_back(sst_payload);
-        }else if (sst_payload.stepIndex < this->next_seq) {
-          std::cout << "[Task-" << getRank() << "]: Skipping SST stepIndex: " << sst_payload.stepIndex
+        }else if (stepIndex < this->next_seq) {
+          std::cout << "[Task-" << getRank() << "]: Skipping SST stepIndex: " << stepIndex
                     << " < " << this->next_seq << " = next_seq" << std::endl;
         }else{
 
-          std::cout << "[Task-" << getRank() << "]: Received data from SST stream, stepIndex: " << sst_payload.stepIndex << std::endl;
-          this->next_seq = sst_payload.stepIndex + 1;
+          std::cout << "[Task-" << getRank() << "]: Received data from SST stream, stepIndex: " << stepIndex << std::endl;
+          this->next_seq = stepIndex + 1;
           // Add to stream events
           stream_events.push_back(StreamEvent(sst_payload));
           added_new_data = true;

@@ -59,6 +59,12 @@ class SSTDist:
         self.io = self.ad.DeclareIO("SST_sirt_IO")
         self.io.SetEngine("SST")
 
+        # print("SSTDist: setting parameters...")
+        # self.io.SetParameters({
+        #     "QueueFullPolicy": "Discard",
+        #     "QueueLimit": "4"
+        # })
+
         print("SSTDist: defining variables...")
 
         # 1) Data variable: all chunks concatenated in one 1D array

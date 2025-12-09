@@ -41,7 +41,7 @@ echo "Logging execution information at ${logdir}"
 ln -sfn "`pwd`/${logdir}" "build/logs/latest"
 echo "Updated symlink: ${latest_link} -> ${logdir}"
 
-
+rm mofka.json || true
 echo "Start Mofka server ---------------------------------------------------"
 bash run-mofka.sh > ${logdir}/mofka.out 2> ${logdir}/mofka.err &
 echo bash run-mofka.sh
