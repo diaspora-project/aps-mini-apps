@@ -123,13 +123,13 @@ target_link_libraries(trace_utils
     HDF5::HDF5
 )
 
-# add_library(trace_h5io  ${TRACE_ROOT}/src/tracelib/trace_h5io.cc)
-# target_link_libraries(trace_h5io
-#   PUBLIC
-#     HDF5::HDF5
-#     MPI::MPI_C
-#     Boost::serialization
-# )
+add_library(trace_h5io  ${TRACE_ROOT}/src/tracelib/trace_h5io.cc)
+target_link_libraries(trace_h5io
+  PUBLIC
+    HDF5::HDF5
+    MPI::MPI_C
+    Boost::serialization
+)
 
 add_library(sst_stream ${TRACE_ROOT}/src/comm_sirt/sst_stream.cc)
 target_link_libraries(sst_stream
@@ -179,7 +179,7 @@ target_link_libraries(sirt_stream
   PRIVATE
     recon_engine
     trace_utils
-    # trace_h5io
+    trace_h5io
     sirt
     mofka_stream
     sst_stream
@@ -242,7 +242,7 @@ set(CMAKE_INSTALL_RPATH "${_RPATH_DIRS}")
 set_target_properties(sirt_stream PROPERTIES BUILD_RPATH "${_RPATH_DIRS}")
 set_target_properties(mofka_stream PROPERTIES BUILD_RPATH "${_RPATH_DIRS}")
 set_target_properties(trace_utils  PROPERTIES BUILD_RPATH "${_RPATH_DIRS}")
-# set_target_properties(trace_h5io   PROPERTIES BUILD_RPATH "${_RPATH_DIRS}")
+set_target_properties(trace_h5io   PROPERTIES BUILD_RPATH "${_RPATH_DIRS}")
 set_target_properties(sirt         PROPERTIES BUILD_RPATH "${_RPATH_DIRS}")
 set_target_properties(recon_engine PROPERTIES BUILD_RPATH "${_RPATH_DIRS}")
 
