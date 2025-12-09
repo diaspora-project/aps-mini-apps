@@ -110,6 +110,9 @@ def main(input_path, recon_path, model_path, protocol, group_file, batchsize, np
             m = event.metadata
             t_meta = time.perf_counter()
             m = json.loads(m)
+            if "Type" not in m:
+                print("Receive data without Type: ", m)
+                continue
             if m["Type"] == "FIN":
                 more_data = False
                 break
