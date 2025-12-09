@@ -24,9 +24,19 @@ cd build
 #   -DCMAKE_PREFIX_PATH=/home/ndhai/diaspora/src/spack/var/spack/environments/APS/.spack-env/view
 # cmake --build build -j
 # detect C/C++/Fortran compilers
-CC_PATH=$(command -v cc || command -v gcc || command -v clang || true)
-CXX_PATH=$(command -v c++ || command -v g++ || command -v clang++ || true)
-FC_PATH=$(command -v gfortran || command -v ifort || true)
+
+# Detect if we’re on a Cray/Polaris-like system
+if command -v CC >/dev/null 2>&1 && command -v ftn >/dev/null 2>&1; then
+    echo "Detected Cray environment; using MPI compiler wrappers"
+    CC_PATH=cc
+    CXX_PATH=CC
+    FC_PATH=ftn
+else
+    echo "Using generic compilers"
+    CC_PATH=$(command -v cc || command -v gcc || command -v clang || true)
+    CXX_PATH=$(command -v c++ || command -v g++ || command -v clang++ || true)
+    FC_PATH=$(command -v gfortran || command -v ifort || true)
+fi
 
 if [ -z "$CC_PATH" ] || [ -z "$CXX_PATH" ]; then
   echo "No C/C++ compiler found in PATH. Load compiler module or install gcc/clang."
