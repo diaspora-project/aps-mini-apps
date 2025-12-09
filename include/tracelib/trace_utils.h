@@ -1,13 +1,13 @@
 #ifndef DISP_APPS_RECONSTRUCTION_COMMON_TRACE_UTILS_H_
 #define DISP_APPS_RECONSTRUCTION_COMMON_TRACE_UTILS_H_
 
-#include "trace_h5io.h"
+// #include "trace_h5io.h"
 #include "data_region_2d_bare_base.h"
 
 namespace trace_utils {
   constexpr float kPI = 3.14159265358979f;
 
-  void DegreeToRadian(trace_io::H5Data &theta);
+//   void DegreeToRadian(trace_io::H5Data &theta);
   void Absolute(float *data, size_t count);
   void RemoveNegatives(float *data, size_t count);
   void RemoveNaNs(float *data, size_t count);
