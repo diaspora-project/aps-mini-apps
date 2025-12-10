@@ -415,9 +415,9 @@ def main():
   if assignment_process.is_alive():
     assignment_process.terminate()
 
-  print("Complete data disitribution, sleeping until to exit ...")
-  while True:
-    time.sleep(1)
+  # print("Complete data disitribution, sleeping until to exit ...")
+  # while True:
+  #   time.sleep(1)
 
   sst_dist.close()
     
