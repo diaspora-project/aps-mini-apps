@@ -239,8 +239,7 @@ class MofkaStream
     int getProgress() { return progress; }
     void updateProgress(int progress) { this->progress = progress; } // Update progress for streaming control
     
-    int checkpointProgress() {
-      ckpt_progress = progress;
+    int getCkptProgress() {
       return ckpt_progress;
     }
     
