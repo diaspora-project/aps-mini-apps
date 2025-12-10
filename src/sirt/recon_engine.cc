@@ -240,8 +240,9 @@ int ReconTask::run() {
     if(!(passes%config.ckpt_freq) || stop_flag.load()){
       ckpt_mutex->lock();
       ckpt_client->checkpoint_wait();
+      progress = passes * config.window_len;
+      ms.updateCkptProgress(progress);
       ms.acknowledge();
-      progress = ms.getCkptProgress(); // update checkpointed progress and return it
       std::cout << "[Task-" << task_id << "] Checkpointing at iteration " << passes << ", progress = " << progress << std::endl;
       // if (!ckpt_client->checkpoint(config.ckpt_name, passes)) {
       if (!ckpt_client->checkpoint(ckpt_name, passes)) {

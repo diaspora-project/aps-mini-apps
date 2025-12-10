@@ -239,9 +239,8 @@ class MofkaStream
     int getProgress() { return progress; }
     void updateProgress(int progress) { this->progress = progress; } // Update progress for streaming control
     
-    int getCkptProgress() {
-      return ckpt_progress;
-    }
+    int getCkptProgress() { return ckpt_progress;}
+    void updateCkptProgress(int p) { ckpt_progress = p;}
     
     void updateSeqNext(int next_seq) { this->next_seq = next_seq; } // Update next_seq for streaming control
 
