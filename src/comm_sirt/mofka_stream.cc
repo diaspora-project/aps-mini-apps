@@ -70,7 +70,7 @@ std::thread MofkaStream::receiveEventInBackground(mofka::Consumer consumer)
                         << std::endl;
               break;
             }
-            if (event.metadata().json()["seq_n"].get<int>() < this->getProgress()) {
+            if (event.metadata().json()["seq_n"].get<int>() <= this->ckpt_progress) {
               event.acknowledge();
               std::cout << "[Task-" << getRank()
                         << "]: Acknowledge (buffered): seq_id = "
@@ -135,7 +135,7 @@ void MofkaStream::acknowledge() {
     auto event_prog_id = event->metadata().json()["seq_n"].get<int>();
     // if (event_prog_id < current_proj_id) {
     // if (event_prog_id < current_proj_id + (int)window_len) {
-    if (event_prog_id < progress) {
+    if (event_prog_id <= ckpt_progress) {
       event->acknowledge();
       std::cout << "[Task-" << getRank() << "]: Acknowledge: seq_id = " << event_prog_id << std::endl;
       pending_events.erase(event);

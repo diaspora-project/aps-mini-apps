@@ -64,6 +64,7 @@ class MofkaStream
     // int comm_size;
 
     int progress;
+    int ckpt_progress;
     int next_seq;
     std::vector<mofka::Event> pending_events;
     std::vector<SSTPayload> pending_sst_payloads;
@@ -237,6 +238,12 @@ class MofkaStream
 
     int getProgress() { return progress; }
     void updateProgress(int progress) { this->progress = progress; } // Update progress for streaming control
+    
+    int checkpointProgress() {
+      ckpt_progress = progress;
+      return ckpt_progress;
+    }
+    
     void updateSeqNext(int next_seq) { this->next_seq = next_seq; } // Update next_seq for streaming control
 
     bool isEndOfStream() { return end_of_stream; }
