@@ -340,10 +340,10 @@ def main():
       # tt = mofka_dist.push_image(mofka_sub, sequence_id, args.num_sinograms, ncols, rotation,
       #                 mofka_read_image.UniqueId(), mofka_read_image.Center(), producer=producer)
 
-      if all(isinstance(item, list) for item in tt):
-        mofka_producing_time.extend(tt)
-      else:
-        mofka_producing_time.append(tt)
+      # if all(isinstance(item, list) for item in tt):
+      #   mofka_producing_time.extend(tt)
+      # else:
+      #   mofka_producing_time.append(tt)
 
     # If incoming data is white field
     if mofka_read_image.Itype() is serializer.ITypes.White:
