@@ -33,8 +33,9 @@ SSTStream::SSTStream(const std::string &streamName,
 
         // You can set SST parameters here, e.g.:
         // m_io->SetParameters({{"OpenTimeoutSecs", "30"}});
-        m_io->SetParameter("RendezvousReaderCount", "1");
+        // m_io->SetParameter("RendezvousReaderCount", "1");
         m_io->SetParameter("QueueLimit", "1");
+        m_io->SetParameter("OpenTimeoutSecs", "10"); // wait 10 seconds max
 
         m_engine = std::make_unique<adios2::Engine>(
             m_io->Open(m_streamName, adios2::Mode::Read));
