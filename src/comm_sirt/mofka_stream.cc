@@ -134,7 +134,8 @@ void MofkaStream::acknowledge() {
     auto event = pending_events.begin();
     auto event_prog_id = event->metadata().json()["seq_n"].get<int>();
     // if (event_prog_id < current_proj_id) {
-    if (event_prog_id < current_proj_id + (int)window_len) {
+    // if (event_prog_id < current_proj_id + (int)window_len) {
+    if (event_prog_id < progress) {
       event->acknowledge();
       std::cout << "[Task-" << getRank() << "]: Acknowledge: seq_id = " << event_prog_id << std::endl;
       pending_events.erase(event);
