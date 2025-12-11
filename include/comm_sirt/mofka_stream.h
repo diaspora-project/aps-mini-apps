@@ -68,7 +68,8 @@ class MofkaStream
     int next_seq;
     std::vector<mofka::Event> pending_events;
     std::vector<SSTPayload> pending_sst_payloads;
-    bool end_of_stream = false;
+    bool mofka_eos = false;
+    bool sst_eos = false;
 
     std::vector<mofka::Event> mofka_buffered_events;
     std::mutex mofka_buffer_mutex;
@@ -244,8 +245,9 @@ class MofkaStream
     
     void updateSeqNext(int next_seq) { this->next_seq = next_seq; } // Update next_seq for streaming control
 
-    bool isEndOfStream() { return end_of_stream; }
-    void setEndOfStream(bool eos) { end_of_stream = eos; } // Update end of stream flag
+    bool isEndOfStream() { return mofka_eos && sst_eos; }
+    void setSSTEndOfStream(bool eos) { sst_eos = eos; } // Update SST end of stream flag
+    void setMofkaEndOfStream(bool eos) { mofka_eos = eos; } // Update Mofka end of stream flag
     
     /* Interrupt mofka stream due to emergency reasons */
     void interrupt(int signal=-1);

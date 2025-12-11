@@ -155,6 +155,7 @@ def main(input_path, recon_path, model_path, protocol, group_file, batchsize, nu
 
             del waiting_metadata[iteration_stream]
             del waiting_data[iteration_stream]
+            completed_iterations.add(iteration_stream)
             
     fields = ["t_wait", "t_metadata", "metadata_size" ,"t_data", "data_size"]
     with open(logdir + '/Den_pull.csv', 'w') as f:

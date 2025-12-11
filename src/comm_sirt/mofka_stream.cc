@@ -59,11 +59,18 @@ std::thread MofkaStream::receiveEventInBackground(mofka::Consumer consumer)
       // Poll until event is ready (or EOS)
       while (!future_event.completed() && !isEndOfStream()) {
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
-
         {
           std::lock_guard<std::mutex> lock(this->mofka_buffer_mutex);
           while (!mofka_buffered_events.empty()) {
             auto &event = mofka_buffered_events.front();
+            if (event.metadata().json()["Type"] == "FIN") {
+              std::cout << "[Task-" << getRank()
+                        << "]: Received FIN event in buffered events."
+                        << std::endl;
+              // Re-add FIN at the end to end sure all data events are processed first
+              mofka_buffered_events.erase(mofka_buffered_events.begin());
+              mofka_buffered_events.push_back(event);
+            }
             if (event.metadata().json()["Type"] != "MSG_DATA_REP") {
               std::cout << "[Task-" << getRank()
                         << "]: Received non-DATA event: " << event.metadata().json()["Type"]
@@ -346,7 +353,7 @@ DataRegionBase<float, TraceMetadata>* MofkaStream::readSlidingWindow(
 
       if (sst_stream.is_eos() && this->pending_sst_payloads.empty()) {
         std::cout << "[Task-" << getRank() << "]: SST stream has ended and no pending SST payloads." << std::endl;
-        setEndOfStream(true);
+        setSSTEndOfStream(true);
         return nullptr;
       }
 
@@ -394,7 +401,7 @@ DataRegionBase<float, TraceMetadata>* MofkaStream::readSlidingWindow(
         if (getMofkaBufferedEvent(event)) {
           //if endMsg break
           if (event.metadata().json()["Type"].get<std::string>() == "FIN") {
-            setEndOfStream(true);
+            setMofkaEndOfStream(true);
             std::cout << "[Task-" << getRank() << "]: End of stream detected" << std::endl;
             return nullptr;
           }
