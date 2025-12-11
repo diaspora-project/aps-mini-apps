@@ -74,7 +74,7 @@ def flush_mofka_producer(p):
   while True:
     # time.sleep(0.1) # sleep to avoid busy-waiting
     time.sleep(0.01)
-    print("Flushing mofka producer ...")
+    # print("Flushing mofka producer ...")
     p.flush()
 
 # def task_to_worker_assignment(action_producer, action_consumer, args, action_mofka_dist):
