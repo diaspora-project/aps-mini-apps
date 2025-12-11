@@ -73,7 +73,7 @@ def parse_arguments():
 def flush_mofka_producer(p):
   while True:
     # time.sleep(0.1) # sleep to avoid busy-waiting
-    time.sleep(1)
+    time.sleep(0.1)
     print("Flushing mofka producer ...")
     p.flush()
 
