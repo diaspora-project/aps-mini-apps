@@ -70,6 +70,11 @@ def parse_arguments():
   return parser.parse_args()
 
 
+def flush_mofka_producer(p):
+  while True:
+    time.sleep(0.1) # sleep to avoid busy-waiting
+    p.flush()
+
 # def task_to_worker_assignment(action_producer, action_consumer, args, action_mofka_dist):
 def task_to_worker_assignment(args, num_workers):
 
@@ -268,6 +273,10 @@ def main():
                              stream_name="sirt_stream", max_meta_bytes=65536)
 
   print("Starting to receive images ...")
+
+  # Create a new thread to periodically flush the producer
+  flush_thread = threading.Thread(target=flush_mofka_producer, args=(producer), daemon=True)
+  flush_thread.start()
 
   while True:
 
