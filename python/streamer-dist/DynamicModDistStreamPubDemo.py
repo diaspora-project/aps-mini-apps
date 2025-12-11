@@ -70,12 +70,30 @@ def parse_arguments():
   return parser.parse_args()
 
 
-def flush_mofka_producer(p):
+class ImagePacket:
+  def __init__(self, data, sequence_id, num_sinograms, num_columns, rotation, unique_id, center):
+    self.data = data
+    self.sequence_id = sequence_id
+    self.num_sinograms = num_sinograms
+    self.num_columns = num_columns
+    self.rotation = rotation
+    self.unique_id = unique_id
+    self.center = center
+
+import queue
+mofka_queue = queue.Queue()
+
+def flush_mofka_producer(md, p):
+  print("Starting mofka producer flush thread ...")
   while True:
-    # time.sleep(0.1) # sleep to avoid busy-waiting
-    time.sleep(0.01)
-    # print("Flushing mofka producer ...")
-    p.flush()
+    try:
+      image_packet = mofka_queue.get(timeout=0.01)
+      md.push_image(image_packet.data, image_packet.sequence_id, image_packet.num_sinograms, image_packet.num_columns,
+                    image_packet.rotation, image_packet.unique_id, image_packet.center,
+                    producer=p)
+    except queue.Empty:
+      continue
+  print("Exiting mofka producer flush thread ...")
 
 # def task_to_worker_assignment(action_producer, action_consumer, args, action_mofka_dist):
 def task_to_worker_assignment(args, num_workers):
@@ -347,9 +365,12 @@ def main():
       print(f"Sending image seq_id {sequence_id} to sirt through SST")
       tt = sst_dist.push_image(mofka_sub, sequence_id, args.num_sinograms, ncols, rotation,
                       mofka_read_image.UniqueId(), mofka_read_image.Center())
-      print(f"Sending image seq_id {sequence_id} to sirt through Mofka")
-      tt = mofka_dist.push_image(mofka_sub, sequence_id, args.num_sinograms, ncols, rotation,
-                      mofka_read_image.UniqueId(), mofka_read_image.Center(), producer=producer)
+      # print(f"Sending image seq_id {sequence_id} to sirt through Mofka")
+      # tt = mofka_dist.push_image(mofka_sub, sequence_id, args.num_sinograms, ncols, rotation,
+      #                 mofka_read_image.UniqueId(), mofka_read_image.Center(), producer=producer)
+      print(f"Queueing image seq_id {sequence_id} to sirt through Mofka")
+      mofka_queue.put(ImagePacket(mofka_sub, sequence_id, args.num_sinograms, ncols, rotation,
+                      mofka_read_image.UniqueId(), mofka_read_image.Center()))
 
       # if all(isinstance(item, list) for item in tt):
       #   mofka_producing_time.extend(tt)
