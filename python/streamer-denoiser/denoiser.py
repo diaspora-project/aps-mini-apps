@@ -82,7 +82,7 @@ def process_directory(model, directory_path):
                 file_path = os.path.join(root, file)
                 process_file(model, file_path)
 
-def main(input_path, recon_path, model_path, protocol, group_file, batchsize, nproc_sirt, logdir):
+def main(input_path, recon_path, model_path, protocol, group_file, batchsize, num_sinograms, logdir):
     # Load the saved model
     # model = keras.models.load_model(model_path)
     driver = mofka.MofkaDriver(group_file, use_progress_thread=True)
@@ -99,56 +99,56 @@ def main(input_path, recon_path, model_path, protocol, group_file, batchsize, np
                               data_broker=data_broker)
     more_data = True
     mofka_times = []
+
+    waiting_metadata = []
+    waiting_data = []
+
     while more_data:
-        data = []
-        metadata = []
-        for i in range(nproc_sirt*batchsize):
-            ts = time.perf_counter()
-            f = consumer.pull()
-            event = f.wait()
-            t_wait = time.perf_counter()
-            m = event.metadata
-            t_meta = time.perf_counter()
-            m = json.loads(m)
-            if "Type" not in m:
-                # print("Receive data without Type: ", m)
-                continue
-            if m["Type"] == "FIN":
-                more_data = False
-                break
-            else:
-                metadata.append(m)
-                t_data = time.perf_counter()
-                dd = event.data[0]
-                mofka_times.append([t_wait - ts, t_meta - t_wait, sys.getsizeof(m), time.perf_counter() - t_data, len(dd)])
-                dd = np.frombuffer(dd, dtype=np.float32)
-                try:
-                    dd = dd.reshape(metadata[i]["rank_dims"])
-                except ValueError:
-                    dd = np.zeros(metadata[i]["rank_dims"], dtype=dd.dtype)
-                data.append(dd)
-        if len(metadata) > 0:
-            correct_order_meta = [
-                d for _, d in sorted(
-                    zip([(m["iteration_stream"], m["rank"]) for m in metadata], metadata),
-                    key=lambda d: (d[0][0], d[0][1])  # Sort by iteration_stream first, then by rank
-                )
-            ]
-            correct_order = [
-                d for _, d in sorted(
-                    zip([(m["iteration_stream"], m["rank"]) for m in metadata], data),
-                    key=lambda d: (d[0][0], d[0][1])  # Sort by iteration_stream first, then by rank
-                )
-            ]
-            for j in range(len(correct_order_meta)//nproc_sirt):
-                batch_data = correct_order[j*nproc_sirt:nproc_sirt+j*nproc_sirt]
-                batch_meta = correct_order_meta[j*nproc_sirt:nproc_sirt+j*nproc_sirt]
-                print(batch_meta)
-                data = np.concatenate(batch_data, axis=0)
-                #process_stream(model, data, metadata)
-                output_path = recon_path + "/" + batch_meta[0]["iteration_stream"]+'-denoised.h5'
-                with h5py.File(output_path, 'w') as h5_output:
-                    h5_output.create_dataset('/data', data=data)
+        ts = time.perf_counter()
+        f = consumer.pull()
+        event = f.wait()
+        t_wait = time.perf_counter()
+        m = event.metadata
+        t_meta = time.perf_counter()
+        m = json.loads(m)
+        if "Type" not in m:
+            # print("Receive data without Type: ", m)
+            continue
+        if m["Type"] == "FIN":
+            more_data = False
+            break
+        else:
+            t_data = time.perf_counter()
+            dd = event.data[0]
+            mofka_times.append([t_wait - ts, t_meta - t_wait, sys.getsizeof(m), time.perf_counter() - t_data, len(dd)])
+            dd = np.frombuffer(dd, dtype=np.float32)
+            try:
+                dd = dd.reshape(m["rank_dims"])
+            except ValueError:
+                dd = np.zeros(m["rank_dims"], dtype=dd.dtype)
+
+            iteration_stream = m["iteration_stream"]
+            row_id = int(m["rank"])
+
+            if iteration_stream not in waiting_metadata:
+                waiting_metadata[iteration_stream] = {}
+                waiting_data[iteration_stream] = {}
+
+            waiting_metadata[iteration_stream][row_id] = m
+            waiting_data[iteration_stream][row_id] = dd
+        
+        if len(waiting_metadata[iteration_stream]) == num_sinograms:
+            sorted_ranks = sorted(waiting_metadata[iteration_stream].keys())
+            sorted_data = [waiting_data[iteration_stream][r] for r in sorted_ranks]
+            
+            print(f"Denoising and saving iteration stream {iteration_stream}...")
+            out_path = os.path.join(recon_path, f"{iteration_stream}-denoised.h5")
+            with h5py.File(out_path, 'w') as h5_output:
+                h5_output.create_dataset('/data', data=np.concatenate(sorted_data, axis=0))
+
+            del waiting_metadata[iteration_stream]
+            del waiting_data[iteration_stream]
+            
     fields = ["t_wait", "t_metadata", "metadata_size" ,"t_data", "data_size"]
     with open(logdir + '/Den_pull.csv', 'w') as f:
         write = csv.writer(f)
@@ -162,7 +162,7 @@ if __name__ == "__main__":
     parser.add_argument('--protocol', type=str, required=True, help='Mofka protocol')
     parser.add_argument('--group_file', type=str, required=True, help='Path to group file')
     parser.add_argument("--batchsize", type=int, required=True, help="Mofka batchsize")
-    parser.add_argument("--nproc_sirt", type=int, required=True, help="Number of Sirt Processes")
+    parser.add_argument("--num_sinograms", type=int, required=True, help="Number of Sinograms")
     parser.add_argument("--logdir", type=str, required=True, help="Log directory")
 
 

@@ -67,8 +67,8 @@ bash run-exp-control.sh "${failure_mode}" "${mtbf}" "${logdir}" 2> "${logdir}/ex
 echo bash run-exp-control.sh ${mtbf} ${logdir}
 
 echo "Start DEN ------------------------------------------------------------"
-echo bash run-den.sh ${sirt_tasks} ${logdir}
-bash run-den.sh ${sirt_tasks} ${logdir} 2> ${logdir}/den.err | tee ${logdir}/den.out
+echo bash run-den.sh ${num_sinograms} ${logdir}
+bash run-den.sh ${num_sinograms} ${logdir} 2> ${logdir}/den.err | tee ${logdir}/den.out
 
 
 echo "Clean up after run ---------------------------------------------------"

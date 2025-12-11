@@ -118,10 +118,10 @@ bash $exec_dir/run-exp-control.sh "${failure_mode}" "${mtbf}" "${logdir}" 2> "${
 echo "mpiexec --no-vni -n $sirt_ranks -ppn $sirt_ranks -d 16 --hosts $node_control bash $exec_dir/run-exp-control.sh ${failure_mode} ${mtbf} ${logdir}"
 
 echo "Start DEN ------------------------------------------------------------"
-echo "mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_den $exec_dir/run-den.sh bash ${sirt_tasks} ${logdir}"
+echo "mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_den $exec_dir/run-den.sh bash ${num_sinograms} ${logdir}"
 # IMPORTANT: DEN is the foreground block until pipeline finishes
-# mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_den bash $exec_dir/run-den.sh "${sirt_tasks}" "${logdir}" 2> "${logdir}/den.err" | tee "${logdir}/den.out"
-bash $exec_dir/run-den.sh "${sirt_tasks}" "${logdir}" 2> "${logdir}/den.err" | tee "${logdir}/den.out"
+# mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_den bash $exec_dir/run-den.sh "${num_sinograms}" "${logdir}" 2> "${logdir}/den.err" | tee "${logdir}/den.out"
+bash $exec_dir/run-den.sh "${num_sinograms}" "${logdir}" 2> "${logdir}/den.err" | tee "${logdir}/den.out"
 
 # --- If we reached here, DEN completed; mark end time BEFORE cleanup ---
 end_ns=$(date +%s%N)
