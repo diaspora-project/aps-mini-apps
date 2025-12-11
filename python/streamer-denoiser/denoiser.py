@@ -103,7 +103,7 @@ def main(input_path, recon_path, model_path, protocol, group_file, batchsize, nu
     waiting_metadata = {}
     waiting_data = {}
 
-    while more_data:
+    while more_data or waiting_metadata.empty() == False:
         ts = time.perf_counter()
         f = consumer.pull()
         event = f.wait()
