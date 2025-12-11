@@ -100,8 +100,8 @@ def main(input_path, recon_path, model_path, protocol, group_file, batchsize, nu
     more_data = True
     mofka_times = []
 
-    waiting_metadata = []
-    waiting_data = []
+    waiting_metadata = {}
+    waiting_data = {}
 
     while more_data:
         ts = time.perf_counter()
