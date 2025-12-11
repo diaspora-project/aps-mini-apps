@@ -102,6 +102,7 @@ def main(input_path, recon_path, model_path, protocol, group_file, batchsize, nu
 
     waiting_metadata = {}
     waiting_data = {}
+    completed_iterations = set()
 
     while more_data or waiting_metadata.empty() == False:
         ts = time.perf_counter()
@@ -118,6 +119,13 @@ def main(input_path, recon_path, model_path, protocol, group_file, batchsize, nu
             more_data = False
             break
         else:
+
+            iteration_stream = m["iteration_stream"]
+            row_id = int(m["rank"])
+            if iteration_stream in completed_iterations:
+                # Already processed this iteration stream
+                continue
+
             t_data = time.perf_counter()
             dd = event.data[0]
             mofka_times.append([t_wait - ts, t_meta - t_wait, sys.getsizeof(m), time.perf_counter() - t_data, len(dd)])
@@ -127,8 +135,7 @@ def main(input_path, recon_path, model_path, protocol, group_file, batchsize, nu
             except ValueError:
                 dd = np.zeros(m["rank_dims"], dtype=dd.dtype)
 
-            iteration_stream = m["iteration_stream"]
-            row_id = int(m["rank"])
+            
 
             if iteration_stream not in waiting_metadata:
                 waiting_metadata[iteration_stream] = {}
