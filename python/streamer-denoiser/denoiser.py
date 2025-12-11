@@ -167,5 +167,5 @@ if __name__ == "__main__":
 
 
     args = parser.parse_args()
-    main(args.input, args.output, args.model, args.protocol, args.group_file, args.batchsize, args.nproc_sirt, args.logdir)
+    main(args.input, args.output, args.model, args.protocol, args.group_file, args.batchsize, args.num_sinograms, args.logdir)
 
