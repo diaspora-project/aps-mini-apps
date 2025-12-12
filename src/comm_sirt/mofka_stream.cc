@@ -70,6 +70,7 @@ std::thread MofkaStream::receiveEventInBackground(mofka::Consumer consumer)
               // Re-add FIN at the end to end sure all data events are processed first
               mofka_buffered_events.erase(mofka_buffered_events.begin());
               mofka_buffered_events.push_back(event);
+              break;
             }
             if (event.metadata().json()["Type"] != "MSG_DATA_REP") {
               std::cout << "[Task-" << getRank()
