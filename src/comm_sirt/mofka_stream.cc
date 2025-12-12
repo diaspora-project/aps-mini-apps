@@ -352,7 +352,7 @@ DataRegionBase<float, TraceMetadata>* MofkaStream::readSlidingWindow(
         continue;
       }
 
-      if (sst_stream.is_eos() && this->pending_sst_payloads.empty()) {
+      if ((!sst_stream.is_active() || sst_stream.is_eos()) && this->pending_sst_payloads.empty()) {
         std::cout << "[Task-" << getRank() << "]: SST stream has ended and no pending SST payloads." << std::endl;
         setSSTEndOfStream(true);
         return nullptr;
