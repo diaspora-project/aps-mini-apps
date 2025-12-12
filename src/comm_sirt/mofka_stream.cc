@@ -348,7 +348,8 @@ DataRegionBase<float, TraceMetadata>* MofkaStream::readSlidingWindow(
         if (!this->pending_sst_payloads.empty() && pending_sst_payloads[0].stepIndex == this->next_seq) {
           std::cout << "[Task-" << getRank() << "]: Processing pending SST stepIndex: " << this->pending_sst_payloads[0].stepIndex << std::endl;
           // Add to stream events
-          stream_events.push_back(StreamEvent(this->pending_sst_payloads[0]));
+          // stream_events.push_back(StreamEvent(this->pending_sst_payloads[0]));
+          stream_events.emplace_back(StreamEvent(std::move(this->pending_sst_payloads[0])));
           this->pending_sst_payloads.erase(this->pending_sst_payloads.begin());
           this->next_seq++;
           added_new_data = true;
@@ -376,7 +377,8 @@ DataRegionBase<float, TraceMetadata>* MofkaStream::readSlidingWindow(
               std::cout << "[Task-" << getRank() << "]: Received data from SST stream, stepIndex: " << stepIndex << std::endl;
               this->next_seq = stepIndex + 1;
               // Add to stream events
-              stream_events.push_back(StreamEvent(sst_payload));
+              // stream_events.push_back(StreamEvent(sst_payload));
+              stream_events.emplace_back(std::move(StreamEvent(sst_payload)));
               added_new_data = true;
             }
           }

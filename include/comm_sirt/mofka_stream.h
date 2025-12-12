@@ -27,8 +27,8 @@ class StreamEvent {
     StreamEvent(mofka::Event event)
       : event{event} {}
 
-    StreamEvent(SSTPayload sst_payload)
-      : sst_payload{sst_payload}, from_sst{true} {}
+    explicit StreamEvent(SSTPayload sst_payload)
+      : sst_payload{std::move(sst_payload)}, from_sst{true} {}
 
     bool isFromSST() const {
       return from_sst;

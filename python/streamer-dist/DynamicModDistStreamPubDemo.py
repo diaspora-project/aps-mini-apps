@@ -458,7 +458,6 @@ def main():
 
   sst_dist.close()
     
-
   print("Exiting ...")
 
 def task_to_worker_assignment_wrapper(args, num_workers):
