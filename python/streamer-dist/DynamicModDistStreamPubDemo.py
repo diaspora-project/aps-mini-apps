@@ -443,6 +443,8 @@ def main():
   # del action_producer
   # del action_consumer
 
+  print("Cleaning up task assignment process ...")
+
   # Wait for the assignment process to finish
   assignment_process.join(timeout=5)
   if assignment_process.is_alive():
@@ -451,6 +453,8 @@ def main():
   # print("Complete data disitribution, sleeping until to exit ...")
   # while True:
   #   time.sleep(1)
+
+  print("Cleaning up SST stream ...")
 
   sst_dist.close()
     
