@@ -246,6 +246,8 @@ class MofkaStream
     void updateSeqNext(int next_seq) { this->next_seq = next_seq; } // Update next_seq for streaming control
 
     bool isEndOfStream() { return mofka_eos && sst_eos; }
+    bool getSSTEndOfStream() { return sst_eos; }
+    bool getMofkaEndOfStream() { return mofka_eos; }
     void setSSTEndOfStream(bool eos) { sst_eos = eos; } // Update SST end of stream flag
     void setMofkaEndOfStream(bool eos) { mofka_eos = eos; } // Update Mofka end of stream flag
     

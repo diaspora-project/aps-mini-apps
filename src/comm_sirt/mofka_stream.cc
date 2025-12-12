@@ -352,37 +352,36 @@ DataRegionBase<float, TraceMetadata>* MofkaStream::readSlidingWindow(
         continue;
       }
 
-      if ((!sst_stream.is_active() || sst_stream.is_eos()) && this->pending_sst_payloads.empty()) {
-        std::cout << "[Task-" << getRank() << "]: SST stream has ended and no pending SST payloads." << std::endl;
-        setSSTEndOfStream(true);
-        return nullptr;
-      }
-
-      // std::cout << "[Task-" << getRank() << "]: Checking for new data from SST stream..." << std::endl;
-
       // Check SST stream for fast data
-      SSTPayload sst_payload;
-      if (sst_stream.pull_data(sst_payload)) {
-
-        auto metadata_json = json::parse(sst_payload.metadata);
-        auto stepIndex = metadata_json["seq_n"].get<uint64_t>();
-        sst_payload.stepIndex = stepIndex;
-
-        if (stepIndex > this->next_seq) {
-          std::cout << "[Task-" << getRank() << "]: Delay processing SST stepIndex: " << stepIndex
-                    << " > " << this->next_seq << " = next_seq" << std::endl;
-          sst_payload.stepIndex = stepIndex;
-          this->pending_sst_payloads.push_back(sst_payload);
-        }else if (stepIndex < this->next_seq) {
-          std::cout << "[Task-" << getRank() << "]: Skipping SST stepIndex: " << stepIndex
-                    << " < " << this->next_seq << " = next_seq" << std::endl;
+      if (!getSSTEndOfStream()) {
+        if ((!sst_stream.is_active() || sst_stream.is_eos()) && this->pending_sst_payloads.empty()) {
+          std::cout << "[Task-" << getRank() << "]: SST stream has ended and no pending SST payloads." << std::endl;
+          setSSTEndOfStream(true);
         }else{
+          SSTPayload sst_payload;
+          if (sst_stream.pull_data(sst_payload)) {
 
-          std::cout << "[Task-" << getRank() << "]: Received data from SST stream, stepIndex: " << stepIndex << std::endl;
-          this->next_seq = stepIndex + 1;
-          // Add to stream events
-          stream_events.push_back(StreamEvent(sst_payload));
-          added_new_data = true;
+            auto metadata_json = json::parse(sst_payload.metadata);
+            auto stepIndex = metadata_json["seq_n"].get<uint64_t>();
+            sst_payload.stepIndex = stepIndex;
+
+            if (stepIndex > this->next_seq) {
+              std::cout << "[Task-" << getRank() << "]: Delay processing SST stepIndex: " << stepIndex
+                        << " > " << this->next_seq << " = next_seq" << std::endl;
+              sst_payload.stepIndex = stepIndex;
+              this->pending_sst_payloads.push_back(sst_payload);
+            }else if (stepIndex < this->next_seq) {
+              std::cout << "[Task-" << getRank() << "]: Skipping SST stepIndex: " << stepIndex
+                        << " < " << this->next_seq << " = next_seq" << std::endl;
+            }else{
+
+              std::cout << "[Task-" << getRank() << "]: Received data from SST stream, stepIndex: " << stepIndex << std::endl;
+              this->next_seq = stepIndex + 1;
+              // Add to stream events
+              stream_events.push_back(StreamEvent(sst_payload));
+              added_new_data = true;
+            }
+          }
         }
       }else{
         // If no SST data, pull from mofka
