@@ -97,14 +97,14 @@ def main(input_path, recon_path, model_path, protocol, group_file, batchsize, nu
                               batch_size=batch_size,
                               data_selector=data_selector,
                               data_broker=data_broker)
-    more_data = True
+    pending_tasks = num_sinograms
     mofka_times = []
 
     waiting_metadata = {}
     waiting_data = {}
     completed_iterations = set()
 
-    while more_data or waiting_metadata.empty() == False:
+    while pending_tasks > 0 or waiting_metadata.empty() == False:
         ts = time.perf_counter()
         f = consumer.pull()
         event = f.wait()
@@ -116,7 +116,7 @@ def main(input_path, recon_path, model_path, protocol, group_file, batchsize, nu
             # print("Receive data without Type: ", m)
             continue
         if m["Type"] == "FIN":
-            more_data = False
+            pending_tasks -= 1
             break
         else:
 
