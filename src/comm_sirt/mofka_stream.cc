@@ -342,19 +342,17 @@ DataRegionBase<float, TraceMetadata>* MofkaStream::readSlidingWindow(
         return nullptr; // Exit if interrupt signal is received
       }
 
-      // Clean up SST payloads before getting new data
-      if (!this->pending_sst_payloads.empty() && pending_sst_payloads[0].stepIndex == this->next_seq) {
-        std::cout << "[Task-" << getRank() << "]: Processing pending SST stepIndex: " << this->pending_sst_payloads[0].stepIndex << std::endl;
-        // Add to stream events
-        stream_events.push_back(StreamEvent(this->pending_sst_payloads[0]));
-        this->pending_sst_payloads.erase(this->pending_sst_payloads.begin());
-        this->next_seq++;
-        continue;
-      }
-
       // Check SST stream for fast data
       if (!getSSTEndOfStream()) {
-        if ((!sst_stream.is_active() || sst_stream.is_eos()) && this->pending_sst_payloads.empty()) {
+        // Clean up SST payloads before getting new data
+        if (!this->pending_sst_payloads.empty() && pending_sst_payloads[0].stepIndex == this->next_seq) {
+          std::cout << "[Task-" << getRank() << "]: Processing pending SST stepIndex: " << this->pending_sst_payloads[0].stepIndex << std::endl;
+          // Add to stream events
+          stream_events.push_back(StreamEvent(this->pending_sst_payloads[0]));
+          this->pending_sst_payloads.erase(this->pending_sst_payloads.begin());
+          this->next_seq++;
+          added_new_data = true;
+        } else if ((!sst_stream.is_active() || sst_stream.is_eos()) && this->pending_sst_payloads.empty()) {
           std::cout << "[Task-" << getRank() << "]: SST stream has ended and no pending SST payloads." << std::endl;
           setSSTEndOfStream(true);
         }else{
