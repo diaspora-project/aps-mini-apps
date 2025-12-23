@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <thread> // only needed for sleep in pull_data (optional)
+#include <future>
 
 SSTStream::SSTStream(const std::string &streamName,
                         int partitionId,
@@ -43,9 +44,25 @@ SSTStream::SSTStream(const std::string &streamName,
         m_io->SetParameter("QueueLimit", "1");
         m_io->SetParameter("OpenTimeoutSecs", "1"); // wait 1 seconds max
 
-        m_engine = std::make_unique<adios2::Engine>(
-            m_io->Open(m_streamName, adios2::Mode::Read));
+        // m_engine = std::make_unique<adios2::Engine>(
+        //     m_io->Open(m_streamName, adios2::Mode::Read));
 
+        // std::cout << "[Task " << m_partitionId << "] SSTStream initialized." << std::endl;
+        // m_is_active.store(true);
+
+        auto fut = std::async(std::launch::async, [&] {
+            return m_io->Open(m_streamName, adios2::Mode::Read);
+        });
+
+        if (fut.wait_for(std::chrono::seconds(1)) != std::future_status::ready) {
+            // timed out
+            m_is_active.store(false);
+            m_eos.store(true);
+            std::cout << "[Task " << m_partitionId << "] SSTStream initialization failed." << std::endl;
+            return;
+        }
+
+        m_engine = std::make_unique<adios2::Engine>(fut.get());
         std::cout << "[Task " << m_partitionId << "] SSTStream initialized." << std::endl;
         m_is_active.store(true);
     }catch (const std::exception &ex) {
