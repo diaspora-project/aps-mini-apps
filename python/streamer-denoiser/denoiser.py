@@ -120,7 +120,7 @@ def main(input_path, recon_path, model_path, protocol, group_file, batchsize, nu
             break
         else:
 
-            print("Received data for iteration stream ", m["iteration_stream"], " rank ", m["rank"])
+            # print("Received data for iteration stream ", m["iteration_stream"], " rank ", m["rank"])
 
             iteration_stream = m["iteration_stream"]
             row_id = int(m["rank"])
