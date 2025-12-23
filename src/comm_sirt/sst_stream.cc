@@ -4,14 +4,20 @@
 #include <thread> // only needed for sleep in pull_data (optional)
 
 SSTStream::SSTStream(const std::string &streamName,
-                                                     int partitionId,
-                                                     int numPartitions)
+                        int partitionId,
+                        int numPartitions,
+                        bool enable)
     : m_streamName(streamName),
       m_partitionId(partitionId),
       m_numPartitions(numPartitions),
       m_eos(false),
       m_stepIndex(0)
 {
+    if (enable == false) {
+        m_is_active.store(false);
+        return;
+    }
+
     if (m_partitionId < 0 || m_partitionId >= m_numPartitions) {
         throw std::runtime_error("Invalid partitionId for SSTStream");
     }

@@ -25,7 +25,8 @@ public:
     // streamName: SST stream created by Python writer
     SSTStream(const std::string &streamName,
                               int partitionId,
-                              int numPartitions);
+                              int numPartitions,
+                              bool enable=true);
 
     ~SSTStream();
 

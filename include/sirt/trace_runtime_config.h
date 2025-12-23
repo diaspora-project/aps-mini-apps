@@ -51,6 +51,7 @@ class TraceRuntimeConfig {
     std::string ckpt_config = "veloc.cfg";
     std::string ckpt_name   = "sirt-ckpt";
     std::string logdir      = ".";
+    bool        sst         = true;
 
     TraceRuntimeConfig(int argc, char **argv) {
       try {
@@ -103,6 +104,9 @@ class TraceRuntimeConfig {
           "", "ckpt-config", "Checkpoint Configuration (VeloC)", false, "veloc.cfg", "string");
         TCLAP::ValueArg<std::string> argCkptName(
           "", "ckpt-name", "Checkpoint Name (VeloC)", false, "sirt-ckpt", "string");
+        TCLAP::ValueArg<float> argSST(
+          "", "sst", "Get data from SST Stream", false, false, "bool");
+
 
         cmd.add(argWorkerId);
         cmd.add(argNumWorkers);
@@ -129,6 +133,8 @@ class TraceRuntimeConfig {
         cmd.add(argCkptFreq);
         cmd.add(argCkptConfig);
         cmd.add(argCkptName);
+
+        cmd.add(argSST);
 
         cmd.parse(argc, argv);
 
@@ -161,6 +167,8 @@ class TraceRuntimeConfig {
         logdir     = argLogDir.getValue();
         pub_freq   = static_cast<int>(argPubFreq.getValue()); // actually store it
 
+        sst        = argSST.getValue();
+
         std::cout << "Worker ID: " << worker_id
                   << " Worker Index: " << worker_index
                   << "; Number of Workers: " << num_workers
@@ -180,6 +188,7 @@ class TraceRuntimeConfig {
           std::cout << "Mofka Protocol=" << protocol << std::endl;
           std::cout << "Mofka batchsize=" << batchsize << std::endl;
           std::cout << "Group file=" << group_file << std::endl;
+          std::cout << "SST Stream=" << (sst ? "true" : "false") << std::endl;
         }
       } catch (TCLAP::ArgException &e) {
         std::cerr << "error: " << e.error() << " for arg " << e.argId() << std::endl;

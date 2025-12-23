@@ -111,7 +111,8 @@ int ReconTask::run() {
   SSTStream sst_stream = SSTStream{
     "sirt_stream",
     task_id,
-    h5md.dims[1]
+    h5md.dims[1],
+    config.sst
   };
 
   /***********************/
