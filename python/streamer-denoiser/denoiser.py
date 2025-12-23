@@ -116,6 +116,7 @@ def main(input_path, recon_path, model_path, protocol, group_file, batchsize, nu
             # print("Receive data without Type: ", m)
             continue
         if m["Type"] == "FIN":
+            print("Received FIN: ", m)
             pending_tasks -= 1
             break
         else:
