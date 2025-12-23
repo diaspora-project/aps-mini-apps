@@ -82,7 +82,7 @@ def process_directory(model, directory_path):
                 file_path = os.path.join(root, file)
                 process_file(model, file_path)
 
-def main(input_path, recon_path, model_path, protocol, group_file, batchsize, num_sinograms, logdir):
+def main(input_path, recon_path, model_path, protocol, group_file, batchsize, num_tasks, logdir):
     # Load the saved model
     # model = keras.models.load_model(model_path)
     driver = mofka.MofkaDriver(group_file, use_progress_thread=True)
@@ -97,7 +97,7 @@ def main(input_path, recon_path, model_path, protocol, group_file, batchsize, nu
                               batch_size=batch_size,
                               data_selector=data_selector,
                               data_broker=data_broker)
-    pending_tasks = num_sinograms
+    pending_tasks = num_tasks
     mofka_times = []
 
     waiting_metadata = {}
@@ -146,7 +146,7 @@ def main(input_path, recon_path, model_path, protocol, group_file, batchsize, nu
             waiting_metadata[iteration_stream][row_id] = m
             waiting_data[iteration_stream][row_id] = dd
         
-        if len(waiting_metadata[iteration_stream]) == num_sinograms:
+        if len(waiting_metadata[iteration_stream]) == num_tasks:
             sorted_ranks = sorted(waiting_metadata[iteration_stream].keys())
             sorted_data = [waiting_data[iteration_stream][r] for r in sorted_ranks]
             
@@ -172,10 +172,10 @@ if __name__ == "__main__":
     parser.add_argument('--protocol', type=str, required=True, help='Mofka protocol')
     parser.add_argument('--group_file', type=str, required=True, help='Path to group file')
     parser.add_argument("--batchsize", type=int, required=True, help="Mofka batchsize")
-    parser.add_argument("--num_sinograms", type=int, required=True, help="Number of Sinograms")
+    parser.add_argument("--num_tasks", type=int, required=True, help="Number of Sinograms")
     parser.add_argument("--logdir", type=str, required=True, help="Log directory")
 
 
     args = parser.parse_args()
-    main(args.input, args.output, args.model, args.protocol, args.group_file, args.batchsize, args.num_sinograms, args.logdir)
+    main(args.input, args.output, args.model, args.protocol, args.group_file, args.batchsize, args.num_tasks, args.logdir)
 

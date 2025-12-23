@@ -8,7 +8,7 @@ if [ "$#" -ne 2 ]; then
     exit 1
 fi
 
-n_sinograms=$1
+n_tasks=$1
 logdir=$2
 
 trap "echo 'Ctrl+C pressed. Terminating...'; exit 1" SIGINT SIGTERM
@@ -21,5 +21,5 @@ python -u ./build/python/streamer-denoiser/denoiser.py \
     --protocol na+sm \
     --group_file mofka.json \
     --batchsize 4 \
-    --num_sinograms ${n_sinograms} \
+    --num_tasks ${n_tasks} \
     --logdir ${logdir}
