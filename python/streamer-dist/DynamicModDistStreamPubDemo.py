@@ -65,6 +65,9 @@ def parse_arguments():
 
   parser.add_argument('--logdir', type=str, default='.',
               help='Path to save log files.')
+  
+  parser.add_argument('--sst', type=bool, default=False,
+              help='Use SST for data distribution.')
 
 
   return parser.parse_args()
@@ -290,7 +293,8 @@ def main():
   seq=0
   time0 = time.time()
 
-  sst_dist = SSTDist(num_sinograms=args.num_sinograms, chunk_size=args.num_columns, 
+  if args.sst:
+    sst_dist = SSTDist(num_sinograms=args.num_sinograms, chunk_size=args.num_columns, 
                              stream_name="sirt_stream", max_meta_bytes=65536)
 
   print("Starting to receive images ...")
@@ -364,8 +368,9 @@ def main():
       mofka_sub = sub.flatten()
       ncols = sub.shape[2]
       print(f"Sending image seq_id {sequence_id} to sirt through SST")
-      tt = sst_dist.push_image(mofka_sub, sequence_id, args.num_sinograms, ncols, rotation,
-                      mofka_read_image.UniqueId(), mofka_read_image.Center())
+      if args.sst:
+        tt = sst_dist.push_image(mofka_sub, sequence_id, args.num_sinograms, ncols, rotation,
+                        mofka_read_image.UniqueId(), mofka_read_image.Center())
       # print(f"Sending image seq_id {sequence_id} to sirt through Mofka")
       # tt = mofka_dist.push_image(mofka_sub, sequence_id, args.num_sinograms, ncols, rotation,
       #                 mofka_read_image.UniqueId(), mofka_read_image.Center(), producer=producer)
