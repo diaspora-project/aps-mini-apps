@@ -60,7 +60,8 @@ def assign_data(comm_rank: int, comm_size: int, tot_sino: int, tot_cols: int) ->
         "tn_sinograms" : tot_sino,
         "beg_sinogram": beg_sino,
         "n_sinograms" : my_nsino,
-        "n_rays_per_proj_row" : tot_cols
+        "n_rays_per_proj_row" : tot_cols,
+        "num_tasks": comm_size
     }
     return info_rep
 

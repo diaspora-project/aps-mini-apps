@@ -75,6 +75,7 @@ int ReconTask::run() {
   json tmetadata = ms.getInfo();
   auto n_blocks = tmetadata["n_sinograms"].get<int64_t>();
   auto num_cols = tmetadata["n_rays_per_proj_row"].get<int64_t>();
+  auto num_tasks = tmetadata["num_tasks"].get<int64_t>();
 
   std::cout << "[Task-" << task_id << "] Init reconstruction: n_blocks: " << n_blocks << " num_cols: " << num_cols << std::endl;
 
@@ -111,7 +112,7 @@ int ReconTask::run() {
   SSTStream sst_stream = SSTStream{
     "sirt_stream",
     task_id,
-    h5md.dims[1],
+    num_tasks,
     config.sst
   };
 
