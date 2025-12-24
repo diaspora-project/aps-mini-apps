@@ -62,32 +62,45 @@ std::thread MofkaStream::receiveEventInBackground(mofka::Consumer consumer)
         {
           std::lock_guard<std::mutex> lock(this->mofka_buffer_mutex);
           while (!mofka_buffered_events.empty()) {
-            auto &event = mofka_buffered_events.front();
-            if (event.metadata().json()["Type"] == "FIN") {
+            auto &front = mofka_buffered_events.front();
+            const auto type = front.metadata().json().value("Type", "");
+            if (type == "FIN") {
               std::cout << "[Task-" << getRank()
                         << "]: Received FIN event in buffered events."
                         << std::endl;
               // Re-add FIN at the end to end sure all data events are processed first
-              std::rotate(mofka_buffered_events.begin(),
-                mofka_buffered_events.begin() + 1,
-                mofka_buffered_events.end());
+              if (mofka_buffered_events.size() > 1) {
+                std::rotate(mofka_buffered_events.begin(),
+                  mofka_buffered_events.begin() + 1,
+                  mofka_buffered_events.end());
+              }
               break;
             }
-            if (event.metadata().json()["Type"] != "MSG_DATA_REP") {
+            if (type != "MSG_DATA_REP") {
               std::cout << "[Task-" << getRank()
-                        << "]: Received non-DATA event: " << event.metadata().json()["Type"]
-                        << std::endl;
+                        << "]: Received non-DATA event: " << type << std::endl;
               break;
             }
-            if (event.metadata().json()["seq_n"].get<int>() <= this->ckpt_progress) {
-              event.acknowledge();
+            int seq = -1;
+            try {
+              seq = front.metadata().json().at("seq_n").get<int>();
+            } catch (...) {
+              std::cout << "[Task-" << getRank() << "]: DATA event missing/invalid seq_n\n";
+              break;
+            }
+            if (seq <= this->ckpt_progress) {
+              try {
+                front.acknowledge();
+              } catch (const std::exception &e) {
+                std::cout << "[Task-" << getRank() << "]: acknowledge() failed: " << e.what() << "\n";
+                break;
+              }
               std::cout << "[Task-" << getRank()
                         << "]: Acknowledge (buffered): seq_id = "
-                        << event.metadata().json()["seq_n"].get<int>()
-                        << std::endl;
+                        << seq << std::endl;
               mofka_buffered_events.erase(mofka_buffered_events.begin());
             } else {
-              break;
+              break; // seq > ckpt_progress
             }
           }
         } // lock_guard released here
