@@ -77,22 +77,13 @@ echo create dist-sirt handshakes topics
 
 mofkactl topic create handshake_s_d \
 	--groupfile $GROUPFILE
-	
+
 mofkactl partition add handshake_s_d \
 		--type default \
 		--rank 0 \
 		--groupfile $GROUPFILE \
 		--metadata "${METADATA_PROVIDER}" \
 		--data "${DATA_PROVIDER}"
-# for i in $(seq 1 $sirt_tasks)
-# do
-# 	mofkactl partition add handshake_s_d \
-# 		--type default \
-# 		--rank 0 \
-# 		--groupfile $GROUPFILE \
-# 		--metadata "${METADATA_PROVIDER}" \
-# 		--data "${DATA_PROVIDER}"
-# done
 
 echo create sirt-dist handshakes topics
 
@@ -105,16 +96,6 @@ mofkactl partition add handshake_d_s \
 		--groupfile $GROUPFILE \
 		--metadata "${METADATA_PROVIDER}" \
 		--data "${DATA_PROVIDER}"
-# for i in $(seq 1 $sirt_tasks)
-# do
-# 	mofkactl partition add handshake_d_s \
-# 		--type default \
-# 		--rank 0 \
-# 		--groupfile $GROUPFILE \
-# 		--metadata "${METADATA_PROVIDER}" \
-# 		--data "${DATA_PROVIDER}"
-
-# done
 
 echo create dist-sirt action control topics
 

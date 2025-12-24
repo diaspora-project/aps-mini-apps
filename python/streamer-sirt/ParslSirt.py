@@ -256,7 +256,8 @@ def main():
     sirt_bin_str = str(sirt_bin)
 
     # Build the forwarded argument vector (exclude helper flags)
-    helper_keys = {"num_workers", "extra_ld_paths", "sirt_bin"}
+    # helper_keys = {"num_workers", "extra_ld_paths", "sirt_bin"}
+    helper_keys = {"extra_ld_paths", "sirt_bin"}
     all_args = []
     for arg_name, value in vars(p).items():
         if arg_name in helper_keys:
