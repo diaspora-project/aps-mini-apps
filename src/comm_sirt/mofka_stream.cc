@@ -242,6 +242,8 @@ void MofkaStream::handshake(int task_index) {
   auto event = hs_consumer.pull().wait();
   mofka::Metadata m = event.metadata();
   json mdata = m.json();
+  std::cerr << "mdata type=" << mdata.type_name()
+          << " dump=" << mdata.dump() << "\n";
   setInfo(mdata[task_index]);
 }
 
