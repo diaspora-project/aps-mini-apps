@@ -344,6 +344,9 @@ DataRegionBase<float, TraceMetadata>* MofkaStream::readSlidingWindow(
   // std::vector<mofka::Event> mofka_events;
   std::vector<StreamEvent> stream_events;
 
+  bool sst_lagging = false;
+  int delayed_sst_seq = 0;
+
   for(int i=0; i<step; ++i) {
     // mofka messages
 
@@ -357,7 +360,7 @@ DataRegionBase<float, TraceMetadata>* MofkaStream::readSlidingWindow(
       }
 
       // Check SST stream for fast data
-      if (!getSSTEndOfStream()) {
+      if (!sst_lagging && !getSSTEndOfStream()) {
         // Clean up SST payloads before getting new data
         if (!this->pending_sst_payloads.empty() && pending_sst_payloads[0].stepIndex == this->next_seq) {
           std::cout << "[Task-" << getRank() << "]: Processing pending SST stepIndex: " << this->pending_sst_payloads[0].stepIndex << std::endl;
@@ -383,6 +386,10 @@ DataRegionBase<float, TraceMetadata>* MofkaStream::readSlidingWindow(
                         << " > " << this->next_seq << " = next_seq" << std::endl;
               sst_payload.stepIndex = stepIndex;
               this->pending_sst_payloads.push_back(sst_payload);
+              // we are lagging behind SST stream, mark the sequence then read data from Mofka instead
+              // until we catch up
+              delayed_sst_seq = stepIndex;
+              sst_lagging = true;
             }else if (stepIndex < this->next_seq) {
               std::cout << "[Task-" << getRank() << "]: Skipping SST stepIndex: " << stepIndex
                         << " < " << this->next_seq << " = next_seq" << std::endl;
@@ -424,6 +431,11 @@ DataRegionBase<float, TraceMetadata>* MofkaStream::readSlidingWindow(
           int proj_id = event.metadata().json()["projection_id"].get<int>();
           double theta = event.metadata().json()["theta"].get<float>();
           double center = event.metadata().json()["center"].get<float>();
+
+          if (sst_lagging && sequence_id >= delayed_sst_seq) {
+            std::cout << "[Task-" << getRank() << "]: Caught up with SST stream at sequence_id: " << sequence_id << std::endl;
+            sst_lagging = false;
+          }
           
           if (this->next_seq > sequence_id+1) {
             std::cout << "[Task-" << getRank() << "]: Mofka: Skipping seq_id: " << sequence_id
