@@ -247,6 +247,7 @@ class MofkaStream
     }
     void updateCkptProgress(int p) {
       std::lock_guard<std::mutex> lock(this->ckpt_progress_mutex);
+      std::cout << "[Task-" << comm_rank << "] Updating ckpt_progress to " << p << std::endl;
       ckpt_progress = p;
     }
     
