@@ -184,7 +184,7 @@ class MofkaDist:
             #f.wait()
             mofka_t.append(["push", projection_id, ts, time.perf_counter(), time.perf_counter() - ts, sys.getsizeof(self.buffer[self.counter][i][0]) ,len(self.buffer[self.counter][i][1])])
 
-        print("Flusing images")
+        print("Flushing images")
 
         # self.seq += 1
         self.counter += 1
