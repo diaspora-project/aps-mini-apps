@@ -300,7 +300,7 @@ def main():
   print("Starting to receive images ...")
 
   # Create a new thread to periodically flush the producer
-  flush_thread = threading.Thread(target=flush_mofka_producer, args=(mofka_dist,producer,), daemon=True)
+  flush_thread = threading.Thread(target=flush_mofka_producer, args=(mofka_dist,producer,), daemon=False)
   flush_thread.start()
 
   while True:
