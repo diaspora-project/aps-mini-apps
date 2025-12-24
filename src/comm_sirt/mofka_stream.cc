@@ -242,9 +242,9 @@ void MofkaStream::handshake(int task_index) {
   auto event = hs_consumer.pull().wait();
   mofka::Metadata m = event.metadata();
   json mdata = m.json();
-  std::cerr << "mdata type=" << mdata.type_name()
+  std::cerr << "[Task-" << task_index << "]: handshake mdata type=" << mdata.type_name()
           << " dump=" << mdata.dump() << "\n";
-  setInfo(mdata[task_index]);
+  setInfo(mdata[std::to_string(task_index)]);
 }
 
 /* Publish reconstructed image
