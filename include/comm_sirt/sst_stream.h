@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 #include <optional>
+#include <future>
 
 // Result of one SST step (for one partition)
 struct SSTPayload {
