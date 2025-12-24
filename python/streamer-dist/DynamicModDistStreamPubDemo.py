@@ -92,9 +92,9 @@ def flush_mofka_producer(md, p):
     try:
       image_packet = mofka_queue.get(timeout=0.01)
       print(f"Sending image seq_id {image_packet.sequence_id} to sirt through Mofka")
-      # md.push_image(image_packet.data, image_packet.sequence_id, image_packet.num_sinograms, image_packet.num_columns,
-      #               image_packet.rotation, image_packet.unique_id, image_packet.center,
-      #               producer=p)
+      md.push_image(image_packet.data, image_packet.sequence_id, image_packet.num_sinograms, image_packet.num_columns,
+                    image_packet.rotation, image_packet.unique_id, image_packet.center,
+                    producer=p)
     except queue.Empty:
       continue
   print("Exiting mofka producer flush thread ...")
