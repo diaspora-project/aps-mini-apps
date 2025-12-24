@@ -54,7 +54,7 @@ SSTStream::SSTStream(const std::string &streamName,
             return m_io->Open(m_streamName, adios2::Mode::Read);
         }));
 
-        if (m_openFuture->wait_for(std::chrono::seconds(1)) != std::future_status::ready) {
+        if (m_openFuture->wait_for(std::chrono::seconds(10)) != std::future_status::ready) {
             // timed out
             m_is_active.store(false);
             m_eos.store(true);
