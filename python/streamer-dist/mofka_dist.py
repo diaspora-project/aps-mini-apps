@@ -129,10 +129,11 @@ class MofkaDist:
         topic_name = "handshake_d_s"
         producer = self.producer(topic_name, "handshaker")
         # distribute data info
+        info = {}
         for p in range(self.ntasks):
-            info = assign_data(p, self.ntasks, row, col)
+            info[p] = assign_data(p, self.ntasks, row, col)
             print("Exchange metadata with task #", p)
-            f = producer.push(info)
+        f = producer.push(info)
         print("Flushing metadata to SIRT")
         producer.flush()
         print("Completing exchanging with SIRT")

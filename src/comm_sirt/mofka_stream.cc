@@ -233,7 +233,7 @@ MofkaStream::MofkaStream(mofka::MofkaDriver driver,
 void MofkaStream::handshake(int task_index) {
   // Receive metadata info
   std::string topic_name = "handshake_d_s";
-  std::vector<size_t> targets = {static_cast<size_t>(task_index)};
+  std::vector<size_t> targets = {static_cast<size_t>(0)};
   mofka::TopicHandle topic = driver.openTopic(topic_name);
   mofka::Consumer hs_consumer = topic.consumer( "hs_c",
                                                 batchSize,
@@ -242,7 +242,7 @@ void MofkaStream::handshake(int task_index) {
   auto event = hs_consumer.pull().wait();
   mofka::Metadata m = event.metadata();
   json mdata = m.json();
-  setInfo(mdata);
+  setInfo(mdata[task_index]);
 }
 
 /* Publish reconstructed image
