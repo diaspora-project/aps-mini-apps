@@ -118,7 +118,7 @@ def main(input_path, recon_path, model_path, protocol, group_file, batchsize, nu
         if m["Type"] == "FIN":
             print("Received FIN: ", m, " Pending tasks before decrement: ", pending_tasks)
             pending_tasks -= 1
-            break
+            # break
         else:
 
             print("Received data for iteration stream ", m["iteration_stream"], " rank ", m["rank"])
