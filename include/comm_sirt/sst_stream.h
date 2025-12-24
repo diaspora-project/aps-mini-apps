@@ -6,6 +6,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <optional>
 
 // Result of one SST step (for one partition)
 struct SSTPayload {
@@ -60,6 +61,9 @@ private:
     std::uint64_t     m_stepIndex;
 
     std::atomic<bool> m_is_active;
+    
+    std::optional<std::future<adios2::Engine>> m_openFuture;
+
 
     // void parse_metadata_json(
     //         const std::string &json,

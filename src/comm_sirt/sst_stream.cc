@@ -50,11 +50,11 @@ SSTStream::SSTStream(const std::string &streamName,
         // std::cout << "[Task " << m_partitionId << "] SSTStream initialized." << std::endl;
         // m_is_active.store(true);
 
-        auto fut = std::async(std::launch::async, [&] {
+        m_openFuture.emplace(async(std::launch::async, [&] {
             return m_io->Open(m_streamName, adios2::Mode::Read);
-        });
+        }));
 
-        if (fut.wait_for(std::chrono::seconds(1)) != std::future_status::ready) {
+        if (m_openFuture->wait_for(std::chrono::seconds(1)) != std::future_status::ready) {
             // timed out
             m_is_active.store(false);
             m_eos.store(true);
@@ -62,8 +62,9 @@ SSTStream::SSTStream(const std::string &streamName,
             return;
         }
 
-        m_engine = std::make_unique<adios2::Engine>(fut.get());
+        m_engine = std::make_unique<adios2::Engine>(m_openFuture->get());
         std::cout << "[Task " << m_partitionId << "] SSTStream initialized." << std::endl;
+        m_openFuture.reset();
         m_is_active.store(true);
     }catch (const std::exception &ex) {
         std::cout << "SSTStream initialization failed: " << ex.what();
