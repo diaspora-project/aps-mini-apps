@@ -216,6 +216,7 @@ MofkaStream::MofkaStream(mofka::MofkaDriver driver,
   comm_rank {rank},
   // comm_size {size},
   progress {progress},
+  ckpt_progress {0},
   next_seq {progress+1},
   driver {driver}
   {}
