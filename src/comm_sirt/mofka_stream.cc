@@ -88,7 +88,7 @@ std::thread MofkaStream::receiveEventInBackground(mofka::Consumer consumer)
               std::cout << "[Task-" << getRank() << "]: DATA event missing/invalid seq_n\n";
               break;
             }
-            if (seq <= this->ckpt_progress) {
+            if (seq <= getCkptProgress()) {
               try {
                 front.acknowledge();
               } catch (const std::exception &e) {
@@ -97,7 +97,7 @@ std::thread MofkaStream::receiveEventInBackground(mofka::Consumer consumer)
               }
               std::cout << "[Task-" << getRank()
                         << "]: Acknowledge (buffered): seq_id = "
-                        << seq << " <= ckpt_progress = " << this->ckpt_progress << std::endl;
+                        << seq << " <= ckpt_progress = " << getCkptProgress() << std::endl;
               mofka_buffered_events.erase(mofka_buffered_events.begin());
             } else {
               break; // seq > ckpt_progress
@@ -157,11 +157,11 @@ void MofkaStream::acknowledge() {
     auto event_prog_id = event->metadata().json()["seq_n"].get<int>();
     // if (event_prog_id < current_proj_id) {
     // if (event_prog_id < current_proj_id + (int)window_len) {
-    if (event_prog_id <= this->ckpt_progress) {
+    if (event_prog_id <= getCkptProgress()) {
       event->acknowledge();
-      std::cout << "[Task-" << getRank() << "]: Acknowledge: seq_id = " << event_prog_id << " <= ckpt_progress = " << this->ckpt_progress << std::endl;
+      std::cout << "[Task-" << getRank() << "]: Acknowledge: seq_id = " << event_prog_id << " <= ckpt_progress = " << getCkptProgress() << std::endl;
       pending_events.erase(event);
-      // if (event_prog_id > ckpt_progress) {
+      // if (event_prog_id > getCkptProgress()) {
       //   ckpt_progress = event_prog_id;
       // }
     } else {

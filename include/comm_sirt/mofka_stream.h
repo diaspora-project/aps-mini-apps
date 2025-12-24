@@ -65,6 +65,7 @@ class MofkaStream
 
     int progress;
     int ckpt_progress;
+    std::mutex ckpt_progress_mutex;
     int next_seq;
     std::vector<mofka::Event> pending_events;
     std::vector<SSTPayload> pending_sst_payloads;
@@ -240,8 +241,14 @@ class MofkaStream
     int getProgress() { return progress; }
     void updateProgress(int progress) { this->progress = progress; } // Update progress for streaming control
     
-    int getCkptProgress() { return ckpt_progress;}
-    void updateCkptProgress(int p) { ckpt_progress = p;}
+    int getCkptProgress() {
+      std::lock_guard<std::mutex> lock(this->ckpt_progress_mutex);
+      return ckpt_progress;
+    }
+    void updateCkptProgress(int p) {
+      std::lock_guard<std::mutex> lock(this->ckpt_progress_mutex);
+      ckpt_progress = p;
+    }
     
     void updateSeqNext(int next_seq) { this->next_seq = next_seq; } // Update next_seq for streaming control
 
