@@ -39,9 +39,11 @@ void handle_sigterm(int signum) {
     for (auto& [task_id, task] : running_tasks) {
         task.kill(sigterm_captured);
     }
-    // cleanup();
-    // std::cerr << "Exiting..." << std::endl;
-    // exit(signum);
+    // give it a short grace period
+    std::this_thread::sleep_for(std::chrono::seconds(2));
+
+    // if still not exiting (e.g., SST Open stuck), force exit
+    std::_Exit(1);   // or _exit(1)
 }
 
 int main(int argc, char **argv) {
