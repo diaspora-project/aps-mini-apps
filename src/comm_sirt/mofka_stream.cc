@@ -68,8 +68,9 @@ std::thread MofkaStream::receiveEventInBackground(mofka::Consumer consumer)
                         << "]: Received FIN event in buffered events."
                         << std::endl;
               // Re-add FIN at the end to end sure all data events are processed first
-              mofka_buffered_events.erase(mofka_buffered_events.begin());
-              mofka_buffered_events.push_back(event);
+              std::rotate(mofka_buffered_events.begin(),
+                mofka_buffered_events.begin() + 1,
+                mofka_buffered_events.end());
               break;
             }
             if (event.metadata().json()["Type"] != "MSG_DATA_REP") {
