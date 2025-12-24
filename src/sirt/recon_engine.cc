@@ -116,6 +116,8 @@ int ReconTask::run() {
     config.sst
   };
 
+  std::cout << "[Task-" << task_id << "] Initializing recon space." << std::endl;
+
   /***********************/
   /* Initiate middleware */
   /* Prepare main reduction space and its objects */
