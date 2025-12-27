@@ -200,7 +200,7 @@ def task_to_worker_assignment(args, num_workers):
     # Move task from worker with negative surplus to worker with positive surplus
     to_move_tasks = []
     for w in sorted_surplus_worker_caps:
-      while surplus_worker_caps[w] < 0:
+      if surplus_worker_caps[w] < 0:
         # find task with largest weight to move
         tasks = worker_to_task[w]
         task_weights_in_worker = [task_weights[t] for t in tasks]
