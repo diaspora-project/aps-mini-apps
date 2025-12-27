@@ -160,18 +160,20 @@ def task_to_worker_assignment(args, num_workers):
       continue
     
     # Make reassignment only if total progress is large enough to reflect performance
-    if total_progress < num_tasks * 2:
-      print(f"[LB] Total progress {total_progress} is less than threshold {num_tasks * 2}, continue collecting ...")
+    progress_threshold = num_tasks * 16
+    if total_progress < progress_threshold:
+      print(f"[LB] Total progress {total_progress} is less than threshold {progress_threshold}, continue collecting ...")
       continue
-      
-    print(f"[LB] Total progress {total_progress} reached threshold {num_tasks * 2}, evaluating reassignment ...")
+
+    print(f"[LB] Total progress {total_progress} reached threshold {progress_threshold}, evaluating reassignment ...")
     
     # sorting task_id based on progress from smallest to largest
     sorted_tasks = sorted(range(num_tasks), key=lambda x: task_progress[x])
     min_progress = sorted_tasks[0]
     max_progress = sorted_tasks[-1]
     if min_progress == max_progress:
-      continue  # all tasks are at the same progress, no need to reassign
+      print("[LB] All tasks are at the same progress, no need to reassign")
+      continue
     task_lag = [(max_progress - task_progress[i])/(max_progress - min_progress) for i in range(num_tasks)]
     sum_lag = sum(task_lag)
     task_weights = [task_lag[i]*num_tasks/sum_lag for i in range(num_tasks)]
