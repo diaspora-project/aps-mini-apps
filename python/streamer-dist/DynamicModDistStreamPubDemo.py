@@ -208,6 +208,7 @@ def task_to_worker_assignment(args, num_workers):
         to_move_tasks.append((max_weight_task, w))
       else:
         break
+    print(f"[LB] Tasks to move: {to_move_tasks}")
     
     # find workers with positive surplus to receive tasks
     for task in to_move_tasks:
@@ -252,6 +253,8 @@ def task_to_worker_assignment(args, num_workers):
     min_worker_progress = min(worker_progress)
     worker_progress = [worker_progress[i] - min_worker_progress for i in range(num_workers)]
     total_progress = sum(worker_progress)
+  
+  print(f"[LB] Load balancing completed after {round} rounds. Exiting task assignment process ...")
 
 
 #@profile
