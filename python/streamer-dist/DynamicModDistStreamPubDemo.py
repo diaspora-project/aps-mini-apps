@@ -137,7 +137,10 @@ def task_to_worker_assignment(args, num_workers):
   else:
     print("Dynamic load balancing is disabled")
   
+  round = 0
+  
   while args.dynamic_loadbalancing.lower() == "true":
+    print(f"[LB] Load balancing round {round}: Collecting data from recon tasks ----------- ")
     f = action_consumer.pull()
     event = f.wait()
     metadata = json.loads(event.metadata)
