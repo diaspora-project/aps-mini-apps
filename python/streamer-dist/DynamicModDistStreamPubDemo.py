@@ -169,8 +169,8 @@ def task_to_worker_assignment(args, num_workers):
     
     # sorting task_id based on progress from smallest to largest
     sorted_tasks = sorted(range(num_tasks), key=lambda x: task_progress[x])
-    min_progress = sorted_tasks[0]
-    max_progress = sorted_tasks[-1]
+    min_progress = task_progress[sorted_tasks[0]]
+    max_progress = task_progress[sorted_tasks[-1]]
     if min_progress == max_progress:
       print("[LB] All tasks are at the same progress, no need to reassign")
       continue
@@ -185,6 +185,15 @@ def task_to_worker_assignment(args, num_workers):
     worker_weights = [sum(task_weights[t] for t in worker_to_task[w]) for w in range(num_workers)]
     surplus_worker_caps = np.array(worker_caps) - np.array(worker_weights)
     sorted_surplus_worker_caps = sorted(range(num_workers), key=lambda x: surplus_worker_caps[x])
+
+    print(f"[LB] Progress report:")
+    print(f"[LB] min_task_progress: Task-{sorted_tasks[0]} (progress={min_progress}), max_task_progress: Task-{sorted_tasks[-1]} (progress={max_progress})")
+    print(f"[LB] sorted task progress: {sorted_tasks}")
+    print(f"[LB] sorted surplus worker caps: {sorted_surplus_worker_caps}")
+    for w in range(num_workers):
+      print(f"[LB]  Worker {w}: progress={worker_progress[w]}, capacity={worker_caps[w]:.2f}, weight={worker_weights[w]:.2f}, surplus={surplus_worker_caps[w]:.2f}")
+      for t in worker_to_task[w]:
+        print(f"[LB]    --> Task {t}: progress={task_progress[t]}, task_lag={task_lag[t]}, task_weight={task_weights[t]}")
 
     task_assigned = False
 
