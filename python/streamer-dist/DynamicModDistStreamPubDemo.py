@@ -141,6 +141,8 @@ def task_to_worker_assignment(args, num_workers):
   
   while args.dynamic_loadbalancing.lower() == "true":
     print(f"[LB] Load balancing round {round}: Collecting data from recon tasks ----------- ")
+    round += 1
+
     f = action_consumer.pull()
     event = f.wait()
     metadata = json.loads(event.metadata)
@@ -159,8 +161,10 @@ def task_to_worker_assignment(args, num_workers):
     
     # Make reassignment only if total progress is large enough to reflect performance
     if total_progress < num_tasks * 2:
+      print(f"[LB] Total progress {total_progress} is less than threshold {num_tasks * 2}, continue collecting ...")
       continue
       
+    print(f"[LB] Total progress {total_progress} reached threshold {num_tasks * 2}, evaluating reassignment ...")
     
     # sorting task_id based on progress from smallest to largest
     sorted_tasks = sorted(range(num_tasks), key=lambda x: task_progress[x])
