@@ -132,6 +132,11 @@ def task_to_worker_assignment(args, num_workers):
   total_progress = 0
 
   # Listen from consumer and take actions if needed
+  if args.dynamic_loadbalancing.lower() == "true":
+    print("Dynamic load balancing is enabled")
+  else:
+    print("Dynamic load balancing is disabled")
+  
   while args.dynamic_loadbalancing.lower() == "true":
     f = action_consumer.pull()
     event = f.wait()
@@ -141,12 +146,12 @@ def task_to_worker_assignment(args, num_workers):
       worker_id = task_to_worker[task_id]
       progress = metadata["progress"]
       improved_progress = max(0, progress - task_progress[task_id])
-      print(f"Received progress update: task {task_id} on worker {worker_id} progress {progress - improved_progress} --> {progress}")
+      print(f"[LB] Received progress update: task {task_id} on worker {worker_id} progress {progress - improved_progress} --> {progress}")
       task_progress[task_id] = progress
       worker_progress[worker_id] += improved_progress
       total_progress += improved_progress
     else:
-      print(f"Unknown metadata type received: {metadata['Type']}")
+      print(f"[LB] Unknown metadata type received: {metadata['Type']}")
       continue
     
     # Make reassignment only if total progress is large enough to reflect performance
@@ -201,7 +206,7 @@ def task_to_worker_assignment(args, num_workers):
               "task_id": task_id
           }
           action_producer.push(stop_info, bytearray(1), partition=0)
-          print(f"Stopping task {max_weight_task} on worker {w} for reassignment")
+          print(f"[LB] Stopping task {max_weight_task} on worker {w} for reassignment")
           # move task to this worker
           assign_info = {
               "Type": "START_TASK",
@@ -210,7 +215,7 @@ def task_to_worker_assignment(args, num_workers):
               "task_id": task_id
           }
           action_producer.push(assign_info, bytearray(1), partition=0)
-          print(f"Reassigning task {task_id} from worker {from_worker} to worker {w}")
+          print(f"[LB] Reassigning task {task_id} from worker {from_worker} to worker {w}")
           surplus_worker_caps[w] -= task_weights[task_id]
           worker_to_task[w].append(task_id)
           task_assigned = True
