@@ -233,10 +233,16 @@ def task_to_worker_assignment(args, num_workers):
       # reorder worker by surplus capacity after new assignments
       sorted_surplus_worker_caps = sorted(range(num_workers), key=lambda x: surplus_worker_caps[x])
     
-    if task_assigned:
-      # reset progress tracking after reassignment to make sure their performance is updated
-      worker_progress = [0 for _ in range(num_workers)]
-      total_progress = 0
+    # if task_assigned:
+    #   # reset progress tracking after reassignment to make sure their performance is updated
+    #   worker_progress = [0 for _ in range(num_workers)]
+    #   total_progress = 0
+    
+    # subtract smallest progress from all workers to avoid progress accumulation making
+    # progress differences less significant
+    min_worker_progress = min(worker_progress)
+    worker_progress = [worker_progress[i] - min_worker_progress for i in range(num_workers)]
+    total_progress = sum(worker_progress)
 
 
 #@profile
