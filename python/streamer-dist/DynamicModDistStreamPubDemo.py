@@ -174,15 +174,23 @@ def task_to_worker_assignment(args, num_workers):
     if min_progress == max_progress:
       print("[LB] All tasks are at the same progress, no need to reassign")
       continue
+    # How task are lagging behind the fastest task
     task_lag = [(max_progress - task_progress[i])/(max_progress - min_progress) for i in range(num_tasks)]
     sum_lag = sum(task_lag)
+    # weights are normalized lags
     task_weights = [task_lag[i]*num_tasks/sum_lag for i in range(num_tasks)]
     
     sum_worker_progress = sum(worker_progress)
+    # worker capacities are normalized progress
     worker_caps = [worker_progress[i]*num_tasks/sum_worker_progress for i in range(num_workers)]
     
-    # reassign tasks based on weights and capacities
+    # reassign tasks based on their weights and workers' capacities
     worker_weights = [sum(task_weights[t] for t in worker_to_task[w]) for w in range(num_workers)]
+    # surplus capacities are the extra capacities after considering assigned task weights
+    # positive surplus means the worker can take more tasks
+    # negative surplus means the worker is overloaded
+    # task reassignment is to move tasks from workers with negative surplus to workers with positive surplus
+    # optimal assignment is when all workers have zero surplus capacity 
     surplus_worker_caps = np.array(worker_caps) - np.array(worker_weights)
     sorted_surplus_worker_caps = sorted(range(num_workers), key=lambda x: surplus_worker_caps[x])
 
@@ -193,7 +201,7 @@ def task_to_worker_assignment(args, num_workers):
     for w in range(num_workers):
       print(f"[LB]  Worker {w}: progress={worker_progress[w]}, capacity={worker_caps[w]:.2f}, weight={worker_weights[w]:.2f}, surplus={surplus_worker_caps[w]:.2f}")
       for t in worker_to_task[w]:
-        print(f"[LB]    --> Task {t}: progress={task_progress[t]}, task_lag={task_lag[t]}, task_weight={task_weights[t]}")
+        print(f"[LB]    --> Task {t}: progress={task_progress[t]}, task_lag={task_lag[t]:.2f}, task_weight={task_weights[t]:.2f}")
 
     task_assigned = False
 
@@ -214,7 +222,7 @@ def task_to_worker_assignment(args, num_workers):
     for task in to_move_tasks:
       task_id, from_worker = task
       for w in sorted_surplus_worker_caps:
-        if surplus_worker_caps[w] > task_weights[task_id]:
+        if surplus_worker_caps[w] >= task_weights[task_id]:
           # stop the max weight task on from_worker
           surplus_worker_caps[from_worker] += task_weights[task_id]
           worker_to_task[from_worker].remove(task_id)
@@ -243,6 +251,9 @@ def task_to_worker_assignment(args, num_workers):
       # reorder worker by surplus capacity after new assignments
       sorted_surplus_worker_caps = sorted(range(num_workers), key=lambda x: surplus_worker_caps[x])
     
+    if not task_assigned:
+      print("[LB] No task reassignment is made in this round")
+
     # if task_assigned:
     #   # reset progress tracking after reassignment to make sure their performance is updated
     #   worker_progress = [0 for _ in range(num_workers)]
