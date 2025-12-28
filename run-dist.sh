@@ -18,7 +18,8 @@ logdir=$3
 trap "echo 'Ctrl+C pressed. Terminating...'; exit 1" SIGINT SIGTERM
 
 # python -u ./build/python/streamer-dist/ModDistStreamPubDemo.py \
-python -u ./build/python/streamer-dist/DynamicModDistStreamPubDemo.py \
+# python -u ./build/python/streamer-dist/DynamicModDistStreamPubDemo.py \
+python -u ./build/python/streamer-dist/DynamicModDistStreamPubThreading.py \
     --cast_to_float32 \
     --normalize \
     --ntask_sirt ${num_tasks} \
