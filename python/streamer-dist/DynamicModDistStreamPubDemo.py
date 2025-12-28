@@ -121,13 +121,20 @@ class SharedRing:
       self.name = shm_name
       self._owner = False
 
-    self.buf = self.shm.buf  # memoryview
+    # self.buf = self.shm.buf  # memoryview
 
   def slot_view(self, slot: int) -> memoryview:
     off = slot * self.slot_bytes
-    return self.buf[off : off + self.slot_bytes]
+    return self.shm.buf[off : off + self.slot_bytes]
 
   def close(self):
+    # # Release our own exported buffer view first
+    # try:
+    #   if hasattr(self, "buf") and self.buf is not None:
+    #     self.buf.release()
+    #     self.buf = None
+    # except Exception:
+    #   pass
     self.shm.close()
 
   def unlink(self):
@@ -139,6 +146,7 @@ def flush_mofka_producer(args, shm_name, num_slots, slot_bytes, desc_q, ack_q):
     ring = SharedRing(num_slots=num_slots, slot_bytes=slot_bytes, shm_name=shm_name, create=False)
 
     md = MofkaDist(group_file=args.group_file, batchsize=args.batchsize)
+    md.handshake(args.ntask_sirt, args.num_sinograms, args.num_columns)
     p = md.producer(topic_name="dist_sirt", producer_name="dist")
 
     try:
@@ -149,19 +157,11 @@ def flush_mofka_producer(args, shm_name, num_slots, slot_bytes, desc_q, ack_q):
         
         if desc.sequence_id < 0:
           print(f"Received complete signal in mofka producer with sequence_id={desc.sequence_id}. Exiting ...")
-          try:
-            md.last_flush(producer=p)
-          except Exception as e:
-            print("last_flush failed:", e)
-          try:
-            md.done_image(producer=p)
-          except Exception as e:
-            print("done_image failed:", e)
           break
         else:
           try:
             mv = ring.slot_view(desc.slot)[:desc.nbytes]
-            payload = bytes(mv)
+            payload = mv.tobytes()
             md.push_image(payload,
                           desc.sequence_id,
                           desc.num_sinograms,
@@ -173,8 +173,28 @@ def flush_mofka_producer(args, shm_name, num_slots, slot_bytes, desc_q, ack_q):
             ack_q.put(("OK", desc.slot, desc.msg_id, None))
           except Exception as e:
             ack_q.put(("EXC", desc.slot, desc.msg_id, repr(e)))
+          finally:
+            try:
+              mv.release()
+            except Exception:
+              pass
+            mv = None
     finally:
-        ring.close()
+      try:
+        md.last_flush(producer=p)
+      except Exception:
+        pass
+      try:
+        md.done_image(producer=p)
+      except Exception:
+        pass
+      # force cleanup before shm close (helps some native libs)
+      try:
+        del p
+        del md
+      except Exception:
+        pass
+      ring.close()
 
   # while True:
   #   try:
@@ -219,7 +239,7 @@ class MofkaShmSender:
       target=flush_mofka_producer,
       args=(self.init_args, self.ring.name, self.ring.num_slots, self.ring.slot_bytes,
             self.desc_q, self.ack_q),
-      daemon=True
+      daemon=False
     )
     p.start()
     return p
@@ -262,40 +282,43 @@ class MofkaShmSender:
           if spilled:
             # We spilled successfully => free slot; DO NOT keep for retry
             self.free_slots.append(slot)
+            sv = None
             try:
               sv = self.ring.slot_view(slot)
               sv[:] = b"\x00" * len(sv)
-            except Exception:
-              pass
+            finally:
+              try:
+                if sv is not None:
+                  sv.release()
+              except Exception:
+                pass
           else:
             # Spill failed => keep parked (slot remains occupied)
             self.pending_uncertain.append(desc)
             self.uncertain_ids.add(msg_id)
 
   def _spill_failed_payload(self, desc: ImageDesc, err: str):
-    # Best-effort: dump payload to disk so we can free the slot without losing data
     try:
       outdir = os.path.join(getattr(self.init_args, "logdir", "."), "failed_payloads")
       os.makedirs(outdir, exist_ok=True)
       path = os.path.join(outdir, f"{desc.msg_id}.bin")
-      mv = self.ring.slot_view(desc.slot)[:desc.nbytes]
-      with open(path, "wb") as f:
-        f.write(mv)
+
+      mv = None
+      try:
+        mv = self.ring.slot_view(desc.slot)[:desc.nbytes]
+        with open(path, "wb") as f:
+          f.write(mv.tobytes())
+      finally:
+        try:
+          if mv is not None:
+            mv.release()
+        except Exception:
+          pass
+
       meta_path = os.path.join(outdir, f"{desc.msg_id}.json")
       with open(meta_path, "w") as f:
-        json.dump({
-          "msg_id": desc.msg_id,
-          "sequence_id": desc.sequence_id,
-          "num_sinograms": desc.num_sinograms,
-          "num_columns": desc.num_columns,
-          "slot": desc.slot,
-          "rotation": desc.rotation,
-          "unique_id": desc.unique_id,
-          "center": desc.center,
-          "nbytes": desc.nbytes,
-          "attempts": desc.attempts,
-          "last_error": err,
-        }, f, indent=2)
+        json.dump({...}, f, indent=2)
+
       print(f"[WARN] Spilled failed payload to {path} (slot {desc.slot})")
       return True
     except Exception as e:
@@ -399,8 +422,16 @@ class MofkaShmSender:
       raise ValueError(f"payload too big: {len(data)} > {self.ring.slot_bytes}")
 
     # write to shm
-    sv = self.ring.slot_view(slot)
-    sv[:len(data)] = data
+    sv = None
+    try:
+      sv = self.ring.slot_view(slot)
+      sv[:len(data)] = data
+    finally:
+      try:
+        if sv is not None:
+          sv.release()
+      except Exception:
+        pass
 
     desc = ImageDesc(slot=slot, nbytes=len(data), msg_id=msg_id,
                       sequence_id=sequence_id, num_sinograms=num_sinograms, num_columns=num_columns,
@@ -481,7 +512,7 @@ def restart_worker(sender: MofkaShmSender, init_args):
         target=flush_mofka_producer,
         args=(init_args, sender.ring.name, sender.ring.num_slots, sender.ring.slot_bytes,
               sender.desc_q, sender.ack_q),
-        daemon=True
+        daemon=False
     )
     sender.proc.start()
 
@@ -705,7 +736,7 @@ def main():
   assignment_process = multiprocessing.Process(
     target=task_to_worker_assignment_wrapper,
     args=(args, num_workers),
-    daemon=True
+    daemon=False
   )
   assignment_process.start()
 
