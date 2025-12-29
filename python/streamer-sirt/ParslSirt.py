@@ -319,11 +319,13 @@ def main():
         futures.append(fut)
 
     # Wait & print
-    # for f in futures:
-    #     print(f.result())
+    print("Waiting for workers to complete...")
+    for f in futures:
+        print(f.result())
 
-    # if shim_dir:
-    #     shutil.rmtree(shim_dir, ignore_errors=True)
+    print("All workers completed.")
+    if shim_dir:
+        shutil.rmtree(shim_dir, ignore_errors=True)
 
 if __name__ == "__main__":
     main()
