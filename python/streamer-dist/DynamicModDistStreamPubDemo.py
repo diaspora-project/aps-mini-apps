@@ -656,7 +656,7 @@ def task_to_worker_assignment(args, num_workers):
           assign_info = {
               "Type": "START_TASK",
               "from_worker_id": from_worker,
-              "to_worker_id": w,
+              "worker_id": w,
               "task_id": task_id
           }
           action_producer.push(assign_info, bytearray(1), partition=0)
