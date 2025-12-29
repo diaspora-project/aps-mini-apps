@@ -319,8 +319,8 @@ def main():
         futures.append(fut)
 
     # Wait & print
-    for f in futures:
-        print(f.result())
+    # for f in futures:
+    #     print(f.result())
 
     if shim_dir:
         shutil.rmtree(shim_dir, ignore_errors=True)
