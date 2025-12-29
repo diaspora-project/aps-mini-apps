@@ -104,6 +104,8 @@ def main(input_path, recon_path, model_path, protocol, group_file, batchsize, nu
     waiting_data = {}
     completed_iterations = set()
 
+    print("Starting receiving data from SIRTs...")
+
     while pending_tasks > 0 or waiting_metadata.empty() == False:
         ts = time.perf_counter()
         f = consumer.pull()
