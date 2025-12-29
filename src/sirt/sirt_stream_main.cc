@@ -198,8 +198,9 @@ int main(int argc, char **argv) {
             running = false;
         }else{
             std::cerr << "Unknown event type: " << event_type << std::endl;
-            break;
         }
+        std::cout << "[Worker-" << config.worker_id << "] Finished processing event from DIST. Acknowledging event..." << std::endl;
+        event.acknowledge();
     }
     
     cleanup();
