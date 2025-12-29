@@ -308,6 +308,7 @@ def main():
     # Launch workers
     futures = []
     for i in range(int(p.num_workers)):
+        print(f"Launching SIRT worker {i}...")
         fut = run_sirt(
             id=str(i),
             logdir=p.logdir,
