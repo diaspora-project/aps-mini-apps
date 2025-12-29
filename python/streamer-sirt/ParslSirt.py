@@ -296,14 +296,14 @@ def main():
     print(f"Workers: {p.num_workers}")
     print("Args:", all_args)
     print("\nComputed LD_LIBRARY_PATH:\n", effective_ld)
-    print("\nldd BEFORE shims (rc={}):\n".format(rc1), ldd_out1)
-    if created:
-        print("Created SONAME shims:")
-        for need, src, dst in created:
-            print(f"  {need} -> {src}  (at {dst})")
-    print("\nldd AFTER shims (rc={}):\n".format(rc2), ldd_out2)
-    if missing2:
-        print("Still missing after shims:", ", ".join(sorted(missing2)))
+    # print("\nldd BEFORE shims (rc={}):\n".format(rc1), ldd_out1)
+    # if created:
+    #     print("Created SONAME shims:")
+    #     for need, src, dst in created:
+    #         print(f"  {need} -> {src}  (at {dst})")
+    # print("\nldd AFTER shims (rc={}):\n".format(rc2), ldd_out2)
+    # if missing2:
+    #     print("Still missing after shims:", ", ".join(sorted(missing2)))
 
     # Launch workers
     futures = []
