@@ -322,8 +322,8 @@ def main():
     # for f in futures:
     #     print(f.result())
 
-    if shim_dir:
-        shutil.rmtree(shim_dir, ignore_errors=True)
+    # if shim_dir:
+    #     shutil.rmtree(shim_dir, ignore_errors=True)
 
 if __name__ == "__main__":
     main()
