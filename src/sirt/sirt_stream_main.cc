@@ -164,6 +164,7 @@ int main(int argc, char **argv) {
                     std::cout << "[Worker-" << config.worker_id << "] Task " << task_id << " completed. Notifying the producer the completion" << std::endl;
                     json end_md = {
                         {"Type", "COMPLETE"},
+                        {"worker_id", config.worker_id},
                         {"task_id", task_id}
                     };
                     producer.push(end_md).wait();
@@ -172,6 +173,8 @@ int main(int argc, char **argv) {
                 stopped_threads.push_back(std::move(running_threads[task_id]));
                 running_threads.erase(task_id);
                 task_progresses.erase(task_id);
+            }else{
+                std::cout << "[Worker-" << config.worker_id << "] Received END_TASK for Task " << task_id << " which is not running. Ignoring." << std::endl;
             }
         }else if (event_type == "START_TASK") {
           int task_id = json_metadata["task_id"].get<int>();
