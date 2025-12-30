@@ -117,6 +117,9 @@ std::thread MofkaStream::receiveEventInBackground(mofka::Consumer consumer)
         setConsumerTimes("wait_t", 1, elapsed.count());
 
         std::lock_guard<std::mutex> lock(this->mofka_buffer_mutex);
+        std::cout << "[Task-" << getRank()
+                  << "]: Received Mofka event " << event.metadata().json().dump() << " in background thread."
+                  << std::endl;
         mofka_buffered_events.push_back(event);
       }
     }
