@@ -232,6 +232,7 @@ def run_sirt(id, logdir=".", args=None, launcher_env=None, sirt_bin_path=""):
     args = args or []
     stderr = os.path.join(logdir, f'sirt-{id}.err')
     stdout = os.path.join(logdir, f'sirt-{id}.out')
+    strdiag = "/dev/null"
 
     env_exports = [f'export {k}="{v}"' for k, v in (launcher_env or {}).items()]
     # diag = [
@@ -239,8 +240,8 @@ def run_sirt(id, logdir=".", args=None, launcher_env=None, sirt_bin_path=""):
     #     f'ldd {sirt_bin_path} || true'
     # ]
     diag = [
-        f'echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH" >> "{stderr}" 2>&1',
-        f'ldd "{sirt_bin_path}" >> "{stderr}" 2>&1 || true'
+        f'echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH" >> "{strdiag}" 2>&1',
+        f'ldd "{sirt_bin_path}" >> "{strdiag}" 2>&1 || true'
     ]
     cmd = " && ".join(
         env_exports
