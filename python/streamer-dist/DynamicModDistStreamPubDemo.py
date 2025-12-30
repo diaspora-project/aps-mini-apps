@@ -574,7 +574,7 @@ def task_to_worker_assignment(args, num_workers):
       worker_progress[worker_id] += improved_progress
       total_progress += improved_progress
     else:
-      print(f"[LB] Unknown metadata type received: {metadata['Type']}")
+      print(f"[LB] Unknown metadata received: {event.metadata},")
       continue
     
     # Make reassignment only if total progress is large enough to reflect performance

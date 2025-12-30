@@ -161,38 +161,14 @@ int main(int argc, char **argv) {
             int task_id = json_metadata["task_id"].get<int>();
             if (running_tasks.find(task_id) != running_tasks.end()) {
                 std::cout << "[Worker-" << config.worker_id << "] Stoping [Task-" << task_id << "]..." << std::endl;
-                // running_tasks[task_id].stop([&] {
-                //     std::cout << "[Worker-" << config.worker_id << "] Task " << task_id << " completed. Notifying the producer the completion" << std::endl;
-                //     json end_md = {
-                //         {"Type", "COMPLETE"},
-                //         {"worker_id", config.worker_id},
-                //         {"task_id", task_id}
-                //     };
-                //     producer.push(end_md).wait();
-                // });
-                running_tasks[task_id].stop([&, task_id] {
-                    try {
-                        std::cout << "[Worker-" << config.worker_id << "] Task " << task_id
-                                << " completed. Notifying the producer the completion\n";
-
-                        nlohmann::json end_md = {
-                            {"Type", "COMPLETE"},
-                            {"worker_id", config.worker_id},
-                            {"task_id", task_id}
-                        };
-
-                        std::cout << "end_md type=" << end_md.type_name()
-                                << " value=" << end_md.dump() << std::endl;
-
-                        auto fut = producer.push(end_md);   // if it throws, you’ll catch it
-                        fut.wait();
-                    } catch (const nlohmann::json::exception& e) {
-                        std::cerr << "JSON error in completion callback: " << e.what() << std::endl;
-                        throw; // or swallow if you must
-                    } catch (const std::exception& e) {
-                        std::cerr << "Error in completion callback: " << e.what() << std::endl;
-                        throw;
-                    }
+                running_tasks[task_id].stop([&] {
+                    std::cout << "[Worker-" << config.worker_id << "] Task " << task_id << " completed. Notifying the producer the completion" << std::endl;
+                    json end_md = {
+                        {"Type", "COMPLETE"},
+                        {"worker_id", config.worker_id},
+                        {"task_id", task_id}
+                    };
+                    producer.push(end_md).wait();
                 });
                 running_tasks.erase(task_id);
                 stopped_threads.push_back(std::move(running_threads[task_id]));
