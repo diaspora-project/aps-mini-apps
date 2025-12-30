@@ -151,7 +151,7 @@ void MofkaStream::eraseBegTraceMsg(){
 }
 
 void MofkaStream::acknowledge() {
-  std::cout << "[Task-" << getRank() << "]: Acknowledging up to checkpoint progress: " << getCkptProgress() << std::endl;
+  std::cout << "[Task-" << getRank() << "]: Acknowledging up to: " << vmeta.begin()->dump() << std::endl;
   auto current_proj_id = (*vmeta.begin())["seq_n"].get<int>();
   std::cout << "[Task-" << getRank() << "]: Current proj_id: " << current_proj_id << std::endl;
   while (!pending_events.empty()) {
