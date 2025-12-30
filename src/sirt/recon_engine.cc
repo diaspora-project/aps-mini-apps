@@ -386,10 +386,10 @@ int ReconTask::run() {
 }
 
 void ReconTask::stop(std::function<void()> callback) {
+  stop_flag.store(true);
   if (callback) {
     on_stop_callback = callback;
-  }  
-  stop_flag.store(true);
+  }
 }
 
 void ReconTask::kill(int signal) {

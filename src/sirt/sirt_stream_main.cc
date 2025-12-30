@@ -160,6 +160,7 @@ int main(int argc, char **argv) {
         if (event_type == "END_TASK") {
             int task_id = json_metadata["task_id"].get<int>();
             if (running_tasks.find(task_id) != running_tasks.end()) {
+                std::cout << "[Worker-" << config.worker_id << "] Stoping [Task-" << task_id << "]..." << std::endl;
                 running_tasks[task_id].stop([&] {
                     std::cout << "[Worker-" << config.worker_id << "] Task " << task_id << " completed. Notifying the producer the completion" << std::endl;
                     json end_md = {
