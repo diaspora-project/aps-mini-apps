@@ -24,7 +24,7 @@ SSTStream::SSTStream(const std::string &streamName,
     }
 
     try {
-        std::cout << "[Task " << m_partitionId << "] Initializing SSTStream for stream '"
+        std::cout << "[Task-" << m_partitionId << "] Initializing SSTStream for stream '"
               << m_streamName << "' with " << m_numPartitions << " partitions."
               << std::endl;
 
@@ -35,7 +35,7 @@ SSTStream::SSTStream(const std::string &streamName,
         m_io->SetEngine("SST");
 
 
-        std::cout << "[Task " << m_partitionId << "] Opening SST stream '" << m_streamName
+        std::cout << "[Task-" << m_partitionId << "] Opening SST stream '" << m_streamName
                 << "' for reading." << std::endl;
 
         // You can set SST parameters here, e.g.:
@@ -47,7 +47,7 @@ SSTStream::SSTStream(const std::string &streamName,
         // m_engine = std::make_unique<adios2::Engine>(
         //     m_io->Open(m_streamName, adios2::Mode::Read));
 
-        // std::cout << "[Task " << m_partitionId << "] SSTStream initialized." << std::endl;
+        // std::cout << "[Task-" << m_partitionId << "] SSTStream initialized." << std::endl;
         // m_is_active.store(true);
 
         m_openFuture.emplace(async(std::launch::async, [&] {
@@ -58,12 +58,12 @@ SSTStream::SSTStream(const std::string &streamName,
             // timed out
             m_is_active.store(false);
             m_eos.store(true);
-            std::cout << "[Task " << m_partitionId << "] SSTStream initialization failed." << std::endl;
+            std::cout << "[Task-" << m_partitionId << "] SSTStream initialization failed." << std::endl;
             return;
         }
 
         m_engine = std::make_unique<adios2::Engine>(m_openFuture->get());
-        std::cout << "[Task " << m_partitionId << "] SSTStream initialized." << std::endl;
+        std::cout << "[Task-" << m_partitionId << "] SSTStream initialized." << std::endl;
         m_openFuture.reset();
         m_is_active.store(true);
     }catch (const std::exception &ex) {
