@@ -247,7 +247,6 @@ int ReconTask::run() {
       progress = passes * config.window_len;
       std::cout << "[Task-" << task_id << "] Updating progress to " << progress << "(pass = " << passes << ", config.window_len = " << config.window_len << ")"<< std::endl;
       ms.updateCkptProgress(progress);
-      std::cout << "[Task-" << task_id << "] Acknowledging checkpoint for iteration " << passes << std::endl;
       ms.acknowledge();
       std::cout << "[Task-" << task_id << "] Checkpointing at iteration " << passes << ", progress = " << progress << std::endl;
       // if (!ckpt_client->checkpoint(config.ckpt_name, passes)) {
