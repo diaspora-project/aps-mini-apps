@@ -151,12 +151,9 @@ void MofkaStream::eraseBegTraceMsg(){
 }
 
 void MofkaStream::acknowledge() {
-  std::cout << "[Task-" << getRank() << "]: Acknowledging up to: " << vmeta.begin()->dump() << std::endl;
-  auto current_proj_id = (*vmeta.begin())["seq_n"].get<int>();
-  std::cout << "[Task-" << getRank() << "]: Current proj_id: " << current_proj_id << std::endl;
+  // auto current_proj_id = (*vmeta.begin())["seq_n"].get<int>();
   while (!pending_events.empty()) {
     auto event = pending_events.begin();
-    std::cout << "[Task-" << getRank() << "]: Checking first event" << std::endl;
     auto event_prog_id = event->metadata().json()["seq_n"].get<int>();
     // if (event_prog_id < current_proj_id) {
     // if (event_prog_id < current_proj_id + (int)window_len) {
