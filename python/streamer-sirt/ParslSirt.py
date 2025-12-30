@@ -12,12 +12,12 @@ from pathlib import Path
 import parsl
 from parsl.app.app import bash_app
 from parsl.configs.local_threads import config as local_threads_config
+from parsl.executors import ThreadPoolExecutor
 
 # ---------------------------------------------------------------------------
 # Parsl config
 # ---------------------------------------------------------------------------
-local_threads_config.retries = 100000
-parsl.load(local_threads_config)
+# local_threads_config.retries = 100000
 
 HERE = Path(__file__).resolve().parent
 
@@ -254,6 +254,11 @@ def run_sirt(id, logdir=".", args=None, launcher_env=None, sirt_bin_path=""):
 # ---------------------------------------------------------------------------
 def main():
     p = parse_arguments()
+
+    # Configure Parsl
+    local_threads_config.retries = 100000
+    local_threads_config.executors=[ThreadPoolExecutor(max_threads=p.num_workers)]
+    parsl.load(local_threads_config)
 
     # Locate binary
     sirt_bin = discover_sirt_bin(p.sirt_bin)
