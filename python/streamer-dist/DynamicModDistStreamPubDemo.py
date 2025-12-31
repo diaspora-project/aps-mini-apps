@@ -26,7 +26,7 @@ def parse_arguments():
   parser = argparse.ArgumentParser( description='Data Distributor Process')
   parser.add_argument('--protocol', default="na+sm", help='Mofka protocol')
 
-  parser.add_argument('--dynamic_loadbalancing', default="true", help='Enable dynamic load balancing')
+  parser.add_argument('--dynamic_loadbalancing', default="false", help='Enable dynamic load balancing')
 
   parser.add_argument('--group_file', type=str, default="mofka.json",
                       help='Group file for the mofka server')
