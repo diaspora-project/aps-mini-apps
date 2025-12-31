@@ -94,6 +94,19 @@ class ImageDesc:
     attempts: int = 0
     last_attempt_ts: float = 0.0
 
+class ImageMsg:
+  def __init__(self, data: bytes, sequence_id: int, num_sinograms: int, num_columns: int,
+                    rotation: float, unique_id: int, center: float, msg_id: str, timeout: float = 0.2):
+    self.data = data
+    self.sequence_id = sequence_id
+    self.num_sinograms = num_sinograms
+    self.num_columns = num_columns
+    self.rotation = rotation
+    self.unique_id = unique_id
+    self.center = center
+    self.msg_id = msg_id
+    self.timeout = timeout
+
 class ImagePacket:
   def __init__(self, data, sequence_id, num_sinograms, num_columns, rotation, unique_id, center):
     self.data = data
@@ -233,6 +246,8 @@ class MofkaShmSender:
     self.UNCERTAIN_RETRY_DELAY_SEC = 300
     self.UNCERTAIN_MAX_RETRIES = 1
     self.RESTART_ON_STALL_SEC = 10
+
+    self.async_waiting_queue = queue.Queue()
 
   def _start_proc(self):
     p = self.ctx.Process(
@@ -446,6 +461,40 @@ class MofkaShmSender:
       self.pending_definite.append(desc)
 
     return True
+
+  def async_enqueue_image(self, data: bytes, sequence_id: int, num_sinograms: int, num_columns: int,
+                    rotation: float, unique_id: int, center: float, msg_id: str,
+                    timeout: float = 0.2) -> bool:
+    self.async_waiting_queue.put(ImageMsg(
+      data=data, sequence_id=sequence_id, num_sinograms=num_sinograms, num_columns=num_columns,
+      rotation=rotation, unique_id=unique_id, center=center, msg_id=msg_id
+    ))
+    return True
+  
+  def _async_sender_thread_fn(self):
+    while True:
+      try:
+        img_msg = self.async_waiting_queue.get(timeout=0.01)
+      except queue.Empty:
+        img_msg = None
+
+      if img_msg is not None:
+        print(f"Queueing image seq_id {img_msg.sequence_id} to sirt through Mofka")
+        self.enqueue_image(
+          data=img_msg.data.tobytes(),
+          sequence_id=img_msg.sequence_id,
+          num_sinograms=img_msg.num_sinograms,
+          num_columns=img_msg.num_columns,
+          rotation=img_msg.rotation,
+          unique_id=img_msg.unique_id,
+          center=img_msg.center,
+          msg_id=img_msg.msg_id,
+          timeout=img_msg.timeout
+        )
+        self.maybe_restart_if_stalled()
+
+  def start_async_sender_thread(self):
+    threading.Thread(target=self._async_sender_thread_fn, daemon=True).start()
 
   def maybe_restart_if_stalled(self):
     """
@@ -685,29 +734,6 @@ def task_to_worker_assignment(args, num_workers):
   
   print(f"[LB] Load balancing completed after {round} rounds. Exiting task assignment process ...")
 
-# atomic counter for sent messages
-msg_lock = threading.Lock()
-msg_counter = 0
-
-def push_image_async(sender, data, seq_id, n_sinos, n_cols, rot, uid, center, run_id):
-  print(f"Queueing image seq_id {seq_id} to sirt through Mofka")
-  msg_id = f"{run_id}:{seq_id}"   # stable id for logging / manual dedup if needed
-  sender.enqueue_image(
-    data=data.tobytes(),
-    sequence_id=seq_id,
-    num_sinograms=n_sinos,
-    num_columns=n_cols,
-    rotation=rot,
-    unique_id=uid,
-    center=center,
-    msg_id=msg_id,
-    timeout=0.2
-  )
-  sender.maybe_restart_if_stalled()
-  with msg_lock:
-    global msg_counter
-    msg_counter += 1
-
 #@profile
 def main():
   args = parse_arguments()
@@ -789,7 +815,7 @@ def main():
 
   print("Starting to receive images ...")
 
-  num_msg = 0
+  sender.start_async_sender_thread()
 
   # # Create a new thread to periodically flush the producer
   # flush_thread = threading.Thread(target=flush_mofka_producer, args=(mofka_dist,producer,), daemon=False)
@@ -895,13 +921,17 @@ def main():
       # if not ok:
       #   # backpressure: pause or spill
       #   time.sleep(0.01)
-
-      threading.Thread(
-        target=push_image_async,
-        args=(sender, mofka_sub, sequence_id, args.num_sinograms, ncols, rotation,
-              mofka_read_image.UniqueId(), mofka_read_image.Center(), run_id),
-        daemon=True
-      ).start()
+      sender.async_enqueue_image(
+        data=mofka_sub,
+        sequence_id=sequence_id,
+        num_sinograms=args.num_sinograms,
+        num_columns=ncols,
+        rotation=rotation,
+        unique_id=mofka_read_image.UniqueId(),
+        center=mofka_read_image.Center(),
+        msg_id=f"{run_id}:{sequence_id}",
+        timeout=0.2
+      )
 
       # if all(isinstance(item, list) for item in tt):
       #   mofka_producing_time.extend(tt)
@@ -961,14 +991,6 @@ def main():
     write.writerows(mofka_consuming_time)
   # del producer
   del consumer
-
-  print("Ensure all messages are sent ...")
-  while True:
-    with msg_lock:
-      if msg_counter == num_msg:
-        break
-    time.sleep(0.1)
-  print(f"All {num_msg} messages have been sent to SIRT.")
 
   print("Stopping shared memory sender ...")
   # drain until we have no known-safe pending/inflight
