@@ -885,12 +885,12 @@ def main():
         sub = tp.remove_nan(sub, val=0.0)
         sub = tp.remove_neg(sub, val=0.00)
         sub[np.where(sub == np.inf)] = 0.00
-      
+
       #to send from mofka:
       mofka_sub = sub.flatten()
       ncols = sub.shape[2]
-      print(f"Sending image seq_id {sequence_id} to sirt through SST")
       if args.sst:
+        print(f"Sending image seq_id {sequence_id} to sirt through SST")
         tt = sst_dist.push_image(mofka_sub, sequence_id, args.num_sinograms, ncols, rotation,
                         mofka_read_image.UniqueId(), mofka_read_image.Center())
         # print(f"Sending image seq_id {sequence_id} to sirt through Mofka")
