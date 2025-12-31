@@ -685,6 +685,9 @@ def task_to_worker_assignment(args, num_workers):
   
   print(f"[LB] Load balancing completed after {round} rounds. Exiting task assignment process ...")
 
+# atomic counter for sent messages
+msg_lock = threading.Lock()
+msg_counter = 0
 
 def push_image_async(sender, data, seq_id, n_sinos, n_cols, rot, uid, center, run_id):
   print(f"Queueing image seq_id {seq_id} to sirt through Mofka")
@@ -701,6 +704,9 @@ def push_image_async(sender, data, seq_id, n_sinos, n_cols, rot, uid, center, ru
     timeout=0.2
   )
   sender.maybe_restart_if_stalled()
+  with msg_lock:
+    global msg_counter
+    msg_counter += 1
 
 #@profile
 def main():
@@ -783,6 +789,8 @@ def main():
 
   print("Starting to receive images ...")
 
+  num_msg = 0
+
   # # Create a new thread to periodically flush the producer
   # flush_thread = threading.Thread(target=flush_mofka_producer, args=(mofka_dist,producer,), daemon=False)
   # flush_thread.start()
@@ -850,6 +858,8 @@ def main():
         sub = tp.remove_nan(sub, val=0.0)
         sub = tp.remove_neg(sub, val=0.00)
         sub[np.where(sub == np.inf)] = 0.00
+
+      num_msg += 1
 
       #to send from mofka:
       mofka_sub = sub.flatten()
@@ -952,6 +962,14 @@ def main():
   # del producer
   del consumer
 
+  print("Ensure all messages are sent ...")
+  while True:
+    with msg_lock:
+      if msg_counter == num_msg:
+        break
+    time.sleep(0.1)
+  print(f"All {num_msg} messages have been sent to SIRT.")
+
   print("Stopping shared memory sender ...")
   # drain until we have no known-safe pending/inflight
   deadline = time.time() + 10.0
@@ -1009,7 +1027,8 @@ def main():
 
   print("Cleaning up SST stream ...")
 
-  sst_dist.close()
+  if args.sst:
+    sst_dist.close()
     
   print("Exiting ...")
 
