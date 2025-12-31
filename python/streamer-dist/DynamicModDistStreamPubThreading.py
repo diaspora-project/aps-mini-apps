@@ -494,6 +494,7 @@ def main():
   print("Cleaning up task assignment process ...")
 
   # Wait for the assignment process to finish
+  args.dynamic_loadbalancing = "false"
   assignment_process.join(timeout=5)
   if assignment_process.is_alive():
     assignment_process.terminate()

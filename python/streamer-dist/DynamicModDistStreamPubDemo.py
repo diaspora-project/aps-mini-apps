@@ -971,6 +971,7 @@ def main():
   # del action_consumer
 
   print("Cleaning up task assignment process ...")
+  args.dynamic_loadbalancing = "false"
 
   # Wait for the assignment process to finish
   assignment_process.join(timeout=5)
