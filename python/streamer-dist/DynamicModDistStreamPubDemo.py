@@ -95,7 +95,7 @@ class ImageDesc:
     last_attempt_ts: float = 0.0
 
 class ImagePacket:
-  def __init__(self, data: bytes, sequence_id: int, num_sinograms: int, num_columns: int,
+  def __init__(self, data: np.ndarray, sequence_id: int, num_sinograms: int, num_columns: int,
                     rotation: float, unique_id: int, center: float, msg_id: str, timeout: float = 0.2):
     self.data = data
     self.sequence_id = sequence_id
@@ -479,7 +479,7 @@ class MofkaShmSender:
 
     return True
 
-  def async_enqueue_image(self, data: Any, sequence_id: int, num_sinograms: int, num_columns: int,
+  def async_enqueue_image(self, data: np.ndarray, sequence_id: int, num_sinograms: int, num_columns: int,
                     rotation: float, unique_id: int, center: float, msg_id: str,
                     timeout: float = 0.2) -> bool:
     self.async_waiting_queue.put(ImagePacket(
@@ -498,10 +498,8 @@ class MofkaShmSender:
 
       if img_msg is not None:
         print(f"Queueing image seq_id {img_msg.sequence_id} to sirt through Mofka")
-        arr = img_msg.data   # assume already contiguous float32
-        payload_mv = memoryview(arr).cast("B")
         self.enqueue_image(
-          payload_mv=payload_mv,
+          payload_mv=img_msg.data,
           sequence_id=img_msg.sequence_id,
           num_sinograms=img_msg.num_sinograms,
           num_columns=img_msg.num_columns,
