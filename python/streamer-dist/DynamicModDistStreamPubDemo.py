@@ -467,11 +467,12 @@ class MofkaShmSender:
                     timeout: float = 0.2) -> bool:
     self.async_waiting_queue.put(ImageMsg(
       data=data, sequence_id=sequence_id, num_sinograms=num_sinograms, num_columns=num_columns,
-      rotation=rotation, unique_id=unique_id, center=center, msg_id=msg_id
+      rotation=rotation, unique_id=unique_id, center=center, msg_id=msg_id, timeout=timeout
     ))
     return True
   
   def _async_sender_thread_fn(self):
+    print("Starting async sender thread ...")
     while True:
       try:
         img_msg = self.async_waiting_queue.get(timeout=0.01)
@@ -884,9 +885,7 @@ def main():
         sub = tp.remove_nan(sub, val=0.0)
         sub = tp.remove_neg(sub, val=0.00)
         sub[np.where(sub == np.inf)] = 0.00
-
-      num_msg += 1
-
+      
       #to send from mofka:
       mofka_sub = sub.flatten()
       ncols = sub.shape[2]
