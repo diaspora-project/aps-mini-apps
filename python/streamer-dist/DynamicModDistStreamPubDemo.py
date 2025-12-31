@@ -845,28 +845,29 @@ def main():
       # print(f"Sending image seq_id {sequence_id} to sirt through Mofka")
       # tt = mofka_dist.push_image(mofka_sub, sequence_id, args.num_sinograms, ncols, rotation,
       #                 mofka_read_image.UniqueId(), mofka_read_image.Center(), producer=producer)
-      print(f"Queueing image seq_id {sequence_id} to sirt through Mofka")
-      # mofka_queue.put(ImagePacket(mofka_sub, sequence_id, args.num_sinograms, ncols, rotation,
-      #                 mofka_read_image.UniqueId(), mofka_read_image.Center()))
-      msg_id = f"{run_id}:{sequence_id}"   # stable id for logging / manual dedup if needed
-      ok = sender.enqueue_image(
-        data=mofka_sub.tobytes(),
-        sequence_id=sequence_id,
-        num_sinograms=args.num_sinograms,
-        num_columns=ncols,
-        rotation=rotation,
-        unique_id=mofka_read_image.UniqueId(),
-        center=mofka_read_image.Center(),
-        msg_id=msg_id,
-        timeout=0.2
-      )
 
-      # periodically
-      sender.maybe_restart_if_stalled()
+      # print(f"Queueing image seq_id {sequence_id} to sirt through Mofka")
+      # # mofka_queue.put(ImagePacket(mofka_sub, sequence_id, args.num_sinograms, ncols, rotation,
+      # #                 mofka_read_image.UniqueId(), mofka_read_image.Center()))
+      # msg_id = f"{run_id}:{sequence_id}"   # stable id for logging / manual dedup if needed
+      # ok = sender.enqueue_image(
+      #   data=mofka_sub.tobytes(),
+      #   sequence_id=sequence_id,
+      #   num_sinograms=args.num_sinograms,
+      #   num_columns=ncols,
+      #   rotation=rotation,
+      #   unique_id=mofka_read_image.UniqueId(),
+      #   center=mofka_read_image.Center(),
+      #   msg_id=msg_id,
+      #   timeout=0.2
+      # )
 
-      if not ok:
-        # backpressure: pause or spill
-        time.sleep(0.01)
+      # # periodically
+      # sender.maybe_restart_if_stalled()
+
+      # if not ok:
+      #   # backpressure: pause or spill
+      #   time.sleep(0.01)
 
       # if all(isinstance(item, list) for item in tt):
       #   mofka_producing_time.extend(tt)
