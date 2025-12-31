@@ -686,6 +686,22 @@ def task_to_worker_assignment(args, num_workers):
   print(f"[LB] Load balancing completed after {round} rounds. Exiting task assignment process ...")
 
 
+def push_image_async(sender, data, seq_id, n_sinos, n_cols, rot, uid, center, run_id):
+  print(f"Queueing image seq_id {seq_id} to sirt through Mofka")
+  msg_id = f"{run_id}:{seq_id}"   # stable id for logging / manual dedup if needed
+  sender.enqueue_image(
+    data=data.tobytes(),
+    sequence_id=seq_id,
+    num_sinograms=n_sinos,
+    num_columns=n_cols,
+    rotation=rot,
+    unique_id=uid,
+    center=center,
+    msg_id=msg_id,
+    timeout=0.2
+  )
+  sender.maybe_restart_if_stalled()
+
 #@profile
 def main():
   args = parse_arguments()
@@ -846,6 +862,7 @@ def main():
       # tt = mofka_dist.push_image(mofka_sub, sequence_id, args.num_sinograms, ncols, rotation,
       #                 mofka_read_image.UniqueId(), mofka_read_image.Center(), producer=producer)
 
+      # Queueing in a seperate thread
       # print(f"Queueing image seq_id {sequence_id} to sirt through Mofka")
       # # mofka_queue.put(ImagePacket(mofka_sub, sequence_id, args.num_sinograms, ncols, rotation,
       # #                 mofka_read_image.UniqueId(), mofka_read_image.Center()))
@@ -868,6 +885,13 @@ def main():
       # if not ok:
       #   # backpressure: pause or spill
       #   time.sleep(0.01)
+
+      threading.Thread(
+        target=push_image_async,
+        args=(sender, mofka_sub, sequence_id, args.num_sinograms, ncols, rotation,
+              mofka_read_image.UniqueId(), mofka_read_image.Center(), run_id),
+        daemon=True
+      ).start()
 
       # if all(isinstance(item, list) for item in tt):
       #   mofka_producing_time.extend(tt)
