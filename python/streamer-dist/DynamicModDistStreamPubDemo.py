@@ -94,7 +94,7 @@ class ImageDesc:
     attempts: int = 0
     last_attempt_ts: float = 0.0
 
-class ImageMsg:
+class ImagePacket:
   def __init__(self, data: bytes, sequence_id: int, num_sinograms: int, num_columns: int,
                     rotation: float, unique_id: int, center: float, msg_id: str, timeout: float = 0.2):
     self.data = data
@@ -107,17 +107,7 @@ class ImageMsg:
     self.msg_id = msg_id
     self.timeout = timeout
 
-class ImagePacket:
-  def __init__(self, data, sequence_id, num_sinograms, num_columns, rotation, unique_id, center):
-    self.data = data
-    self.sequence_id = sequence_id
-    self.num_sinograms = num_sinograms
-    self.num_columns = num_columns
-    self.rotation = rotation
-    self.unique_id = unique_id
-    self.center = center
-
-from typing import Optional
+from typing import Any, Optional
 class SharedRing:
   def __init__(self, num_slots: int, slot_bytes: int, shm_name: Optional[str] = None, create: bool = True):
     self.num_slots = num_slots
@@ -259,6 +249,19 @@ class MofkaShmSender:
     p.start()
     return p
 
+  def _json_safe(self, x):
+    if isinstance(x, set):
+        return sorted(list(x))
+    try:
+        import numpy as np
+        if isinstance(x, (np.integer, np.floating)):
+            return x.item()
+        if isinstance(x, np.ndarray):
+            return f"<ndarray shape={x.shape} dtype={x.dtype}>"
+    except Exception:
+        pass
+    return str(x)
+
   def _drain_acks(self, max_items=256):
     for _ in range(max_items):
       try:
@@ -332,7 +335,21 @@ class MofkaShmSender:
 
       meta_path = os.path.join(outdir, f"{desc.msg_id}.json")
       with open(meta_path, "w") as f:
-        json.dump({...}, f, indent=2)
+        meta = {
+          "msg_id": desc.msg_id,
+          "sequence_id": int(desc.sequence_id),
+          "slot": int(desc.slot),
+          "nbytes": int(desc.nbytes),
+          "num_sinograms": int(desc.num_sinograms),
+          "num_columns": int(desc.num_columns),
+          "rotation": float(desc.rotation),
+          "unique_id": int(desc.unique_id),
+          "center": float(desc.center),
+          "attempts": int(desc.attempts),
+          "error": str(err),
+          "ts": time.time(),
+        }
+        json.dump(meta, f, indent=2, default=self._json_safe)
 
       print(f"[WARN] Spilled failed payload to {path} (slot {desc.slot})")
       return True
@@ -412,7 +429,7 @@ class MofkaShmSender:
     self.proc.join(timeout=timeout)
     return not self.proc.is_alive()
 
-  def enqueue_image(self, data: bytes, sequence_id: int, num_sinograms: int, num_columns: int,
+  def enqueue_image(self, payload_mv: memoryview, sequence_id: int, num_sinograms: int, num_columns: int,
                     rotation: float, unique_id: int, center: float, msg_id: str,
                     timeout: float = 0.2) -> bool:
     """
@@ -432,15 +449,15 @@ class MofkaShmSender:
       return False
 
     slot = self.free_slots.pop()
-    if len(data) > self.ring.slot_bytes:
+    if payload_mv.nbytes > self.ring.slot_bytes:
       self.free_slots.append(slot)
-      raise ValueError(f"payload too big: {len(data)} > {self.ring.slot_bytes}")
+      raise ValueError(f"payload too big: {payload_mv.nbytes} > {self.ring.slot_bytes}")
 
     # write to shm
     sv = None
     try:
       sv = self.ring.slot_view(slot)
-      sv[:len(data)] = data
+      sv[:payload_mv.nbytes] = payload_mv
     finally:
       try:
         if sv is not None:
@@ -448,7 +465,7 @@ class MofkaShmSender:
       except Exception:
         pass
 
-    desc = ImageDesc(slot=slot, nbytes=len(data), msg_id=msg_id,
+    desc = ImageDesc(slot=slot, nbytes=payload_mv.nbytes, msg_id=msg_id,
                       sequence_id=sequence_id, num_sinograms=num_sinograms, num_columns=num_columns,
                       rotation=rotation, unique_id=unique_id, center=center,
                       attempts=0, last_attempt_ts=time.time())
@@ -462,10 +479,10 @@ class MofkaShmSender:
 
     return True
 
-  def async_enqueue_image(self, data: bytes, sequence_id: int, num_sinograms: int, num_columns: int,
+  def async_enqueue_image(self, data: Any, sequence_id: int, num_sinograms: int, num_columns: int,
                     rotation: float, unique_id: int, center: float, msg_id: str,
                     timeout: float = 0.2) -> bool:
-    self.async_waiting_queue.put(ImageMsg(
+    self.async_waiting_queue.put(ImagePacket(
       data=data, sequence_id=sequence_id, num_sinograms=num_sinograms, num_columns=num_columns,
       rotation=rotation, unique_id=unique_id, center=center, msg_id=msg_id, timeout=timeout
     ))
@@ -475,14 +492,16 @@ class MofkaShmSender:
     print("Starting async sender thread ...")
     while True:
       try:
-        img_msg = self.async_waiting_queue.get(timeout=0.01)
+        img_msg = self.async_waiting_queue.get()
       except queue.Empty:
         img_msg = None
 
       if img_msg is not None:
         print(f"Queueing image seq_id {img_msg.sequence_id} to sirt through Mofka")
+        arr = img_msg.data   # assume already contiguous float32
+        payload_mv = memoryview(arr).cast("B")
         self.enqueue_image(
-          data=img_msg.data.tobytes(),
+          payload_mv=payload_mv,
           sequence_id=img_msg.sequence_id,
           num_sinograms=img_msg.num_sinograms,
           num_columns=img_msg.num_columns,
@@ -490,7 +509,7 @@ class MofkaShmSender:
           unique_id=img_msg.unique_id,
           center=img_msg.center,
           msg_id=img_msg.msg_id,
-          timeout=img_msg.timeout
+          timeout=img_msg.timeout,
         )
         self.maybe_restart_if_stalled()
 
@@ -920,6 +939,7 @@ def main():
       # if not ok:
       #   # backpressure: pause or spill
       #   time.sleep(0.01)
+      mofka_sub = np.ascontiguousarray(sub, dtype=np.float32).ravel()
       sender.async_enqueue_image(
         data=mofka_sub,
         sequence_id=sequence_id,
