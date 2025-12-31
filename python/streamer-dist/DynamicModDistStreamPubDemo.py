@@ -351,7 +351,7 @@ class MofkaShmSender:
         }
         json.dump(meta, f, indent=2, default=self._json_safe)
 
-      print(f"[WARN] Spilled failed payload to {path} (slot {desc.slot})")
+      print(f"[WARN] Spilled failed payload to {path} (slot {desc.slot}). Error: {err}")
       return True
     except Exception as e:
       print(f"[WARN] Failed to spill payload for {desc.msg_id}: {e}")
