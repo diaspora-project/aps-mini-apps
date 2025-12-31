@@ -858,45 +858,45 @@ def main():
       if args.sst:
         tt = sst_dist.push_image(mofka_sub, sequence_id, args.num_sinograms, ncols, rotation,
                         mofka_read_image.UniqueId(), mofka_read_image.Center())
-      # print(f"Sending image seq_id {sequence_id} to sirt through Mofka")
-      # tt = mofka_dist.push_image(mofka_sub, sequence_id, args.num_sinograms, ncols, rotation,
-      #                 mofka_read_image.UniqueId(), mofka_read_image.Center(), producer=producer)
+        # print(f"Sending image seq_id {sequence_id} to sirt through Mofka")
+        # tt = mofka_dist.push_image(mofka_sub, sequence_id, args.num_sinograms, ncols, rotation,
+        #                 mofka_read_image.UniqueId(), mofka_read_image.Center(), producer=producer)
 
-      # Queueing in a seperate thread
-      # print(f"Queueing image seq_id {sequence_id} to sirt through Mofka")
-      # # mofka_queue.put(ImagePacket(mofka_sub, sequence_id, args.num_sinograms, ncols, rotation,
-      # #                 mofka_read_image.UniqueId(), mofka_read_image.Center()))
-      # msg_id = f"{run_id}:{sequence_id}"   # stable id for logging / manual dedup if needed
-      # ok = sender.enqueue_image(
-      #   data=mofka_sub.tobytes(),
-      #   sequence_id=sequence_id,
-      #   num_sinograms=args.num_sinograms,
-      #   num_columns=ncols,
-      #   rotation=rotation,
-      #   unique_id=mofka_read_image.UniqueId(),
-      #   center=mofka_read_image.Center(),
-      #   msg_id=msg_id,
-      #   timeout=0.2
-      # )
+        # Queueing in a seperate thread
+        # print(f"Queueing image seq_id {sequence_id} to sirt through Mofka")
+        # # mofka_queue.put(ImagePacket(mofka_sub, sequence_id, args.num_sinograms, ncols, rotation,
+        # #                 mofka_read_image.UniqueId(), mofka_read_image.Center()))
+        # msg_id = f"{run_id}:{sequence_id}"   # stable id for logging / manual dedup if needed
+        # ok = sender.enqueue_image(
+        #   data=mofka_sub.tobytes(),
+        #   sequence_id=sequence_id,
+        #   num_sinograms=args.num_sinograms,
+        #   num_columns=ncols,
+        #   rotation=rotation,
+        #   unique_id=mofka_read_image.UniqueId(),
+        #   center=mofka_read_image.Center(),
+        #   msg_id=msg_id,
+        #   timeout=0.2
+        # )
 
-      # # periodically
-      # sender.maybe_restart_if_stalled()
+        # # periodically
+        # sender.maybe_restart_if_stalled()
 
-      # if not ok:
-      #   # backpressure: pause or spill
-      #   time.sleep(0.01)
+        # if not ok:
+        #   # backpressure: pause or spill
+        #   time.sleep(0.01)
 
-      threading.Thread(
-        target=push_image_async,
-        args=(sender, mofka_sub, sequence_id, args.num_sinograms, ncols, rotation,
-              mofka_read_image.UniqueId(), mofka_read_image.Center(), run_id),
-        daemon=True
-      ).start()
+        threading.Thread(
+          target=push_image_async,
+          args=(sender, mofka_sub, sequence_id, args.num_sinograms, ncols, rotation,
+                mofka_read_image.UniqueId(), mofka_read_image.Center(), run_id),
+          daemon=True
+        ).start()
 
-      # if all(isinstance(item, list) for item in tt):
-      #   mofka_producing_time.extend(tt)
-      # else:
-      #   mofka_producing_time.append(tt)
+        # if all(isinstance(item, list) for item in tt):
+        #   mofka_producing_time.extend(tt)
+        # else:
+        #   mofka_producing_time.append(tt)
 
     # If incoming data is white field
     if mofka_read_image.Itype() is serializer.ITypes.White:
