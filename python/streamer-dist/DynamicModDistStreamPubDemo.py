@@ -71,7 +71,7 @@ def parse_arguments():
   parser.add_argument('--logdir', type=str, default='.',
               help='Path to save log files.')
   
-  parser.add_argument('--sst', type=bool, default=True,
+  parser.add_argument('--sst', type=bool, default=False,
               help='Use SST for data distribution.')
 
 
