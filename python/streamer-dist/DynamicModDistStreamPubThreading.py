@@ -417,9 +417,9 @@ def main():
       # # print(f"Sending image seq_id {sequence_id} to sirt through Mofka")
       # # tt = mofka_dist.push_image(mofka_sub, sequence_id, args.num_sinograms, ncols, rotation,
       # #                 mofka_read_image.UniqueId(), mofka_read_image.Center(), producer=producer)
-      # print(f"Queueing image seq_id {sequence_id} to sirt through Mofka")
-      # mofka_queue.put(ImagePacket(mofka_sub, sequence_id, args.num_sinograms, ncols, rotation,
-      #                 mofka_read_image.UniqueId(), mofka_read_image.Center()))
+      print(f"Queueing image seq_id {sequence_id} to sirt through Mofka")
+      mofka_queue.put(ImagePacket(mofka_sub, sequence_id, args.num_sinograms, ncols, rotation,
+                      mofka_read_image.UniqueId(), mofka_read_image.Center()))
 
       # if all(isinstance(item, list) for item in tt):
       #   mofka_producing_time.extend(tt)
