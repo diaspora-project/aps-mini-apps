@@ -164,7 +164,7 @@ def flush_mofka_producer(args, shm_name, num_slots, slot_bytes, desc_q, ack_q):
         else:
           try:
             mv = ring.slot_view(desc.slot)[:desc.nbytes]
-            payload = mv.tobytes()
+            payload = np.asarray(mv)
             md.push_image(payload,
                           desc.sequence_id,
                           desc.num_sinograms,
