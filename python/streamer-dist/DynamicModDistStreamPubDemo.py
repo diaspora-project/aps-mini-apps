@@ -429,7 +429,7 @@ class MofkaShmSender:
     self.proc.join(timeout=timeout)
     return not self.proc.is_alive()
 
-  def enqueue_image(self, payload_mv: memoryview, sequence_id: int, num_sinograms: int, num_columns: int,
+  def enqueue_image(self, data: np.ndarray, sequence_id: int, num_sinograms: int, num_columns: int,
                     rotation: float, unique_id: int, center: float, msg_id: str,
                     timeout: float = 0.2) -> bool:
     """
@@ -449,6 +449,7 @@ class MofkaShmSender:
       return False
 
     slot = self.free_slots.pop()
+    payload_mv = memoryview(data).cast('B')
     if payload_mv.nbytes > self.ring.slot_bytes:
       self.free_slots.append(slot)
       raise ValueError(f"payload too big: {payload_mv.nbytes} > {self.ring.slot_bytes}")
