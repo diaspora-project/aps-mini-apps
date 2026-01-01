@@ -500,7 +500,7 @@ class MofkaShmSender:
       if img_msg is not None:
         print(f"Queueing image seq_id {img_msg.sequence_id} to sirt through Mofka")
         self.enqueue_image(
-          payload_mv=img_msg.data,
+          data=img_msg.data,
           sequence_id=img_msg.sequence_id,
           num_sinograms=img_msg.num_sinograms,
           num_columns=img_msg.num_columns,
