@@ -178,7 +178,9 @@ def flush_mofka_producer(args, shm_name, num_slots, slot_bytes, desc_q, ack_q):
             ack_q.put(("EXC", desc.slot, desc.msg_id, repr(e)))
           finally:
             try:
+              del payload
               mv.release()
+              del mv
             except Exception:
               pass
             mv = None
