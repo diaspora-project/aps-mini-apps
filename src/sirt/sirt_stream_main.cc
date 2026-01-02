@@ -16,6 +16,7 @@ std::unordered_map<int, ReconTask> running_tasks;
 std::unordered_map<int, int> task_progresses;
 std::unordered_map<int, std::thread> running_threads;
 std::vector<std::thread> stopped_threads;
+std::unordered_map<int, mofka::Event> task_assignments_events;
 
 void cleanup() {
     for (auto& [task_id, thread] : running_threads) {
@@ -170,8 +171,11 @@ int main(int argc, char **argv) {
                         {"worker_id", config.worker_id},
                         {"task_id", task_id}
                     };
+                    event.acknowledge();
                     producer.push(end_md).wait();
                 });
+                task_assignments_events[task_id].acknowledge();
+                task_assignments_events.erase(task_id);
                 stopped_threads.push_back(std::move(running_threads[task_id]));
                 running_tasks.erase(task_id);
                 running_threads.erase(task_id);
@@ -199,6 +203,7 @@ int main(int argc, char **argv) {
                 })
             );
             task_progresses[task_id] = 0;
+            task_assignments_events[task_id] = std::move(event);
           }
         }else if (event_type == "SHUTDOWN") {
             std::cout << "[Worker-" << config.worker_id << "] End of stream. Exiting..." << std::endl;
@@ -206,8 +211,6 @@ int main(int argc, char **argv) {
         }else{
             std::cerr << "Unknown event type: " << event_type << std::endl;
         }
-        std::cout << "[Worker-" << config.worker_id << "] Finished processing event from DIST. Acknowledging event..." << std::endl;
-        event.acknowledge();
     }
     
     cleanup();
