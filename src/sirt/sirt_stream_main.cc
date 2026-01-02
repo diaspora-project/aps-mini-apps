@@ -176,6 +176,7 @@ int main(int argc, char **argv) {
                 running_tasks.erase(task_id);
                 running_threads.erase(task_id);
                 task_progresses.erase(task_id);
+                sleep(10); // give some time for the task to stop gracefully
             }else{
                 std::cout << "[Worker-" << config.worker_id << "] Received END_TASK for Task " << task_id << " which is not running. Ignoring." << std::endl;
             }
