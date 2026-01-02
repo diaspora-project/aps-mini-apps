@@ -717,17 +717,18 @@ def task_to_worker_assignment(args, num_workers):
           # notify sirt worker to stop this task
           stop_info = {
               "Type": "END_TASK",
-              "worker_id": from_worker,
-              "task_id": task_id
+              "task_id": task_id,
+              "worker_id": from_worker
+              
           }
           action_producer.push(stop_info, bytearray(1), partition=0)
           print(f"[LB] Stopping task {max_weight_task} on worker {w} for reassignment")
           # move task to this worker
           assign_info = {
               "Type": "START_TASK",
-              "from_worker_id": from_worker,
+              "task_id": task_id,
               "worker_id": w,
-              "task_id": task_id
+              "from_worker_id": from_worker
           }
           action_producer.push(assign_info, bytearray(1), partition=0)
           print(f"[LB] Reassigning task {task_id} from worker {from_worker} to worker {w}")
