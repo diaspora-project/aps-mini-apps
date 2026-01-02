@@ -171,11 +171,18 @@ int main(int argc, char **argv) {
                         {"worker_id", config.worker_id},
                         {"task_id", task_id}
                     };
+                    std::cout << "[Task-" << task_id << "] Acknowledging the assignment event " << json_metadata.dump() << std::endl;
                     event.acknowledge();
                     producer.push(end_md).wait();
                 });
-                task_assignments_events[task_id].acknowledge();
-                task_assignments_events.erase(task_id);
+                auto it = task_assignments_events.find(task_id );
+                if (it == task_assignments_events.end()) {
+                    std::cout << "[Worker-" << config.worker_id << "] Cannot find the assignment event for Task " << task_id << " to acknowledge." << std::endl;
+                }else{
+                    std::cout << "[Worker-" << config.worker_id << "] Acknowledging the assignment event " << json_metadata.dump() << std::endl;
+                    it->second.acknowledge();
+                    task_assignments_events.erase(task_id);
+                }
                 stopped_threads.push_back(std::move(running_threads[task_id]));
                 running_tasks.erase(task_id);
                 running_threads.erase(task_id);
