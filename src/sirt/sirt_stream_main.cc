@@ -171,8 +171,8 @@ int main(int argc, char **argv) {
                     };
                     producer.push(end_md).wait();
                 });
-                running_tasks.erase(task_id);
                 stopped_threads.push_back(std::move(running_threads[task_id]));
+                running_tasks.erase(task_id);
                 running_threads.erase(task_id);
                 task_progresses.erase(task_id);
             }else{
