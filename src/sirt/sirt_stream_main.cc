@@ -163,23 +163,36 @@ int main(int argc, char **argv) {
             int task_id = json_metadata["task_id"].get<int>();
             if (running_tasks.find(task_id) != running_tasks.end()) {
                 std::cout << "[Worker-" << config.worker_id << "] Stoping [Task-" << task_id << "]..." << std::endl;
-                running_tasks[task_id].stop([&] {
-                    std::cout << "Task complete callback..." << std::endl;
-                    std::cout << "[Task-" << task_id << "] Stopped. Notifying the producer the completion" << std::endl;
-                    json end_md = {
-                        {"Type", "COMPLETE"},
-                        {"worker_id", config.worker_id},
-                        {"task_id", task_id}
-                    };
-                    std::cout << "[Task-" << task_id << "] Acknowledging the assignment event " << json_metadata.dump() << std::endl;
-                    event.acknowledge();
-                    producer.push(end_md).wait();
-                });
+                // running_tasks[task_id].stop([&] {
+                //     std::cout << "Task complete callback..." << std::endl;
+                //     std::cout << "[Task-" << task_id << "] Stopped. Notifying the producer the completion" << std::endl;
+                //     json end_md = {
+                //         {"Type", "COMPLETE"},
+                //         {"worker_id", config.worker_id},
+                //         {"task_id", task_id}
+                //     };
+                //     producer.push(end_md);
+                //     std::cout << "[Task-" << task_id << "] Acknowledging the END_TASK event " << json_metadata.dump() << std::endl;
+                //     event.acknowledge();
+                // });
+
+                running_tasks[task_id].stop();
+                std::cout << "Task complete callback..." << std::endl;
+                std::cout << "[Task-" << task_id << "] Stopped. Notifying the producer the completion" << std::endl;
+                json end_md = {
+                    {"Type", "COMPLETE"},
+                    {"worker_id", config.worker_id},
+                    {"task_id", task_id}
+                };
+                producer.push(end_md);
+                std::cout << "[Task-" << task_id << "] Acknowledging the END_TASK event " << json_metadata.dump() << std::endl;
+                event.acknowledge();
+
                 auto it = task_assignments_events.find(task_id );
                 if (it == task_assignments_events.end()) {
                     std::cout << "[Worker-" << config.worker_id << "] Cannot find the assignment event for Task " << task_id << " to acknowledge." << std::endl;
                 }else{
-                    std::cout << "[Worker-" << config.worker_id << "] Acknowledging the assignment event " << json_metadata.dump() << std::endl;
+                    std::cout << "[Worker-" << config.worker_id << "] Acknowledging the assignment event " << it->second.metadata().json().dump() << std::endl;
                     it->second.acknowledge();
                     task_assignments_events.erase(task_id);
                 }
