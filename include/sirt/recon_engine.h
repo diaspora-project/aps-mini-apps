@@ -44,7 +44,6 @@ class ReconTask {
         } else {
           on_stop_callback = nullptr;
         }
-        on_stop_callback = std::move(other.on_stop_callback);
       }
       return *this;
     }
