@@ -184,14 +184,14 @@ int main(int argc, char **argv) {
                 };
                 producer.push(end_md);
                 std::cout << "[Task-" << task_id << "] Acknowledging the END_TASK event " << json_metadata.dump() << std::endl;
-                event.acknowledge();
+                // event.acknowledge();
 
                 auto it = task_assignments_events.find(task_id );
                 if (it == task_assignments_events.end()) {
                     std::cout << "[Worker-" << config.worker_id << "] Cannot find the assignment event for Task " << task_id << " to acknowledge." << std::endl;
                 }else{
                     std::cout << "[Worker-" << config.worker_id << "] Acknowledging the assignment event " << it->second.metadata().json().dump() << std::endl;
-                    it->second.acknowledge();
+                    // it->second.acknowledge();
                     task_assignments_events.erase(task_id);
                 }
                 stopped_threads.push_back(std::move(running_threads[task_id]));
