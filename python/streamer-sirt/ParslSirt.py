@@ -230,8 +230,10 @@ def parse_arguments():
 @bash_app
 def run_sirt(id, logdir=".", args=None, launcher_env=None, sirt_bin_path=""):
     args = args or []
-    stderr = os.path.join(logdir, f'sirt-{id}.err')
-    stdout = os.path.join(logdir, f'sirt-{id}.out')
+    # stderr = os.path.join(logdir, f'sirt-{id}.err')
+    # stdout = os.path.join(logdir, f'sirt-{id}.out')
+    stderr = os.path.join(logdir, f'sirt-{id}.log')
+    stdout = os.path.join(logdir, f'sirt-{id}.log')
     strdiag = "/dev/null"
 
     env_exports = [f'export {k}="{v}"' for k, v in (launcher_env or {}).items()]
