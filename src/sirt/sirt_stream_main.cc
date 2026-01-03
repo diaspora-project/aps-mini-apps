@@ -51,6 +51,7 @@ int main(int argc, char **argv) {
     std::signal(SIGTERM, handle_sigterm);
 
     /* Initiate middleware's communication layer */
+    std::cout << "Reading worker configuration..." << std::endl;
     TraceRuntimeConfig config(argc, argv);
     
     // Send worker information to dist
