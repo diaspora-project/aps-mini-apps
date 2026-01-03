@@ -177,8 +177,6 @@ int main(int argc, char **argv) {
                 // });
 
                 running_tasks[task_id].stop();
-                std::cout << "Task complete callback..." << std::endl;
-                std::cout << "[Task-" << task_id << "] Stopped. Notifying the producer the completion" << std::endl;
                 json end_md = {
                     {"Type", "COMPLETE"},
                     {"worker_id", config.worker_id},
@@ -200,6 +198,8 @@ int main(int argc, char **argv) {
                 running_tasks.erase(task_id);
                 running_threads.erase(task_id);
                 task_progresses.erase(task_id);
+                std::cout << "[Worker-" << config.worker_id << "] Task " << task_id << " stopped." << std::endl;
+                sleep(10);
             }else{
                 std::cout << "[Worker-" << config.worker_id << "] Received END_TASK for Task " << task_id << " which is not running. Ignoring." << std::endl;
             }
