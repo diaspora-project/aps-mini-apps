@@ -9,7 +9,7 @@ void MofkaStream::addTomoMsg(StreamEvent event){
     size_t n_rays_per_proj =
       getInfo()["n_sinograms"].get<int64_t>() *
       getInfo()["n_rays_per_proj_row"].get<int64_t>();
-    assert(sst_payload.data.size() == n_rays_per_proj && "Pointer size does not match n_rays_per_projection");
+    assert(sst_payload.data.size() == n_rays_per_proj && "SST Stream: Pointer size does not match n_rays_per_projection");
     vproj.insert(vproj.end(), sst_payload.data.begin(), sst_payload.data.end());
   }else{
     auto start_t = std::chrono::high_resolution_clock::now();
@@ -30,10 +30,14 @@ void MofkaStream::addTomoMsg(StreamEvent event){
     // spdlog::info("Received data {}", metadata.string());
 
     size_t n_rays_per_proj =
-    getInfo()["n_sinograms"].get<int64_t>() *
-    getInfo()["n_rays_per_proj_row"].get<int64_t>();
+      getInfo()["n_sinograms"].get<int64_t>() *
+      getInfo()["n_rays_per_proj_row"].get<int64_t>();
     size_t ptr_size = data.segments()[0].size / sizeof(float);
-    assert(n_rays_per_proj == ptr_size && "Pointer size does not match n_rays_per_projection");
+    std::cout << "[Task-" << getRank() << "]: Inserting data for seq_n: "
+              << metadata.json()["seq_n"].get<int>()
+              << ", n_rays_per_proj: " << n_rays_per_proj
+              << ", ptr_size: " << ptr_size << std::endl;
+    assert(n_rays_per_proj == ptr_size && "MofkaStream: Pointer size does not match n_rays_per_projection");
 
     float* start = static_cast<float*>(data.segments()[0].ptr);
     float* end = static_cast<float*>(data.segments()[0].ptr)+ n_rays_per_proj;
@@ -52,7 +56,7 @@ std::thread MofkaStream::receiveEventInBackground(mofka::Consumer consumer)
               << "]: Starting background thread to receive Mofka events..."
               << std::endl;
 
-    while (!isEndOfStream()) {
+    while (!isStopped() && !isEndOfStream()) {
       auto start = std::chrono::high_resolution_clock::now();
       mofka::Future<mofka::Event> future_event = consumer.pull();
 
@@ -123,6 +127,9 @@ std::thread MofkaStream::receiveEventInBackground(mofka::Consumer consumer)
         mofka_buffered_events.push_back(event);
       }
     }
+    std::cout << "[Task-" << getRank()
+              << "]: Exiting background thread for receiving Mofka events."
+              << std::endl;
   });
 }
 

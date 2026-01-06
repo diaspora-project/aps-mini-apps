@@ -169,7 +169,7 @@ class MofkaDist:
                                     center,
                                     sequence_id)
                                     # self.seq)
-        print("Pushing images")
+        print(f"Pushing images with data size: {data.nbytes} bytes, dtype: {data.dtype}")
         self.buffer.append(msgs)
         mofka_t = []
         # Send data to workers
@@ -179,7 +179,7 @@ class MofkaDist:
             f = producer.push(self.buffer[self.counter][i][0], self.buffer[self.counter][i][1], partition=i)
 
             metadata = self.buffer[self.counter][i][0]
-            print(f"Task {i}: seq_id {metadata['seq_n']} proj_id {metadata['projection_id']}, theta: {metadata['theta']} center: {metadata['center']}")
+            print(f"Task {i}: seq_id {metadata['seq_n']} proj_id {metadata['projection_id']}, theta: {metadata['theta']} center: {metadata['center']}, data_size: {metadata['data_size']}, dtype: {metadata['dtype']}")
 
             #f.wait()
             mofka_t.append(["push", projection_id, ts, time.perf_counter(), time.perf_counter() - ts, sys.getsizeof(self.buffer[self.counter][i][0]) ,len(self.buffer[self.counter][i][1])])

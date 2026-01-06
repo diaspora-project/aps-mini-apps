@@ -330,12 +330,13 @@ int ReconTask::run() {
     delete curr_slices;
 
     if (stop_flag.load()) {
-      std::cerr << "Stop flag set. Exiting reconstruction loop..." << std::endl;
+      std::cerr << "[Task-" << task_id << "] Stop flag set. Exiting reconstruction loop and stream..." << std::endl;
+      ms.stopDataCollection();
       // Call the callback if it exists
       if (on_stop_callback) {
         on_stop_callback();
       }
-      break; // Exit the loop if stop flag is set
+      return 1; // Exit the loop if stop flag is set
     }
 
   }

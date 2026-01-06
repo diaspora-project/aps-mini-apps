@@ -164,7 +164,9 @@ def flush_mofka_producer(args, shm_name, num_slots, slot_bytes, desc_q, ack_q):
         else:
           try:
             mv = ring.slot_view(desc.slot)[:desc.nbytes]
-            payload = np.asarray(mv)
+            n_f32 = desc.nbytes // 4
+            payload = np.frombuffer(mv, dtype=np.float32, count=n_f32).copy()
+            # payload = np.frombuffer(mv, dtype=np.float32, count=n_f32)
             md.push_image(payload,
                           desc.sequence_id,
                           desc.num_sinograms,
@@ -451,7 +453,10 @@ class MofkaShmSender:
       return False
 
     slot = self.free_slots.pop()
+    # payload_mv = memoryview(data).cast('B')
     payload_mv = memoryview(data).cast('B')
+    print(f"seq_id: {sequence_id} data size: {data.nbytes}, payload_mv size: {payload_mv.nbytes}, slot_bytes: {self.ring.slot_bytes}")
+
     if payload_mv.nbytes > self.ring.slot_bytes:
       self.free_slots.append(slot)
       raise ValueError(f"payload too big: {payload_mv.nbytes} > {self.ring.slot_bytes}")

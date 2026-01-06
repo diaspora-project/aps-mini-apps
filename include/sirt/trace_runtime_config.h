@@ -177,6 +177,7 @@ class TraceRuntimeConfig {
         if (worker_index == 0) {
           std::cout << "Output file path=" << kReconOutputPath << std::endl;
           std::cout << "Output dir path=" << kReconOutputDir << std::endl;
+          std::cout << "Log dir=" << logdir << std::endl;
           std::cout << "Recon. dataset path=" << kReconDatasetPath << std::endl;
           std::cout << "Center value=" << center << std::endl;
           std::cout << "Number of threads per process=" << thread_count << std::endl;

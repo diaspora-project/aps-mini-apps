@@ -18,6 +18,7 @@
 #include <csignal>
 #include "sst_stream.h"
 #include <thread>
+#include <atomic>
 
 using json = nlohmann::json;
 namespace tl = thallium;
@@ -74,6 +75,8 @@ class MofkaStream
 
     std::vector<mofka::Event> mofka_buffered_events;
     std::mutex mofka_buffer_mutex;
+
+    std::atomic<bool> stop_flag{false};
 
     std::vector<float> vproj;
     std::vector<float> vtheta;
@@ -259,6 +262,12 @@ class MofkaStream
     void setSSTEndOfStream(bool eos) { sst_eos = eos; } // Update SST end of stream flag
     void setMofkaEndOfStream(bool eos) { mofka_eos = eos; } // Update Mofka end of stream flag
     
+    void stopDataCollection() {
+      stop_flag.store(true);
+      sst_eos = true; 
+    }
+    bool isStopped() { return stop_flag.load(); }
+
     /* Interrupt mofka stream due to emergency reasons */
     void interrupt(int signal=-1);
 

@@ -17,6 +17,7 @@ std::unordered_map<int, int> task_progresses;
 std::unordered_map<int, std::thread> running_threads;
 std::vector<std::thread> stopped_threads;
 std::unordered_map<int, mofka::Event> task_assignments_events;
+std::vector<int> pending_task_ids;
 
 void cleanup() {
     for (auto& [task_id, thread] : running_threads) {
@@ -143,6 +144,30 @@ int main(int argc, char **argv) {
             }
             producer.flush();
 
+            while (!pending_task_ids.empty()) {
+                sleep(1);
+                int task_id = pending_task_ids.front();
+                pending_task_ids.erase(pending_task_ids.begin());
+
+                auto it = task_assignments_events.find(task_id);
+                if (it == task_assignments_events.end()) {
+                    std::cout << "[Worker-" << config.worker_id << "] Cannot find the assignment event for Task " << task_id << " to acknowledge." << std::endl;
+                }else{
+                    std::cout << "[Worker-" << config.worker_id << "] Acknowledging the assignment event " << it->second.metadata().json().dump() << std::endl;
+                    it->second.acknowledge();
+                    task_assignments_events.erase(task_id);
+                }
+                std::cout << "[Worker-" << config.worker_id << "] Cleaning up task " << task_id << std::endl;
+                stopped_threads.push_back(std::move(running_threads[task_id]));
+                std::cout << "[Worker-" << config.worker_id << "] Joined stopped thread for Task " << task_id << std::endl;
+                running_tasks.erase(task_id);
+                std::cout << "[Worker-" << config.worker_id << "] Erased running task for Task " << task_id << std::endl;
+                running_threads.erase(task_id);
+                std::cout << "[Worker-" << config.worker_id << "] Erased running thread for Task " << task_id << std::endl;
+                task_progresses.erase(task_id);
+                std::cout << "[Worker-" << config.worker_id << "] Task " << task_id << " stopped." << std::endl;
+            }
+
             if (sigterm_captured) {
                 running = false;
                 break;
@@ -164,43 +189,45 @@ int main(int argc, char **argv) {
             int task_id = json_metadata["task_id"].get<int>();
             if (running_tasks.find(task_id) != running_tasks.end()) {
                 std::cout << "[Worker-" << config.worker_id << "] Stoping [Task-" << task_id << "]..." << std::endl;
-                // running_tasks[task_id].stop([&] {
-                //     std::cout << "Task complete callback..." << std::endl;
-                //     std::cout << "[Task-" << task_id << "] Stopped. Notifying the producer the completion" << std::endl;
-                //     json end_md = {
-                //         {"Type", "COMPLETE"},
-                //         {"worker_id", config.worker_id},
-                //         {"task_id", task_id}
-                //     };
-                //     producer.push(end_md);
-                //     std::cout << "[Task-" << task_id << "] Acknowledging the END_TASK event " << json_metadata.dump() << std::endl;
-                //     event.acknowledge();
-                // });
+                running_tasks[task_id].stop([task_id, &producer, &config, e = std::move(event)]() {
+                    std::cout << "[Task-" << task_id << "] Task complete callback..." << std::endl;
+                    std::cout << "[Task-" << task_id << "] Stopped. Notifying the producer the completion" << std::endl;
+                    json end_md = {
+                        {"Type", "COMPLETE"},
+                        {"worker_id", config.worker_id},
+                        {"task_id", task_id}
+                    };
+                    producer.push(end_md);
+                    std::cout << "[Task-" << task_id << "] Acknowledging the END_TASK event " << e.metadata().json().dump() << std::endl;
+                    e.acknowledge();
+                    
+                    pending_task_ids.push_back(task_id);
 
-                running_tasks[task_id].stop();
-                json end_md = {
-                    {"Type", "COMPLETE"},
-                    {"worker_id", config.worker_id},
-                    {"task_id", task_id}
-                };
-                producer.push(end_md);
-                std::cout << "[Task-" << task_id << "] Acknowledging the END_TASK event " << json_metadata.dump() << std::endl;
+                });
+
+                // running_tasks[task_id].stop();
+                // json end_md = {
+                //     {"Type", "COMPLETE"},
+                //     {"worker_id", config.worker_id},
+                //     {"task_id", task_id}
+                // };
+                // producer.push(end_md);
+                // std::cout << "[Task-" << task_id << "] Acknowledging the END_TASK event " << json_metadata.dump() << std::endl;
                 // event.acknowledge();
 
-                auto it = task_assignments_events.find(task_id );
-                if (it == task_assignments_events.end()) {
-                    std::cout << "[Worker-" << config.worker_id << "] Cannot find the assignment event for Task " << task_id << " to acknowledge." << std::endl;
-                }else{
-                    std::cout << "[Worker-" << config.worker_id << "] Acknowledging the assignment event " << it->second.metadata().json().dump() << std::endl;
-                    // it->second.acknowledge();
-                    task_assignments_events.erase(task_id);
-                }
-                stopped_threads.push_back(std::move(running_threads[task_id]));
-                running_tasks.erase(task_id);
-                running_threads.erase(task_id);
-                task_progresses.erase(task_id);
-                std::cout << "[Worker-" << config.worker_id << "] Task " << task_id << " stopped." << std::endl;
-                sleep(10);
+                // auto it = task_assignments_events.find(task_id );
+                // if (it == task_assignments_events.end()) {
+                //     std::cout << "[Worker-" << config.worker_id << "] Cannot find the assignment event for Task " << task_id << " to acknowledge." << std::endl;
+                // }else{
+                //     std::cout << "[Worker-" << config.worker_id << "] Acknowledging the assignment event " << it->second.metadata().json().dump() << std::endl;
+                //     // it->second.acknowledge();
+                //     task_assignments_events.erase(task_id);
+                // }
+                // stopped_threads.push_back(std::move(running_threads[task_id]));
+                // running_tasks.erase(task_id);
+                // running_threads.erase(task_id);
+                // task_progresses.erase(task_id);
+                // std::cout << "[Worker-" << config.worker_id << "] Task " << task_id << " stopped." << std::endl;
             }else{
                 std::cout << "[Worker-" << config.worker_id << "] Received END_TASK for Task " << task_id << " which is not running. Ignoring." << std::endl;
             }
