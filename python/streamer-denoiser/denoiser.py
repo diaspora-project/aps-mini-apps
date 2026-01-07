@@ -151,18 +151,18 @@ def main(input_path, recon_path, model_path, protocol, group_file, batchsize, nu
             waiting_metadata[iteration_stream][row_id] = m
             waiting_data[iteration_stream][row_id] = dd
         
-        if len(waiting_metadata[iteration_stream]) == num_tasks:
-            sorted_ranks = sorted(waiting_metadata[iteration_stream].keys())
-            sorted_data = [waiting_data[iteration_stream][r] for r in sorted_ranks]
-            
-            print(f"Denoising and saving iteration stream {iteration_stream}...")
-            out_path = os.path.join(recon_path, f"{iteration_stream}-denoised.h5")
-            with h5py.File(out_path, 'w') as h5_output:
-                h5_output.create_dataset('/data', data=np.concatenate(sorted_data, axis=0))
+            if len(waiting_metadata[iteration_stream]) == num_tasks:
+                sorted_ranks = sorted(waiting_metadata[iteration_stream].keys())
+                sorted_data = [waiting_data[iteration_stream][r] for r in sorted_ranks]
+                
+                print(f"Denoising and saving iteration stream {iteration_stream}...")
+                out_path = os.path.join(recon_path, f"{iteration_stream}-denoised.h5")
+                with h5py.File(out_path, 'w') as h5_output:
+                    h5_output.create_dataset('/data', data=np.concatenate(sorted_data, axis=0))
 
-            del waiting_metadata[iteration_stream]
-            del waiting_data[iteration_stream]
-            completed_iterations.add(iteration_stream)
+                del waiting_metadata[iteration_stream]
+                del waiting_data[iteration_stream]
+                completed_iterations.add(iteration_stream)
             
     fields = ["t_wait", "t_metadata", "metadata_size" ,"t_data", "data_size"]
     with open(logdir + '/Den_pull.csv', 'w') as f:
