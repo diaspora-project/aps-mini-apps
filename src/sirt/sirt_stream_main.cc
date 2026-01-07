@@ -16,7 +16,8 @@ std::unordered_map<int, ReconTask> running_tasks;
 std::unordered_map<int, int> task_progresses;
 std::unordered_map<int, std::thread> running_threads;
 std::vector<std::thread> stopped_threads;
-std::unordered_map<int, mofka::Event> task_assignments_events;
+
+std::mutex pending_task_ids_mutex;
 std::vector<int> pending_task_ids;
 
 void cleanup() {
@@ -46,6 +47,61 @@ void handle_sigterm(int signum) {
 
     // if still not exiting (e.g., SST Open stuck), force exit
     std::_Exit(1);   // or _exit(1)
+}
+
+void snapshot_running_tasks(std::string& outputpath, int action_seq = 0) {
+    std::cout << "Saving snapshot of running task ids at " << outputpath << std::endl;
+    json md;
+    std::vector<int> task_ids;
+    for (const auto& [task_id, task] : running_tasks) {
+        task_ids.push_back(task_id);
+    }
+    md["running_task_ids"] = task_ids;
+    md["action_seq"] = action_seq;
+    std::ofstream ofs(outputpath);
+    ofs << md.dump(4);
+    ofs.close();
+    std::cout << "Snapshot for " << md.dump() << " saved." << std::endl;
+}
+
+std::vector<int> load_running_tasks(int worker_id, std::string& inputpath, int &action_seq) {
+    std::cout << "Loading snapshot of running task ids from " << inputpath << std::endl;
+    std::vector<int> events;
+    if (std::filesystem::exists(inputpath)) {
+        std::ifstream ifs(inputpath);
+        json md;
+        ifs >> md;
+        ifs.close();
+        action_seq = md.value("action_seq", 0);
+        events = md["running_task_ids"].get<std::vector<int>>();
+    }else{
+        std::cout << "No snapshot file found at " << inputpath << ". Starting fresh." << std::endl;
+    }
+    return events;
+}
+
+void start_task(mofka::Producer& producer, const json& metadata, const TraceRuntimeConfig& config,
+                mofka::MofkaDriver& driver, std::mutex& ckpt_mutex,
+                int argc, char** argv) {
+    int task_id = metadata["task_id"].get<int>();
+    if (running_tasks.find(task_id) != running_tasks.end()) {
+        std::cerr << "[Worker-" << config.worker_id << "] Task " << task_id << " is already running. Ignoring START_TASK command." << std::endl;
+    }else{
+        std::cout << "[Worker-" << config.worker_id << "] Starting Task " << task_id << std::endl;
+        running_tasks.emplace(
+            std::piecewise_construct,
+            std::forward_as_tuple(task_id),
+            std::forward_as_tuple(task_id, driver, &ckpt_mutex, argc, argv)
+        );
+        running_threads.emplace(
+            std::piecewise_construct,
+            std::forward_as_tuple(task_id),
+            std::forward_as_tuple([&, task_id] {
+                running_tasks.at(task_id).run();
+            })
+        );
+        task_progresses[task_id] = 0;
+    }
 }
 
 int main(int argc, char **argv) {
@@ -102,6 +158,17 @@ int main(int argc, char **argv) {
     std::mutex ckpt_mutex;
 
     bool running = true;
+
+    std::string task_assignment_path = config.logdir + "/sirt-" + config.worker_id + ".json";
+    int action_seq = -1;
+    auto init_events = load_running_tasks(config.worker_index, task_assignment_path, action_seq);
+    if (!init_events.empty()) {
+        std::cout << "[Worker-" << config.worker_id << "] Restarting from snapshot with " << init_events.size() << " tasks." << std::endl;
+        for (const auto& task_id : init_events) {
+            start_task(producer, json{{"task_id", task_id}}, config, driver, ckpt_mutex, argc, argv);
+        }
+    }
+
     while (running) {
         // listen for action messages and initialize/terminate assigned reconstruction tasks.
         // auto event = consumer.pull().wait();
@@ -146,17 +213,13 @@ int main(int argc, char **argv) {
 
             while (!pending_task_ids.empty()) {
                 sleep(1);
+                std::lock_guard<std::mutex> lock(pending_task_ids_mutex);
+                if (pending_task_ids.empty()) {
+                    break;
+                }
                 int task_id = pending_task_ids.front();
                 pending_task_ids.erase(pending_task_ids.begin());
-
-                auto it = task_assignments_events.find(task_id);
-                if (it == task_assignments_events.end()) {
-                    std::cout << "[Worker-" << config.worker_id << "] Cannot find the assignment event for Task " << task_id << " to acknowledge." << std::endl;
-                }else{
-                    std::cout << "[Worker-" << config.worker_id << "] Acknowledging the assignment event " << it->second.metadata().json().dump() << std::endl;
-                    it->second.acknowledge();
-                    task_assignments_events.erase(task_id);
-                }
+                
                 std::cout << "[Worker-" << config.worker_id << "] Cleaning up task " << task_id << std::endl;
                 stopped_threads.push_back(std::move(running_threads[task_id]));
                 std::cout << "[Worker-" << config.worker_id << "] Joined stopped thread for Task " << task_id << std::endl;
@@ -166,6 +229,8 @@ int main(int argc, char **argv) {
                 std::cout << "[Worker-" << config.worker_id << "] Erased running thread for Task " << task_id << std::endl;
                 task_progresses.erase(task_id);
                 std::cout << "[Worker-" << config.worker_id << "] Task " << task_id << " stopped." << std::endl;
+                snapshot_running_tasks(task_assignment_path, action_seq);
+                std::cout << "[Worker-" << config.worker_id << "] Snapshot of running tasks saved at: " << task_assignment_path << std::endl;
             }
 
             if (sigterm_captured) {
@@ -184,13 +249,18 @@ int main(int argc, char **argv) {
             std::cout << "[Worker-" << config.worker_id << "] Event not meant for this worker. Ignoring." << std::endl;
             continue; // Ignore messages not meant for this worker
         }
+        int as = json_metadata.value("action_seq", action_seq);
+        if (as <= action_seq) {
+            std::cout << "[Worker-" << config.worker_id << "] Already processed action_seq " << as << " (current: " << action_seq << "). Ignoring." << std::endl;
+            continue;
+        }
+        action_seq = as;
         std::string event_type = json_metadata["Type"].get<std::string>();
         if (event_type == "END_TASK") {
             int task_id = json_metadata["task_id"].get<int>();
             if (running_tasks.find(task_id) != running_tasks.end()) {
                 std::cout << "[Worker-" << config.worker_id << "] Stoping [Task-" << task_id << "]..." << std::endl;
                 running_tasks[task_id].stop([task_id, &producer, &config, e = std::move(event)]() {
-                    std::cout << "[Task-" << task_id << "] Task complete callback..." << std::endl;
                     std::cout << "[Task-" << task_id << "] Stopped. Notifying the producer the completion" << std::endl;
                     json end_md = {
                         {"Type", "COMPLETE"},
@@ -198,66 +268,24 @@ int main(int argc, char **argv) {
                         {"task_id", task_id}
                     };
                     producer.push(end_md);
-                    std::cout << "[Task-" << task_id << "] Acknowledging the END_TASK event " << e.metadata().json().dump() << std::endl;
-                    e.acknowledge();
-                    
+                    std::lock_guard<std::mutex> lock(pending_task_ids_mutex);
                     pending_task_ids.push_back(task_id);
 
                 });
-
-                // running_tasks[task_id].stop();
-                // json end_md = {
-                //     {"Type", "COMPLETE"},
-                //     {"worker_id", config.worker_id},
-                //     {"task_id", task_id}
-                // };
-                // producer.push(end_md);
-                // std::cout << "[Task-" << task_id << "] Acknowledging the END_TASK event " << json_metadata.dump() << std::endl;
-                // event.acknowledge();
-
-                // auto it = task_assignments_events.find(task_id );
-                // if (it == task_assignments_events.end()) {
-                //     std::cout << "[Worker-" << config.worker_id << "] Cannot find the assignment event for Task " << task_id << " to acknowledge." << std::endl;
-                // }else{
-                //     std::cout << "[Worker-" << config.worker_id << "] Acknowledging the assignment event " << it->second.metadata().json().dump() << std::endl;
-                //     // it->second.acknowledge();
-                //     task_assignments_events.erase(task_id);
-                // }
-                // stopped_threads.push_back(std::move(running_threads[task_id]));
-                // running_tasks.erase(task_id);
-                // running_threads.erase(task_id);
-                // task_progresses.erase(task_id);
-                // std::cout << "[Worker-" << config.worker_id << "] Task " << task_id << " stopped." << std::endl;
             }else{
                 std::cout << "[Worker-" << config.worker_id << "] Received END_TASK for Task " << task_id << " which is not running. Ignoring." << std::endl;
             }
         }else if (event_type == "START_TASK") {
-          int task_id = json_metadata["task_id"].get<int>();
-          if (running_tasks.find(task_id) != running_tasks.end()) {
-              std::cerr << "[Worker-" << config.worker_id << "] Task " << task_id << " is already running. Ignoring START_TASK command." << std::endl;
-          }else{
-            std::cout << "[Worker-" << config.worker_id << "] Starting Task " << task_id << std::endl;
-            running_tasks.emplace(
-                std::piecewise_construct,
-                std::forward_as_tuple(task_id),
-                std::forward_as_tuple(task_id, driver, &ckpt_mutex, argc, argv)
-            );
-            running_threads.emplace(
-                std::piecewise_construct,
-                std::forward_as_tuple(task_id),
-                std::forward_as_tuple([&, task_id] {
-                    running_tasks.at(task_id).run();
-                })
-            );
-            task_progresses[task_id] = 0;
-            task_assignments_events[task_id] = std::move(event);
-          }
+            start_task(producer, json_metadata, config, driver, ckpt_mutex, argc, argv);
+            snapshot_running_tasks(task_assignment_path, action_seq);
         }else if (event_type == "SHUTDOWN") {
             std::cout << "[Worker-" << config.worker_id << "] End of stream. Exiting..." << std::endl;
             running = false;
         }else{
             std::cerr << "Unknown event type: " << event_type << std::endl;
         }
+        std::cout << "[Worker-" << config.worker_id << "] Acknowledging the event " << json_metadata.dump() << std::endl;
+        event.acknowledge();
     }
     
     cleanup();

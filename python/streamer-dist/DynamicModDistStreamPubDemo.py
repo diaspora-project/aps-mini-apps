@@ -26,7 +26,7 @@ def parse_arguments():
   parser = argparse.ArgumentParser( description='Data Distributor Process')
   parser.add_argument('--protocol', default="na+sm", help='Mofka protocol')
 
-  parser.add_argument('--dynamic_loadbalancing', default="true", help='Enable dynamic load balancing')
+  parser.add_argument('--dynamic_loadbalancing', default="false", help='Enable dynamic load balancing')
 
   parser.add_argument('--group_file', type=str, default="mofka.json",
                       help='Group file for the mofka server')
@@ -599,6 +599,8 @@ def task_to_worker_assignment(args, num_workers):
   action_consumer = action_mofka_dist.consumer(topic_name="sirt_dist_action", consumer_name="dist")
   action_producer = action_mofka_dist.producer(topic_name="dist_sirt_action", producer_name="dist")
 
+  action_seq = 0
+
   print("Assigning tasks to workers ...")
   num_tasks = args.ntask_sirt
   # assign tasks to workers in round-robin fashion
@@ -613,8 +615,10 @@ def task_to_worker_assignment(args, num_workers):
       assign_info = {
           "Type": "START_TASK",
           "worker_id": w,
-          "task_id": worker_to_task[w][t]
+          "task_id": worker_to_task[w][t],
+          "action_seq": action_seq
       }
+      action_seq += 1
       action_producer.push(assign_info, bytearray(1), partition=0)
       print(f"Send info to sirt: {assign_info}")
   action_producer.flush()
@@ -723,9 +727,10 @@ def task_to_worker_assignment(args, num_workers):
           stop_info = {
               "Type": "END_TASK",
               "task_id": task_id,
-              "worker_id": from_worker
-              
+              "worker_id": from_worker,
+              "action_seq": action_seq
           }
+          action_seq += 1
           action_producer.push(stop_info, bytearray(1), partition=0)
           print(f"[LB] Stopping task {max_weight_task} on worker {w} for reassignment")
           # move task to this worker
@@ -733,8 +738,10 @@ def task_to_worker_assignment(args, num_workers):
               "Type": "START_TASK",
               "task_id": task_id,
               "worker_id": w,
-              "from_worker_id": from_worker
+              "from_worker_id": from_worker,
+              "action_seq": action_seq
           }
+          action_seq += 1
           action_producer.push(assign_info, bytearray(1), partition=0)
           print(f"[LB] Reassigning task {task_id} from worker {from_worker} to worker {w}")
           surplus_worker_caps[w] -= task_weights[task_id]

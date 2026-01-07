@@ -179,6 +179,7 @@ int ReconTask::run() {
     int killed = kill_signal.load();
     if (killed != 0) {
       std::cout << "[Task-" << task_id << "] Received kill signal: " << killed << ". Exiting..." << std::endl;
+      ms.stopDataCollection();
       return killed;
     }
 
@@ -207,6 +208,7 @@ int ReconTask::run() {
       int killed = kill_signal.load();
       if (killed != 0) {
         std::cout << "[Task-" << task_id << "] Received kill signal: " << killed << ". Exiting..." << std::endl;
+        ms.stopDataCollection();
         return killed;
       }
 
