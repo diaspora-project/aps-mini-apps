@@ -131,10 +131,24 @@ std::thread MofkaStream::receiveEventInBackground(mofka::Consumer consumer)
         setConsumerTimes("wait_t", 1, elapsed.count());
 
         std::lock_guard<std::mutex> lock(this->mofka_buffer_mutex);
-        std::cout << "[Task-" << getRank()
+        size_t data_size = event.data().segments()[0].size / sizeof(float);
+        size_t n_rays_per_proj =
+          getInfo()["n_sinograms"].get<int64_t>() *
+          getInfo()["n_rays_per_proj_row"].get<int64_t>();
+        std::string event_type = event.metadata().json().value("Type", "");
+        if (event_type == "MSG_DATA_REP" && data_size < n_rays_per_proj) {
+          std::cout << "[Task-" << getRank()
+                    << "]: WARNING: Skip Mofka event " << event.metadata().json().dump() << " in background thread."
+                    << " Reason: data size = " << data_size
+                    << " < n_rays_per_proj = " << n_rays_per_proj
+                    << std::endl;
+        }else{
+          std::cout << "[Task-" << getRank()
                   << "]: Received Mofka event " << event.metadata().json().dump() << " in background thread."
+                  << " Data size (in floats): " << data_size
                   << std::endl;
-        mofka_buffered_events.push_back(event);
+          mofka_buffered_events.push_back(event);
+        }
       }
     }
     std::cout << "[Task-" << getRank()

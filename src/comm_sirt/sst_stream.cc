@@ -133,13 +133,37 @@ bool SSTStream::pull_data(SSTPayload &out)
     // --- We have a valid step ---
     ++m_stepIndex;
 
+    // // DEBUG: list available variables
+    // {
+    //     auto vars = m_io->AvailableVariables();
+    //     std::cerr << "[Partition " << m_partitionId << "] Available variables:\n";
+    //     for (const auto &kv : vars) {
+    //         const auto &name = kv.first;
+    //         const auto &info = kv.second;
+    //         auto itType  = info.find("Type");
+    //         auto itShape = info.find("Shape");
+    //         std::cerr << "  - " << name
+    //                 << " | Type="  << (itType  != info.end() ? itType->second  : "<none>")
+    //                 << " | Shape=" << (itShape != info.end() ? itShape->second : "<none>")
+    //                 << "\n";
+    //     }
+    // }
+
     auto varData        = m_io->InquireVariable<float>("data");
-    auto varMetaBytes   = m_io->InquireVariable<std::uint8_t>("meta_bytes");
     auto varMetaOffsets = m_io->InquireVariable<std::int64_t>("meta_offsets");
 
-    if (!varData || !varMetaBytes || !varMetaOffsets) {
-        std::cerr << "[Partition " << m_partitionId
-                  << "] Missing SST variables\n";
+    // auto varMetaBytes   = m_io->InquireVariable<std::uint8_t>("meta_bytes");
+    // auto varMetaBytes   = m_io->InquireVariable<unsigned char>("meta_bytes");
+
+    if (!varData || !varMetaOffsets) {
+        // std::cerr << "[Partition " << m_partitionId
+        //           << "] Missing SST variables\n";
+        if (!varData) {
+            std::cerr << "[Partition " << m_partitionId << "] Missing variable: data\n";
+        }
+        if (!varMetaOffsets) {
+            std::cerr << "[Partition " << m_partitionId << "] Missing variable: meta_offsets\n";
+        }
         m_engine->EndStep();
         return false;
     }
@@ -205,14 +229,54 @@ bool SSTStream::pull_data(SSTPayload &out)
     std::string jsonStr;
 
     if (metaCount > 0) {
-        varMetaBytes.SetSelection(
-            adios2::Box<adios2::Dims>({static_cast<std::size_t>(metaBegin)},
-                                      {metaCount}));
+        // varMetaBytes.SetSelection(
+        //     adios2::Box<adios2::Dims>({static_cast<std::size_t>(metaBegin)},
+        //                               {metaCount}));
 
-        std::vector<uint8_t> metaBuf(metaCount);
-        m_engine->Get(varMetaBytes, metaBuf.data(), adios2::Mode::Sync);
+        // // std::vector<uint8_t> metaBuf(metaCount);
+        // std::vector<unsigned char> metaBuf(metaCount);
+        // m_engine->Get(varMetaBytes, metaBuf.data(), adios2::Mode::Sync);
 
-        jsonStr.assign(reinterpret_cast<char *>(metaBuf.data()), metaCount);
+        // jsonStr.assign(reinterpret_cast<char *>(metaBuf.data()), metaCount);
+        // First try uint8_t
+        if (auto var_u8 = m_io->InquireVariable<std::uint8_t>("meta_bytes")) {
+
+            var_u8.SetSelection(
+                adios2::Box<adios2::Dims>({static_cast<std::size_t>(metaBegin)},
+                                        {metaCount}));
+
+            std::vector<std::uint8_t> buf(metaCount);
+            m_engine->Get(var_u8, buf.data(), adios2::Mode::Sync);
+            jsonStr.assign(reinterpret_cast<const char*>(buf.data()), metaCount);
+
+        // Then try unsigned char
+        } else if (auto var_uc = m_io->InquireVariable<unsigned char>("meta_bytes")) {
+
+            var_uc.SetSelection(
+                adios2::Box<adios2::Dims>({static_cast<std::size_t>(metaBegin)},
+                                        {metaCount}));
+
+            std::vector<unsigned char> buf(metaCount);
+            m_engine->Get(var_uc, buf.data(), adios2::Mode::Sync);
+            jsonStr.assign(reinterpret_cast<const char*>(buf.data()), metaCount);
+
+        // Finally try plain char
+        } else if (auto var_c = m_io->InquireVariable<char>("meta_bytes")) {
+
+            var_c.SetSelection(
+                adios2::Box<adios2::Dims>({static_cast<std::size_t>(metaBegin)},
+                                        {metaCount}));
+
+            std::vector<char> buf(metaCount);
+            m_engine->Get(var_c, buf.data(), adios2::Mode::Sync);
+            jsonStr.assign(buf.data(), metaCount);
+
+        } else {
+            std::cerr << "[Partition " << m_partitionId
+                    << "] meta_bytes not found for any of {uint8_t, unsigned char, char}\n";
+            m_engine->EndStep();
+            return false;
+        }
     }
 
     m_engine->EndStep();
