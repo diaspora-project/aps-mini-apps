@@ -26,7 +26,7 @@ def parse_arguments():
   parser = argparse.ArgumentParser( description='Data Distributor Process')
   parser.add_argument('--protocol', default="na+sm", help='Mofka protocol')
 
-  parser.add_argument('--dynamic_loadbalancing', default="false", help='Enable dynamic load balancing')
+  parser.add_argument('--dynamic_loadbalancing', default="true", help='Enable dynamic load balancing')
 
   parser.add_argument('--group_file', type=str, default="mofka.json",
                       help='Group file for the mofka server')
@@ -640,20 +640,24 @@ def task_to_worker_assignment(args, num_workers):
     print(f"[LB] Load balancing round {round}: Collecting data from recon tasks ----------- ")
     round += 1
 
-    f = action_consumer.pull()
-    event = f.wait()
-    metadata = json.loads(event.metadata)
-    if metadata["Type"] == "PROGRESS":
-      task_id = metadata["task_id"]
-      worker_id = task_to_worker[task_id]
-      progress = metadata["progress"]
-      improved_progress = max(0, progress - task_progress[task_id])
-      print(f"[LB] Received progress update: task {task_id} on worker {worker_id} progress {progress - improved_progress} --> {progress}")
-      task_progress[task_id] = progress
-      worker_progress[worker_id] += improved_progress
-      total_progress += improved_progress
-    else:
-      print(f"[LB] Unknown metadata received: {event.metadata},")
+    try:
+      f = action_consumer.pull()
+      event = f.wait()
+      metadata = json.loads(event.metadata)
+      if metadata["Type"] == "PROGRESS":
+        task_id = metadata["task_id"]
+        worker_id = task_to_worker[task_id]
+        progress = metadata["progress"]
+        improved_progress = max(0, progress - task_progress[task_id])
+        print(f"[LB] Received progress update: task {task_id} on worker {worker_id} progress {progress - improved_progress} --> {progress}")
+        task_progress[task_id] = progress
+        worker_progress[worker_id] += improved_progress
+        total_progress += improved_progress
+      else:
+        print(f"[LB] Unknown metadata received: {event.metadata},")
+        continue
+    except Exception as e:
+      print(f"[LB] Exception while receiving progress update: {e}")
       continue
     
     # Make reassignment only if total progress is large enough to reflect performance

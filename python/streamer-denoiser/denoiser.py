@@ -148,6 +148,9 @@ def main(input_path, recon_path, model_path, protocol, group_file, batchsize, nu
                 waiting_metadata[iteration_stream] = {}
                 waiting_data[iteration_stream] = {}
 
+            if row_id in waiting_metadata[iteration_stream]:
+                print(f"WARNING: Duplicate data received for iteration stream {iteration_stream}, rank {row_id}. Overwriting previous data.")
+            
             waiting_metadata[iteration_stream][row_id] = m
             waiting_data[iteration_stream][row_id] = dd
         

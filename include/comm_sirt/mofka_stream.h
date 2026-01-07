@@ -77,6 +77,7 @@ class MofkaStream
     std::mutex mofka_buffer_mutex;
 
     std::atomic<bool> stop_flag{false};
+    std::atomic<bool> complete_flag{false};
 
     std::vector<float> vproj;
     std::vector<float> vtheta;
@@ -267,6 +268,7 @@ class MofkaStream
       sst_eos = true; 
     }
     bool isStopped() { return stop_flag.load(); }
+    bool isCompleted() { return complete_flag.load(); }
 
     /* Interrupt mofka stream due to emergency reasons */
     void interrupt(int signal=-1);

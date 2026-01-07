@@ -49,19 +49,25 @@ void handle_sigterm(int signum) {
     std::_Exit(1);   // or _exit(1)
 }
 
-void snapshot_running_tasks(std::string& outputpath, int action_seq = 0) {
-    std::cout << "Saving snapshot of running task ids at " << outputpath << std::endl;
+void snapshot_running_tasks(int worker_id, std::string& outputpath, const std::vector<int>* tasks, int action_seq = 0) {
+    std::cout << "[Worker-" << worker_id << "] snapshot of running task ids at " << outputpath << std::endl;
     json md;
     std::vector<int> task_ids;
-    for (const auto& [task_id, task] : running_tasks) {
-        task_ids.push_back(task_id);
+    if (tasks != nullptr) {
+        for (const auto& task_id : *tasks) {
+            task_ids.push_back(task_id);
+        }
+    }else{
+        for (const auto& [task_id, task] : running_tasks) {
+            task_ids.push_back(task_id);
+        }
     }
     md["running_task_ids"] = task_ids;
     md["action_seq"] = action_seq;
     std::ofstream ofs(outputpath);
     ofs << md.dump(4);
     ofs.close();
-    std::cout << "Snapshot for " << md.dump() << " saved." << std::endl;
+    std::cout << "[Worker-" << worker_id << "] Snapshot for " << md.dump() << " saved." << std::endl;
 }
 
 std::vector<int> load_running_tasks(int worker_id, std::string& inputpath, int &action_seq) {
@@ -80,7 +86,7 @@ std::vector<int> load_running_tasks(int worker_id, std::string& inputpath, int &
     return events;
 }
 
-void start_task(mofka::Producer& producer, const json& metadata, const TraceRuntimeConfig& config,
+void start_task(/* mofka::Producer& producer, */ const json& metadata, const TraceRuntimeConfig& config,
                 mofka::MofkaDriver& driver, std::mutex& ckpt_mutex,
                 int argc, char** argv) {
     int task_id = metadata["task_id"].get<int>();
@@ -165,7 +171,7 @@ int main(int argc, char **argv) {
     if (!init_events.empty()) {
         std::cout << "[Worker-" << config.worker_id << "] Restarting from snapshot with " << init_events.size() << " tasks." << std::endl;
         for (const auto& task_id : init_events) {
-            start_task(producer, json{{"task_id", task_id}}, config, driver, ckpt_mutex, argc, argv);
+            start_task(json{{"task_id", task_id}}, config, driver, ckpt_mutex, argc, argv);
         }
     }
 
@@ -212,12 +218,15 @@ int main(int argc, char **argv) {
             producer.flush();
 
             while (!pending_task_ids.empty()) {
-                sleep(1);
                 std::lock_guard<std::mutex> lock(pending_task_ids_mutex);
                 if (pending_task_ids.empty()) {
                     break;
                 }
                 int task_id = pending_task_ids.front();
+                ReconTask& task = running_tasks.at(task_id);
+                if (!task.isMSCompleted()) {
+                    break;
+                }
                 pending_task_ids.erase(pending_task_ids.begin());
                 
                 std::cout << "[Worker-" << config.worker_id << "] Cleaning up task " << task_id << std::endl;
@@ -229,8 +238,6 @@ int main(int argc, char **argv) {
                 std::cout << "[Worker-" << config.worker_id << "] Erased running thread for Task " << task_id << std::endl;
                 task_progresses.erase(task_id);
                 std::cout << "[Worker-" << config.worker_id << "] Task " << task_id << " stopped." << std::endl;
-                snapshot_running_tasks(task_assignment_path, action_seq);
-                std::cout << "[Worker-" << config.worker_id << "] Snapshot of running tasks saved at: " << task_assignment_path << std::endl;
             }
 
             if (sigterm_captured) {
@@ -260,7 +267,16 @@ int main(int argc, char **argv) {
             int task_id = json_metadata["task_id"].get<int>();
             if (running_tasks.find(task_id) != running_tasks.end()) {
                 std::cout << "[Worker-" << config.worker_id << "] Stoping [Task-" << task_id << "]..." << std::endl;
-                running_tasks[task_id].stop([task_id, &producer, &config, e = std::move(event)]() {
+                // Quickly snapshot the state to prevent immediate failure
+                std::vector<int> current_running_task_ids;
+                for (const auto& [tid, task] : running_tasks) {
+                    if (tid != task_id) {
+                        current_running_task_ids.push_back(tid);
+                    }
+                }
+                snapshot_running_tasks(config.worker_index, task_assignment_path, &current_running_task_ids, action_seq);
+                std::cout << "[Worker-" << config.worker_id << "] Snapshot of running tasks saved at: " << task_assignment_path << std::endl;
+                running_tasks[task_id].stop([task_id, &producer, &config]() {
                     std::cout << "[Task-" << task_id << "] Stopped. Notifying the producer the completion" << std::endl;
                     json end_md = {
                         {"Type", "COMPLETE"},
@@ -276,8 +292,8 @@ int main(int argc, char **argv) {
                 std::cout << "[Worker-" << config.worker_id << "] Received END_TASK for Task " << task_id << " which is not running. Ignoring." << std::endl;
             }
         }else if (event_type == "START_TASK") {
-            start_task(producer, json_metadata, config, driver, ckpt_mutex, argc, argv);
-            snapshot_running_tasks(task_assignment_path, action_seq);
+            start_task(json_metadata, config, driver, ckpt_mutex, argc, argv);
+            snapshot_running_tasks(config.worker_index, task_assignment_path, nullptr, action_seq);
         }else if (event_type == "SHUTDOWN") {
             std::cout << "[Worker-" << config.worker_id << "] End of stream. Exiting..." << std::endl;
             running = false;

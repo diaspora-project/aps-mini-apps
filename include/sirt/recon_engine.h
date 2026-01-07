@@ -68,6 +68,10 @@ class ReconTask {
     int getCheckpointedProgress() const {
       return checkpointed_progress;
     }
+
+    bool isMSCompleted() {
+      return ms.isCompleted();
+    }
 };
 
 #endif // SIRT_RETCON_ENGINE_H

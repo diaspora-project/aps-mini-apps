@@ -52,16 +52,26 @@ std::thread MofkaStream::receiveEventInBackground(mofka::Consumer consumer)
 {
   return std::thread([this, consumer = std::move(consumer)]() mutable {
 
+    if (isStopped() || isEndOfStream()) {
+      std::cout << "[Task-" << getRank()
+                << "]: MofkaStream already stopped or at end of stream. Not starting background thread."
+                << std::endl;
+      return;
+    }
+
     std::cout << "[Task-" << getRank()
               << "]: Starting background thread to receive Mofka events..."
               << std::endl;
+    
+    stop_flag.store(false);
+    complete_flag.store(false);
 
     while (!isStopped() && !isEndOfStream()) {
       auto start = std::chrono::high_resolution_clock::now();
       mofka::Future<mofka::Event> future_event = consumer.pull();
 
       // Poll until event is ready (or EOS)
-      while (!future_event.completed() && !isEndOfStream()) {
+      while (!future_event.completed() && !isEndOfStream() && !isStopped()) {
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
         {
           std::lock_guard<std::mutex> lock(this->mofka_buffer_mutex);
@@ -110,7 +120,7 @@ std::thread MofkaStream::receiveEventInBackground(mofka::Consumer consumer)
         } // lock_guard released here
       }
 
-      if (isEndOfStream()) {
+      if (isEndOfStream() || isStopped()) {
         break;
       }
 
@@ -130,6 +140,9 @@ std::thread MofkaStream::receiveEventInBackground(mofka::Consumer consumer)
     std::cout << "[Task-" << getRank()
               << "]: Exiting background thread for receiving Mofka events."
               << std::endl;
+    
+    complete_flag.store(true);
+    
   });
 }
 
