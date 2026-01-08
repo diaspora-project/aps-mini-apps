@@ -12,7 +12,7 @@
 #include <string>
 #include <fstream>
 #include <iostream>
-#include <mofka_stream.h>
+#include <diaspora_stream.h>
 #include "trace_data.h"
 #include <vector>
 
@@ -21,7 +21,8 @@ class TraceRuntimeConfig {
     std::string kReconOutputPath;
     std::string kReconDatasetPath;
     std::string kReconOutputDir;
-    std::string group_file;
+    std::string driver_type;
+    std::string driver_config_file;
     size_t batchsize;
     int thread_count;
     int window_len;
@@ -38,8 +39,10 @@ class TraceRuntimeConfig {
       try
       {
         TCLAP::CmdLine cmd("SIRT Iterative Image Reconstruction", ' ', "0.01");
-        TCLAP::ValueArg<std::string> argGroupFile(
-          "", "group-file", "Mofka group file", false, "mofka.json", "string");
+        TCLAP::ValueArg<std::string> argDriverType(
+          "", "driver-type", "Type of diaspora driver", false, "files", "string");
+        TCLAP::ValueArg<std::string> argDriverConfigFile(
+          "", "driver-config-file", "Config file for the Diaspora driver", false, "", "string");
         TCLAP::ValueArg<size_t> argBatchSize(
           "", "batchsize", "Mofka batchsize", false, 1, "size_t");
         TCLAP::ValueArg<std::string> argReconOutputPath(
@@ -69,7 +72,8 @@ class TraceRuntimeConfig {
           "", "window-iter", "Number of iterations on received window",
           false, 1, "int");
 
-        cmd.add(argGroupFile);
+        cmd.add(argDriverType);
+        cmd.add(argDriverConfigFile);
         cmd.add(argBatchSize);
         cmd.add(argReconOutputPath);
         cmd.add(argReconOutputDir);
@@ -95,7 +99,8 @@ class TraceRuntimeConfig {
         window_step= argWindowStep.getValue();
         window_iter= argWindowIter.getValue();
         batchsize = argBatchSize.getValue();
-        group_file = argGroupFile.getValue();
+        driver_type = argDriverType.getValue();
+        driver_config_file = argDriverConfigFile.getValue();
 
         std::cout << "MPI rank:"<< rank << "; MPI size:" << size << std::endl;
         if(rank==0)
@@ -111,7 +116,8 @@ class TraceRuntimeConfig {
           std::cout << "Window iter=" << window_iter << std::endl;
           std::cout << "Publish frequency=" << pub_freq << std::endl;
           std::cout << "Mofka batchsize=" << batchsize << std::endl;
-          std::cout << "Group file=" << group_file << std::endl;
+          std::cout << "Driver type=" << driver_type << std::endl;
+          std::cout << "Driver config file=" << driver_config_file << std::endl;
         }
       }
       catch (TCLAP::ArgException &e)
@@ -127,17 +133,18 @@ int main(int argc, char **argv)
   DISPCommBase<float> *comm =
         new DISPCommMPI<float>(&argc, &argv);
   TraceRuntimeConfig config(argc, argv, comm->rank(), comm->size());
-  MofkaStream ms = MofkaStream{ config.group_file,
-                                config.batchsize,
-                                static_cast<uint32_t>(config.window_len),
-                                comm->rank(),
-                                comm->size()};
+  DiasporaStream ms = DiasporaStream{ config.driver_type,
+                                      config.driver_config_file,
+                                      config.batchsize,
+                                      static_cast<uint32_t>(config.window_len),
+                                      comm->rank(),
+                                      comm->size()};
   ms.handshake(comm->rank(), comm->size());
   std::string consuming_topic = "dist_sirt";
   std::string producing_topic = "sirt_den";
   std::vector<size_t> targets = {static_cast<size_t>(comm->rank())};
-  mofka::Producer  producer = ms.getProducer(producing_topic, "sirt");
-  mofka::Consumer consumer = ms.getConsumer(consuming_topic, "sirt", targets);
+  auto producer = ms.getProducer(producing_topic, "sirt");
+  auto consumer = ms.getConsumer(consuming_topic, "sirt", targets);
   /* Get metadata structure */
   json tmetadata = ms.getInfo();
   auto n_blocks = tmetadata["n_sinograms"].get<int64_t>();
@@ -247,7 +254,7 @@ int main(int argc, char **argv)
           int recon_slice_data_index = rank_metadata.num_neighbor_recon_slices()* rank_metadata.num_grids() * rank_metadata.num_grids();
           ADataRegion<float> &recon = rank_metadata.recon();
 
-          hsize_t ndims = static_cast<hsize_t>(h5md.ndims);
+          // hsize_t ndims = static_cast<hsize_t>(h5md.ndims);
 
           hsize_t rank_dims[3] = {
             static_cast<hsize_t>(rank_metadata.num_slices()),
@@ -270,7 +277,7 @@ int main(int argc, char **argv)
 
           ms.publishImage(md, &recon[recon_slice_data_index], data_size, producer);
 
-        } catch(const mofka::Exception& ex) {
+        } catch(const diaspora::Exception& ex) {
           spdlog::critical("{}", ex.what());
           exit(-1);
         }
@@ -312,8 +319,8 @@ int main(int argc, char **argv)
   json md = {{"Type", "FIN"}};
   // data part
   float d = 1;
-  auto future = producer.push(mofka::Metadata{md}, mofka::Data{&d,sizeof(float)});
-  future.wait();
+  auto future = producer.push(diaspora::Metadata{md}, diaspora::DataView{&d,sizeof(float)});
+  future.wait(-1);
 
   /**************************/
   #ifdef TIMERON

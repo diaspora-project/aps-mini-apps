@@ -11,11 +11,13 @@ We have included a spack env file `spack_polaris.yaml` with needed dependencies.
 
 Here are the steps to use spack to install the environment:
 1. Clone spack (use this [repo](https://github.com/GueroudjiAmal/spack/tree/aps) for Polaris)
-2. Clone mochi spack packages [repo](https://github.com/mochi-hpc/mochi-spack-packages.git)
-3. Create a spack env `spack env create APS spack.yaml`
-4. Activate the env `spack env activate APS`
-5. Add mochi spack packages to the env `spack repo add mochi-spack-packages`
-6. Concretize and install `spack concretize && spack install`
+2. Clone diaspora spack packages [repo](https://github.com/diaspora-project/diaspora-spack-packages.git)
+3. Clone mochi spack packages [repo](https://github.com/mochi-hpc/mochi-spack-packages.git)
+4. Create a spack env `spack env create APS spack.yaml`
+5. Activate the env `spack env activate APS`
+6. Add mochi spack packages to the env `spack repo add mochi-spack-packages`
+7. Add diaspora spack packages to the env `spack repo add diaspora-spack-packages/spack_repo/diaspora`
+8. Concretize and install `spack concretize && spack install`
 
 There are 4 main componenets:
 1. streamer-daq: In order to setup the python script, follow the below steps (again from project root directory):

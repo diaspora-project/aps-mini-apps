@@ -38,23 +38,24 @@ if(NOT HDF5_FOUND OR NOT HDF5_IS_PARALLEL)
     message(FATAL_ERROR "HDF5 library not compiled with parallel support.")
 endif()
 
-# find mofka
-find_package (mofka REQUIRED)
+# find diaspora
+find_package (diaspora-stream-api REQUIRED)
+find_package (fmt REQUIRED)
 
 include_directories(${Trace_SOURCE_DIR}/include)
 include_directories(${Trace_SOURCE_DIR}/include/tracelib)
 include_directories(${HDF5_INCLUDE_DIRS})
 
 include_directories(${Trace_SOURCE_DIR}/include)
-include_directories(${Trace_SOURCE_DIR}/include/mofka_sirt)
+include_directories(${Trace_SOURCE_DIR}/include/diaspora_sirt)
 
 add_library(trace_utils ${Trace_SOURCE_DIR}/src/tracelib/trace_utils.cc)
 add_library(trace_h5io ${Trace_SOURCE_DIR}/src/tracelib/trace_h5io.cc)
 
-add_library(mofka_stream ${Trace_SOURCE_DIR}/src/mofka_sirt/mofka_stream.cc)
-target_link_libraries(mofka_stream PRIVATE mofka::client)
+add_library(diaspora_stream ${Trace_SOURCE_DIR}/src/diaspora_sirt/diaspora_stream.cc)
+target_link_libraries(diaspora_stream PRIVATE diaspora-stream-api)
 add_library(sirt ${CMAKE_CURRENT_LIST_DIR}/sirt.cc)
 
 add_executable(sirt_stream sirt_stream_main.cc)
-target_link_libraries(sirt_stream mofka_stream sirt trace_utils trace_h5io MPI::MPI_CXX hdf5::hdf5 Threads::Threads mofka::client)
+target_link_libraries(sirt_stream diaspora_stream sirt trace_utils trace_h5io MPI::MPI_CXX hdf5::hdf5 Threads::Threads diaspora-stream-api fmt::fmt-header-only)
 #target_include_directories(sirt_stream PRIVATE ${HDF5_INCLUDE_DIRS})

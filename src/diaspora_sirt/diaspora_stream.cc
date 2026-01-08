@@ -1,13 +1,13 @@
-#include <mofka_stream.h>
+#include <diaspora_stream.h>
 
-void MofkaStream::addTomoMsg(mofka::Event event){
+void DiasporaStream::addTomoMsg(diaspora::Event event){
   auto start_t = std::chrono::high_resolution_clock::now();
-  mofka::Metadata metadata = event.metadata();
+  diaspora::Metadata metadata = event.metadata();
   auto end_t = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> elapsed = end_t - start_t;
   setConsumerTimes("mata_t", metadata.string().size(), elapsed.count());
   start_t = std::chrono::high_resolution_clock::now();
-  mofka::Data data = event.data();
+  diaspora::DataView data = event.data();
   end_t = std::chrono::high_resolution_clock::now();
   elapsed = end_t - start_t;
   setConsumerTimes("data_t", data.segments()[0].size, elapsed.count());
@@ -32,7 +32,7 @@ void MofkaStream::addTomoMsg(mofka::Event event){
 
 /* Erase streaming message to buffers
 */
-void MofkaStream::eraseBegTraceMsg(){
+void DiasporaStream::eraseBegTraceMsg(){
   vtheta.erase(vtheta.begin());
   size_t n_rays_per_proj =
   getInfo()["n_sinograms"].get<int64_t>() *
@@ -47,7 +47,7 @@ void MofkaStream::eraseBegTraceMsg(){
 
   return: DataRegionBase
 */
-DataRegionBase<float, TraceMetadata>* MofkaStream::setupTraceDataRegion(
+DataRegionBase<float, TraceMetadata>* DiasporaStream::setupTraceDataRegion(
   DataRegionBareBase<float> &recon_image){
     TraceMetadata *mdata = new TraceMetadata(
     vtheta.data(),
@@ -75,7 +75,9 @@ DataRegionBase<float, TraceMetadata>* MofkaStream::setupTraceDataRegion(
   return curr_data;
 }
 
-MofkaStream::MofkaStream(std::string group_file,
+DiasporaStream::DiasporaStream(
+            std::string driver_type,
+            std::string driver_config_file,
             size_t batchsize,
             uint32_t window_len,
             int rank,
@@ -84,35 +86,46 @@ MofkaStream::MofkaStream(std::string group_file,
   window_len {window_len},
   counter {0},
   comm_rank {rank},
-  comm_size {size},
-  driver {group_file, true}
-  {}
+  comm_size {size}
+  {
+      diaspora::Metadata driver_options;
+      if(!driver_config_file.empty()) {
+        auto ifs = std::ifstream(driver_config_file);
+        if(!ifs.good()) {
+            throw diaspora::Exception{std::string{"Cannot open driver config file "} + driver_config_file};
+        }
+        driver_options = json::parse(ifs);
+      } else if (driver_type == "files") {
+        driver_options = json::parse("{\"root_path\":\"./diaspora-data\"}");
+      }
+      driver = diaspora::Driver::New(driver_type.c_str(), driver_options);
+  }
 
 
 /* Handshake with Dist component
 * @param rank: MPI rank
 * @param size: MPI size
 */
-void MofkaStream::handshake(int rank, int size){
+void DiasporaStream::handshake(int rank, int size){
   std::string topic_name = "handshake_s_d";
   // Send comm size to dist_streamer
-  mofka::Producer hs_producer = getProducer(topic_name, "hs_p");
+  diaspora::Producer hs_producer = getProducer(topic_name, "hs_p");
 
   json md = {{"comm_size", size}};
-  mofka::Metadata metadata{md};
+  diaspora::Metadata metadata{md};
   auto future = hs_producer.push(metadata);
-  future.wait();
+  future.wait(-1);
 
   // Receive metadata info
   topic_name = "handshake_d_s";
   std::vector<size_t> targets = {static_cast<size_t>(rank)};
-  mofka::TopicHandle topic = driver.openTopic(topic_name);
-  mofka::Consumer hs_consumer = topic.consumer( "hs_c",
+  diaspora::TopicHandle topic = driver.openTopic(topic_name);
+  diaspora::Consumer hs_consumer = topic.consumer( "hs_c",
                                                 batchSize,
                                                 threadCount,
                                                 targets);
-  auto event = hs_consumer.pull().wait();
-  mofka::Metadata m = event.metadata();
+  auto event = hs_consumer.pull().wait(-1).value();
+  diaspora::Metadata m = event.metadata();
   json mdata = m.json();
   setInfo(mdata);
 }
@@ -120,19 +133,19 @@ void MofkaStream::handshake(int rank, int size){
 /* Publish reconstructed image
 * @param metadata: metadata in json format
 * @param data:     pointer to the reconstructed image
-* @param producer: mofka producer
+* @param producer: diaspora producer
 */
-void MofkaStream::publishImage(
+void DiasporaStream::publishImage(
   json &meta,
   float *data,
   size_t size,
-  mofka::Producer producer){
+  diaspora::Producer producer){
 
-  mofka::Metadata metadata{meta};
+  diaspora::Metadata metadata{meta};
   float* copy = new float[size];
   std::memcpy(copy, data, size * sizeof(float));
   buffer.push_back(copy);
-  mofka::Data data_m = mofka::Data(buffer[buffer.size()-1], size*sizeof(float));
+  auto data_m = diaspora::DataView(buffer[buffer.size()-1], size*sizeof(float));
   auto start = std::chrono::high_resolution_clock::now();
   auto f  = producer.push(metadata, data_m);
   batch++;
@@ -162,7 +175,7 @@ void MofkaStream::publishImage(
     //     producer_times.emplace_back("Wait", buffer.size()*size*sizeof(float), elapsed_flush.count());
 
     //   }
-    // } catch(const mofka::Exception& ex) {
+    // } catch(const diaspora::Exception& ex) {
     //     std::cerr << "MOFKA EXCEPTION: " << ex.what() << std::endl;
     // }
     size_t c=0;
@@ -179,38 +192,38 @@ void MofkaStream::publishImage(
 }
 
 
-/* Create and return a mofka producer
-* @param topic_name:    mofka topic
+/* Create and return a diaspora producer
+* @param topic_name:    diaspora topic
 * @param producer_name: producer name
 
-  return: mofka producer
+  return: diaspora producer
 */
-mofka::Producer MofkaStream::getProducer(std::string topic_name,
+diaspora::Producer DiasporaStream::getProducer(std::string topic_name,
                                          std::string producer_name="streamer_sirt"){
   auto topic = driver.openTopic(topic_name);
-  mofka::Producer producer = topic.producer(producer_name,
+  diaspora::Producer producer = topic.producer(producer_name,
                                             batchSize,
                                             threadCount,
                                             ordering);
   return producer;
 }
 
-/* Create and return a mofka consumer
-* @param topic_name:    mofka topic
+/* Create and return a diaspora consumer
+* @param topic_name:    diaspora topic
 * @param consumer_name: consumer name
-* @param targets:       list of mofka partitions to consume from
+* @param targets:       list of diaspora partitions to consume from
 
-  return: mofka consumer
+  return: diaspora consumer
 */
-mofka::Consumer MofkaStream::getConsumer(std::string topic_name,
+diaspora::Consumer DiasporaStream::getConsumer(std::string topic_name,
                                          std::string consumer_name="dist_sirt",
                                          std::vector<size_t> targets={0}){
-  mofka::TopicHandle topic = driver.openTopic(topic_name);
-  mofka::Consumer consumer = topic.consumer(consumer_name,
+  diaspora::TopicHandle topic = driver.openTopic(topic_name);
+  diaspora::Consumer consumer = topic.consumer(consumer_name,
                                             threadCount,
                                             batchSize,
                                             data_selector,
-                                            data_broker,
+                                            data_allocator,
                                             targets);
   return consumer;
 }
@@ -225,37 +238,37 @@ mofka::Consumer MofkaStream::getConsumer(std::string topic_name,
   *          DataRegionBase if there is data in sliding window
   */
 
-DataRegionBase<float, TraceMetadata>* MofkaStream::readSlidingWindow(
+DataRegionBase<float, TraceMetadata>* DiasporaStream::readSlidingWindow(
   DataRegionBareBase<float> &recon_image,
   int step,
-  mofka::Consumer consumer){
+  diaspora::Consumer consumer){
   // Dynamically meet sizes
   while(vtheta.size()> window_len)
     eraseBegTraceMsg();
 
   // Receive new message
-  std::vector<mofka::Event> mofka_events;
+  std::vector<diaspora::Event> diaspora_events;
 
   for(int i=0; i<step; ++i) {
-    // mofka messages
+    // diaspora messages
     auto start = std::chrono::high_resolution_clock::now();
-    auto event = consumer.pull().wait();
+    auto event = consumer.pull().wait(-1).value();
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = end - start;
     setConsumerTimes("wait_t", 1, elapsed.count());
-    mofka_events.push_back(event);
+    diaspora_events.push_back(event);
     //if endMsg break
     if (event.metadata().json()["Type"].get<std::string>() == "FIN") return nullptr;
   }
   // TODO: After receiving message corrections might need to be applied
 
   /// End of the processing
-  if(mofka_events.size()==0 && vtheta.size()==0){
+  if(diaspora_events.size()==0 && vtheta.size()==0){
     //std::cout << "End of the processing: " << vtheta.size() << std::endl;
     return nullptr;
   }
   /// End of messages, but there is data to be processed in window
-  else if(mofka_events.size()==0 && vtheta.size()>0){
+  else if(diaspora_events.size()==0 && vtheta.size()>0){
     for(int i=0; i<step; ++i){  // Delete step size element
       if(vtheta.size()>0) eraseBegTraceMsg();
       else break;
@@ -264,22 +277,22 @@ DataRegionBase<float, TraceMetadata>* MofkaStream::readSlidingWindow(
     if(vtheta.size()==0) return nullptr;
   }
   /// New message(s) arrived, there is space in window
-  else if(mofka_events.size()>0 && vtheta.size()<window_len){
+  else if(diaspora_events.size()>0 && vtheta.size()<window_len){
     //std::cout << "New message(s) arrived, there is space in window: " << window_len_ - vtheta.size() << std::endl;
-    for(auto msg : mofka_events){
+    for(auto msg : diaspora_events){
       addTomoMsg(msg);
       ++counter;
     }
   std::cout << "After adding # items in window: " << vtheta.size() << std::endl;
   }
   /// New message arrived, there is no space in window
-  else if(mofka_events.size()>0 && vtheta.size()>=window_len){
+  else if(diaspora_events.size()>0 && vtheta.size()>=window_len){
     //std::cout << "New message arrived, there is no space in window: " << vtheta.size() << std::endl;
     for(int i=0; i<step; ++i) {
       if(vtheta.size()>0) eraseBegTraceMsg();
       else break;
     }
-    for(auto msg : mofka_events){
+    for(auto msg : diaspora_events){
       addTomoMsg(msg);
       ++counter;
     }
@@ -287,7 +300,7 @@ DataRegionBase<float, TraceMetadata>* MofkaStream::readSlidingWindow(
   else std::cerr << "Unknown state in ReadWindow!" << std::endl;
 
   /// Clean-up vector
-  mofka_events.clear();
+  diaspora_events.clear();
 
   /// Generate new data and metadata
   DataRegionBase<float, TraceMetadata>* data_region =
@@ -296,35 +309,35 @@ DataRegionBase<float, TraceMetadata>* MofkaStream::readSlidingWindow(
   return data_region;
   }
 
-json MofkaStream::getInfo(){ return info;}
+json DiasporaStream::getInfo(){ return info;}
 
-int MofkaStream::getRank() {return comm_rank;}
+int DiasporaStream::getRank() {return comm_rank;}
 
-int MofkaStream::getBufferSize() {return buffer.size();}
+int DiasporaStream::getBufferSize() {return buffer.size();}
 
-uint32_t MofkaStream::getBatch() {return batch;}
+uint32_t DiasporaStream::getBatch() {return batch;}
 
-uint32_t MofkaStream::getCounter(){ return counter;}
+uint32_t DiasporaStream::getCounter(){ return counter;}
 
-std::queue<mofka::Future<mofka::EventID>> MofkaStream::getFutures(){ return futures;}
+std::queue<diaspora::Future<std::optional<diaspora::EventID>>>& DiasporaStream::getFutures(){ return futures;}
 
-void MofkaStream::setInfo(json &j) {info = j;}
+void DiasporaStream::setInfo(json &j) {info = j;}
 
-void MofkaStream::windowLength(uint32_t wlen){ window_len = wlen;}
+void DiasporaStream::windowLength(uint32_t wlen){ window_len = wlen;}
 
-std::vector<std::tuple<std::string, uint64_t, float>> MofkaStream::getConsumerTimes(){return consumer_times;}
+const std::vector<std::tuple<std::string, uint64_t, float>>& DiasporaStream::getConsumerTimes(){return consumer_times;}
 
-void MofkaStream::setConsumerTimes(std::string op, uint64_t size, float time){
+void DiasporaStream::setConsumerTimes(std::string op, uint64_t size, float time){
   consumer_times.emplace_back(op, size, time);
 }
 
-std::vector<std::tuple<std::string, uint64_t, float>> MofkaStream::getProducerTimes(){return producer_times;}
+std::vector<std::tuple<std::string, uint64_t, float>> DiasporaStream::getProducerTimes(){return producer_times;}
 
-void MofkaStream::setProducerTimes(std::string op, uint64_t size, float time){
+void DiasporaStream::setProducerTimes(std::string op, uint64_t size, float time){
   producer_times.emplace_back(op, size, time);
 }
 
-int MofkaStream::writeTimes(std::string type){
+int DiasporaStream::writeTimes(std::string type){
   std::string filename = "Sirt_"+ type + "_rank_" + std::to_string(getRank()) + ".csv";
   std::ofstream file(filename);
   if (!file.is_open()) {

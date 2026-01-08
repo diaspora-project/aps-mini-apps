@@ -3,9 +3,8 @@
 
 #include "data_region_base.h"
 #include <cassert>
-#include <mofka/Client.hpp>
-#include <mofka/TopicHandle.hpp>
-#include <mofka/MofkaDriver.hpp>
+#include <diaspora/TopicHandle.hpp>
+#include <diaspora/Driver.hpp>
 #include <spdlog/spdlog.h>
 #include <fmt/format.h>
 #include <time.h>
@@ -16,15 +15,14 @@
 #include <utility>
 #include <nlohmann/json.hpp>
 #include "trace_data.h"
-#include <mofka_stream.h>
+#include <diaspora_stream.h>
 #include <queue>
 
 using json = nlohmann::json;
-namespace tl = thallium;
 
 
 
-class MofkaStream
+class DiasporaStream
 {
   private:
     size_t batchsize;
@@ -36,39 +34,39 @@ class MofkaStream
     std::vector<float> vproj;
     std::vector<float> vtheta;
     std::vector<json> vmeta;
-    std::queue<mofka::Future<mofka::EventID>> futures;
+    std::queue<diaspora::Future<std::optional<diaspora::EventID>>> futures;
     json info;
 
-    mofka::MofkaDriver driver;
+    diaspora::Driver driver;
     size_t batch = 0;
     std::vector<float*> buffer;
     std::vector<std::tuple<std::string, uint64_t, float>> producer_times; // type, size, duration
     std::vector<std::tuple<std::string, uint64_t, float>> consumer_times; // type, size, duration
 
-    mofka::BatchSize   batchSize   = mofka::BatchSize{batchsize};
-    mofka::ThreadCount threadCount = mofka::ThreadCount{1};
-    mofka::Ordering    ordering    = mofka::Ordering::Strict;
+    diaspora::BatchSize   batchSize   = diaspora::BatchSize{batchsize};
+    diaspora::ThreadCount threadCount = diaspora::ThreadCount{1};
+    diaspora::Ordering    ordering    = diaspora::Ordering::Strict;
 
-    mofka::Validator         validator;
-    mofka::Serializer        serializer;
-    mofka::PartitionSelector selector;
+    diaspora::Validator         validator;
+    diaspora::Serializer        serializer;
+    diaspora::PartitionSelector selector;
 
-    mofka::DataSelector data_selector = [](const mofka::Metadata& metadata,
-                                           const mofka::DataDescriptor& descriptor) {
+    diaspora::DataSelector data_selector = [](const diaspora::Metadata& metadata,
+                                           const diaspora::DataDescriptor& descriptor) {
       (void)metadata;
       return descriptor;
     };
 
-    mofka::DataBroker data_broker = [](const mofka::Metadata& metadata,
-                                       const mofka::DataDescriptor& descriptor) {
+    diaspora::DataAllocator data_allocator = [](const diaspora::Metadata& metadata,
+                                                const diaspora::DataDescriptor& descriptor) {
         (void)metadata;
-        return mofka::Data{new float[descriptor.size()], descriptor.size()};
+        return diaspora::DataView{new float[descriptor.size()], descriptor.size()};
     };
 
     /* Add streaming message to buffers
-    * @param event: mofka event containing data and metadata
+    * @param event: diaspora event containing data and metadata
     */
-    void addTomoMsg(mofka::Event event);
+    void addTomoMsg(diaspora::Event event);
 
 
     /* Erase streaming message to buffers
@@ -86,11 +84,12 @@ class MofkaStream
 
   public:
 
-    MofkaStream(std::string group_file,
-                size_t batchsize,
-                uint32_t window_len,
-                int rank,
-                int size);
+    DiasporaStream(std::string driver_type,
+                   std::string driver_config_file,
+                   size_t batchsize,
+                   uint32_t window_len,
+                   int rank,
+                   int size);
 
 
     /* Handshake with Dist component
@@ -102,32 +101,32 @@ class MofkaStream
     /* Publish reconstructed image
     * @param metadata: metadata in json format
     * @param data: pointer to the reconstructed image
-    * @param producer: mofka producer
+    * @param producer: diaspora producer
     */
     void publishImage(
       json &metadata,
       float *data,
       size_t size,
-      mofka::Producer producer);
+      diaspora::Producer producer);
 
 
-    /* Create and return a mofka producer
-    * @param topic_name: mofka topic
+    /* Create and return a diaspora producer
+    * @param topic_name: diaspora topic
     * @param producer_name: producer name
 
-      return: mofka producer
+      return: diaspora producer
     */
-    mofka::Producer getProducer( std::string topic_name,
+    diaspora::Producer getProducer( std::string topic_name,
                                   std::string producer_name);
 
-    /* Create and return a mofka consumer
-    * @param topic_name: mofka topic
+    /* Create and return a diaspora consumer
+    * @param topic_name: diaspora topic
     * @param consumer_name: consumer name
-    * @param targets: list of mofka partitions to consume from
+    * @param targets: list of diaspora partitions to consume from
 
-      return: mofka consumer
+      return: diaspora consumer
     */
-    mofka::Consumer getConsumer(std::string topic_name,
+    diaspora::Consumer getConsumer(std::string topic_name,
                                 std::string consumer_name,
                                 std::vector<size_t>);
 
@@ -144,7 +143,7 @@ class MofkaStream
     DataRegionBase<float, TraceMetadata>* readSlidingWindow(
       DataRegionBareBase<float> &recon_image,
       int step,
-      mofka::Consumer consumer);
+      diaspora::Consumer consumer);
 
     json getInfo();
 
@@ -160,13 +159,13 @@ class MofkaStream
 
     void windowLength(uint32_t wlen);
 
-    std::vector<std::tuple<std::string, uint64_t, float>> getConsumerTimes();
+    const std::vector<std::tuple<std::string, uint64_t, float>>& getConsumerTimes();
 
     void setConsumerTimes(std::string op, uint64_t size, float time);
 
     std::vector<std::tuple<std::string, uint64_t, float>> getProducerTimes();
 
-    std::queue<mofka::Future<mofka::EventID>> getFutures();
+    std::queue<diaspora::Future<std::optional<diaspora::EventID>>>& getFutures();
 
     void setProducerTimes(std::string op, uint64_t size, float time);
 
