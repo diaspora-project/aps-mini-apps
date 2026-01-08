@@ -49,6 +49,8 @@ public:
         return m_is_active.load();
     }
 
+    int get_success_pulls() { return success_pull; }
+
 private:
     std::string m_streamName;
     int m_partitionId;
@@ -64,6 +66,8 @@ private:
     std::atomic<bool> m_is_active;
     
     std::optional<std::future<adios2::Engine>> m_openFuture;
+
+    int success_pull = 0;
 
 
     // void parse_metadata_json(

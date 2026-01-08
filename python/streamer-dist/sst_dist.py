@@ -102,6 +102,51 @@ class SSTDist:
 
         print("SSTDist: initialized.")
 
+    def done_image(self):
+        """
+        Send a FIN message to indicate no more images will be sent.
+        """
+        print("Sending SST FIN message...")
+
+        chunk_jsons = []
+        for task_id in range(self.num_sinograms):
+            offset = task_id * self.chunk_size
+            meta = {
+                "Type": "FIN",
+            }
+            chunk_jsons.append(json.dumps(meta))
+
+        encoded = [m.encode("utf-8") for m in chunk_jsons]
+        offsets = [0]
+        for b in encoded:
+            offsets.append(offsets[-1] + len(b))
+
+        total_meta_len = offsets[-1]
+        if total_meta_len > self.max_meta_bytes:
+            raise ValueError(
+                f"push_image: metadata bytes {total_meta_len} exceed max_meta_bytes "
+                f"{self.max_meta_bytes}; increase max_meta_bytes."
+            )
+
+        # Prepare meta_bytes and meta_offsets for FIN message
+        meta_bytes = np.zeros(self.max_meta_bytes, dtype=np.uint8)
+        pos = 0
+        for b in encoded:
+            length = len(b)
+            meta_bytes[pos:pos + length] = np.frombuffer(b, dtype=np.uint8)
+            pos += length
+
+        meta_offsets = np.array(offsets, dtype=np.int64)
+
+        # Push FIN step
+        self.writer.BeginStep()
+        self.writer.Put(self.var_data, np.zeros(self.total_size, dtype=np.float32))  # empty data
+        self.writer.Put(self.var_meta_bytes, meta_bytes)
+        self.writer.Put(self.var_meta_offsets, meta_offsets)
+        self.writer.EndStep()
+
+        print("SST FIN message sent.")
+
     def push_image(
         self,
         data: np.ndarray,

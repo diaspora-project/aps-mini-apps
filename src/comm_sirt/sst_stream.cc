@@ -58,7 +58,7 @@ SSTStream::SSTStream(const std::string &streamName,
             // timed out
             m_is_active.store(false);
             m_eos.store(true);
-            std::cout << "[Task-" << m_partitionId << "] SSTStream initialization failed." << std::endl;
+            std::cout << "[Task-" << m_partitionId << "] SSTStream initialization timeouted." << std::endl;
             return;
         }
 
@@ -285,6 +285,8 @@ bool SSTStream::pull_data(SSTPayload &out)
     out.metadata    = std::move(jsonStr);
     out.stepIndex   = m_stepIndex;
     out.endOfStream = false;
+    
+    this->success_pull++;
 
     return true;
 }

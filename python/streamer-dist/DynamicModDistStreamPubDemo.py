@@ -26,7 +26,7 @@ def parse_arguments():
   parser = argparse.ArgumentParser( description='Data Distributor Process')
   parser.add_argument('--protocol', default="na+sm", help='Mofka protocol')
 
-  parser.add_argument('--dynamic_loadbalancing', default="true", help='Enable dynamic load balancing')
+  parser.add_argument('--dynamic_loadbalancing', default="false", help='Enable dynamic load balancing')
 
   parser.add_argument('--group_file', type=str, default="mofka.json",
                       help='Group file for the mofka server')
@@ -1002,6 +1002,11 @@ def main():
       tot_dark_imgs += 1
     seq+=1
 
+
+  # Send FIN to SIRT with SST
+  if args.sst:
+    sst_dist.done_image()
+
   # t = mofka_dist.last_flush(producer)
   # if t is not None:
   #   mofka_producing_time.append(t)
@@ -1073,12 +1078,12 @@ def main():
   # del action_consumer
 
   print("Cleaning up task assignment process ...")
-  args.dynamic_loadbalancing = "false"
+  # args.dynamic_loadbalancing = "false"
 
   # Wait for the assignment process to finish
-  assignment_process.join(timeout=5)
-  if assignment_process.is_alive():
-    assignment_process.terminate()
+  assignment_process.join()
+  # if assignment_process.is_alive():
+  #   assignment_process.terminate()
 
   # print("Complete data disitribution, sleeping until to exit ...")
   # while True:

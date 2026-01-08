@@ -418,6 +418,17 @@ DataRegionBase<float, TraceMetadata>* MofkaStream::readSlidingWindow(
           if (sst_stream.pull_data(sst_payload)) {
 
             auto metadata_json = json::parse(sst_payload.metadata);
+
+            if (metadata_json["Type"].get<std::string>() == "FIN") {
+              setSSTEndOfStream(true);
+              std::cout << "[Task-" << getRank() << "]: End of stream detected from SST" << std::endl;
+              if (sst_stream.get_success_pulls() > 1) {
+                std::cout << "[Task-" << getRank() << "]: At least one successful pulls from SST stream before FIN --> True end of stream, stop Mofka as well." << std::endl;
+                setMofkaEndOfStream(true);
+              }
+              return nullptr;
+            }
+
             auto stepIndex = metadata_json["seq_n"].get<uint64_t>();
             sst_payload.stepIndex = stepIndex;
 
@@ -463,7 +474,7 @@ DataRegionBase<float, TraceMetadata>* MofkaStream::readSlidingWindow(
           //if endMsg break
           if (event.metadata().json()["Type"].get<std::string>() == "FIN") {
             setMofkaEndOfStream(true);
-            std::cout << "[Task-" << getRank() << "]: End of stream detected" << std::endl;
+            std::cout << "[Task-" << getRank() << "]: End of stream detected from Mofka" << std::endl;
             return nullptr;
           }
           
