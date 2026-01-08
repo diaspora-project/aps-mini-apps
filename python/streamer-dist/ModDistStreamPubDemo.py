@@ -9,18 +9,21 @@ import math
 import TraceSerializer
 import tomopy as tp
 import json
-from mofka_dist import MofkaDist
+from diaspora_dist import DiasporaDist
 import csv
 #from memory_profiler import profile
 
 def parse_arguments():
   parser = argparse.ArgumentParser( description='Data Distributor Process')
 
-  parser.add_argument('--group_file', type=str, default="mofka.json",
-                      help='Group file for the mofka server')
+  parser.add_argument('--driver_type', type=str, default="files",
+                      help='Type of Diaspora driver')
+
+  parser.add_argument('--driver_config_file', type=str, default="",
+                      help='JSON config file for Diaspora Driver')
 
   parser.add_argument('--batchsize', type=int, default=16,
-                      help='mofka batch size')
+                      help='Streaming batch size')
 
   parser.add_argument('--nproc_sirt', type=int, default=0,
                       help='number of reconstruction processes')
@@ -61,15 +64,17 @@ def parse_arguments():
 #@profile
 def main():
   args = parse_arguments()
-  # Setup mofka
-  mofka_dist = MofkaDist(group_file=args.group_file, batchsize=args.batchsize)
+  # Setup Diaspora
+  diaspora_dist = DiasporaDist(driver_type=args.driver_type,
+                               driver_config_file=args.driver_config_file,
+                               batchsize=args.batchsize)
   # Handshake with Sirt
-  mofka_dist.handshake(args.nproc_sirt, args.num_sinograms, args.num_columns)
+  diaspora_dist.handshake(args.nproc_sirt, args.num_sinograms, args.num_columns)
 
-  consumer = mofka_dist.consumer(topic_name="daq_dist", consumer_name="dist")
-  producer = mofka_dist.producer(topic_name="dist_sirt", producer_name="producer_dist")
-  mofka_producing_time = []
-  mofka_consuming_time = []
+  consumer = diaspora_dist.consumer(topic_name="daq_dist", consumer_name="dist")
+  producer = diaspora_dist.producer(topic_name="dist_sirt", producer_name="producer_dist")
+  diaspora_producing_time = []
+  diaspora_consuming_time = []
   # Setup serializer
   serializer = TraceSerializer.ImageSerializer()
 
@@ -86,11 +91,11 @@ def main():
   time0 = time.time()
   while True:
 
-    mofka_metadata, mofka_data, pull_times = mofka_dist.pull_image(consumer)
-    if mofka_metadata["Type"] == "FIN": break
+    metadata, data, pull_times = diaspora_dist.pull_image(consumer)
+    if metadata["Type"] == "FIN": break
     total_received += 1
-    total_size += len(mofka_data)
-    mofka_consuming_time.append(pull_times)
+    total_size += len(data)
+    diaspora_consuming_time.append(pull_times)
     # This is mostly for data rate tests
     if args.skip_serialize:
       print("Skipping rest. Received msg: {}".format(total_received))
@@ -98,17 +103,17 @@ def main():
 
     # Deserialize msg to image
 
-    mofka_read_image = serializer.deserialize(serialized_image=mofka_data)
-    serializer.info(mofka_read_image) # print image information
+    read_image = serializer.deserialize(serialized_image=data)
+    serializer.info(read_image) # print image information
 
     # # Local checks
     # if args.check_seq:
-    #   if seq != mofka_read_image.Seq():
-    #     print("Wrong sequence number: {} != {}".format(seq, mofka_read_image.Seq()))
+    #   if seq != read_image.Seq():
+    #     print("Wrong sequence number: {} != {}".format(seq, read_image.Seq()))
     #   seq += 1
 
     # Push image to workers (REQ/REP)
-    my_image_np = mofka_read_image.TdataAsNumpy()
+    my_image_np = read_image.TdataAsNumpy()
     if args.uint8_to_float32:
       my_image_np.dtype = np.uint8
       sub = np.array(my_image_np, dtype="float32")
@@ -120,10 +125,10 @@ def main():
       sub = my_image_np
     else: sub = my_image_np
 
-    sub = sub.reshape((1, mofka_read_image.Dims().Y(), mofka_read_image.Dims().X()))
+    sub = sub.reshape((1, read_image.Dims().Y(), read_image.Dims().X()))
     # If incoming data is projection
-    if mofka_read_image.Itype() is serializer.ITypes.Projection:
-      rotation=mofka_read_image.Rotation()
+    if read_image.Itype() is serializer.ITypes.Projection:
+      rotation=read_image.Rotation()
       if args.degree_to_radian: rotation = rotation*math.pi/180.
 
       # Tomopy operations expect 3D data, reshape incoming projections.
@@ -145,49 +150,49 @@ def main():
         sub = tp.remove_neg(sub, val=0.00)
         sub[np.where(sub == np.inf)] = 0.00
 
-      #to send from mofka:
-      mofka_sub = sub.flatten()
+      #to send from diaspora:
+      diaspora_sub = sub.flatten()
       if args.nproc_sirt>2:
-        mofka_sub = np.tile(mofka_sub, args.nproc_sirt//2) # I suppose that the args.nproc_sirt is always a multiple of 2
+        diaspora_sub = np.tile(diaspora_sub, args.nproc_sirt//2) # I suppose that the args.nproc_sirt is always a multiple of 2
       ncols = sub.shape[2]
-      tt = mofka_dist.push_image(mofka_sub, args.num_sinograms, ncols, rotation,
-                      mofka_read_image.UniqueId(), mofka_read_image.Center(), producer=producer)
+      tt = diaspora_dist.push_image(diaspora_sub, args.num_sinograms, ncols, rotation,
+                                    read_image.UniqueId(), read_image.Center(), producer=producer)
 
       if all(isinstance(item, list) for item in tt):
-        mofka_producing_time.extend(tt)
+        diaspora_producing_time.extend(tt)
       else:
-        mofka_producing_time.append(tt)
+        diaspora_producing_time.append(tt)
 
     # If incoming data is white field
-    if mofka_read_image.Itype() is serializer.ITypes.White:
+    if read_image.Itype() is serializer.ITypes.White:
       #print("White field data is received: {}".format(read_image.UniqueId()))
       white_imgs.extend(sub)
       tot_white_imgs += 1
 
     # If incoming data is white-reset
-    if mofka_read_image.Itype() is serializer.ITypes.WhiteReset:
+    if read_image.Itype() is serializer.ITypes.WhiteReset:
       #print("White-reset data is received: {}".format(read_image.UniqueId()))
       white_imgs=[]
       white_imgs.extend(sub)
       tot_white_imgs += 1
 
     # If incoming data is dark field
-    if mofka_read_image.Itype() is serializer.ITypes.Dark:
+    if read_image.Itype() is serializer.ITypes.Dark:
       #print("Dark data is received: {}".format(read_image.UniqueId()))
       dark_imgs.extend(sub)
       tot_dark_imgs += 1
 
     # If incoming data is dark-reset
-    if mofka_read_image.Itype() is serializer.ITypes.DarkReset:
+    if read_image.Itype() is serializer.ITypes.DarkReset:
       #print("Dark-reset data is received: {}".format(read_image.UniqueId()))
       dark_imgs=[]
       dark_imgs.extend(sub)
       tot_dark_imgs += 1
     seq+=1
 
-  t = mofka_dist.last_flush(producer)
+  t = diaspora_dist.last_flush(producer)
   if t is not None:
-    mofka_producing_time.append(t)
+    diaspora_producing_time.append(t)
   time1 = time.time()
 
   # Profile information
@@ -197,18 +202,18 @@ def main():
   print("Rate (MiB/s): {:.2f}; (msg/s): {:.2f}".format(
             tot_MiBs/elapsed_time, total_received/elapsed_time))
 
-  mofka_dist.done_image(producer)
-  mofka_producing_time.append(["total", 0, time0, time1, elapsed_time, tot_MiBs])
+  diaspora_dist.done_image(producer)
+  diaspora_producing_time.append(["total", 0, time0, time1, elapsed_time, tot_MiBs])
   fields = ["type", "projection_id", "start", "stop", "duration", "metadata_size" ,"data_size"]
   with open('Dist_push.csv', 'w') as f:
     write = csv.writer(f)
     write.writerow(fields)
-    write.writerows(mofka_producing_time)
+    write.writerows(diaspora_producing_time)
   fields = ["t_wait", "t_metadata", "metadata_size" ,"t_data", "data_size"]
   with open('Dist_pull.csv', 'w') as f:
     write = csv.writer(f)
     write.writerow(fields)
-    write.writerows(mofka_consuming_time)
+    write.writerows(diaspora_consuming_time)
   del producer
   del consumer
   print("Exiting ...")

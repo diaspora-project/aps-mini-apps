@@ -4,7 +4,7 @@ import time
 import json
 import numpy as np
 import h5py
-import mochi.mofka.client as mofka
+import diaspora_stream.api as diaspora
 import csv
 #import keras
 import argparse
@@ -76,12 +76,20 @@ def process_directory(model, directory_path):
                 file_path = os.path.join(root, file)
                 process_file(model, file_path)
 
-def main(input_path, model_path, group_file, batchsize, nproc_sirt):
+def main(input_path, model_path, driver_type, driver_config_file, batchsize, nproc_sirt):
     # Load the saved model
     # model = keras.models.load_model(model_path)
-    driver = mofka.MofkaDriver(group_file, use_progress_thread=True)
+    driver_options = {}
+    if driver_config_file != "":
+        with open(driver_config_file) as f:
+            driver_options = json.load(f)
+    elif driver_type == "files":
+        driver_options = {
+            "root_path": "./diaspora-data"
+        }
+    driver = driaspora.Driver(driver_type, options=driver_options)
     batch_size = batchsize # AdaptiveBatchSize
-    thread_pool = mofka.ThreadPool(0)
+    thread_pool = driver.make_thread_pool(0)
     # create a topic
     topic_name = "sirt_den"
     topic = driver.open_topic(topic_name)
@@ -90,7 +98,7 @@ def main(input_path, model_path, group_file, batchsize, nproc_sirt):
                               thread_pool=thread_pool,
                               batch_size=batch_size)
     more_data = True
-    mofka_times = []
+    diaspora_times = []
     time0 = time.perf_counter()
     cpt = nproc_sirt
     while more_data:
@@ -104,8 +112,8 @@ def main(input_path, model_path, group_file, batchsize, nproc_sirt):
             m = event.metadata
             t_meta = time.perf_counter()
             m = json.loads(m)
-            m["mofka_e_id"] = event.event_id
-            m["mofka_e_partition"] = event.partition
+            m["diaspora_e_id"] = event.event_id
+            m["diaspora_e_partition"] = event.partition
             if m["Type"] == "FIN":
                 cpt = cpt-1
                 if cpt==0:
@@ -115,7 +123,7 @@ def main(input_path, model_path, group_file, batchsize, nproc_sirt):
                 metadata.append(m)
                 t_data = time.perf_counter()
                 dd = bytearray(event.data[0])
-                mofka_times.append([t_wait - ts, t_meta - t_wait, len(str(m)), time.perf_counter() - t_data, len(dd)])
+                diaspora_times.append([t_wait - ts, t_meta - t_wait, len(str(m)), time.perf_counter() - t_data, len(dd)])
                 dd = np.frombuffer(dd, dtype=np.float32)
                 try:
                     dd = dd.reshape(metadata[i]["rank_dims"])
@@ -163,7 +171,7 @@ def main(input_path, model_path, group_file, batchsize, nproc_sirt):
     with open('Den_pull.csv', 'w') as f:
         write = csv.writer(f)
         write.writerow(fields)
-        write.writerows(mofka_times)
+        write.writerows(diaspora_times)
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Denoise HDF5 files using a trained model.')
     parser.add_argument('--input', type=str, required=False, help='Input file or directory path.')
