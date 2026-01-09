@@ -40,9 +40,9 @@ class TraceRuntimeConfig {
       {
         TCLAP::CmdLine cmd("SIRT Iterative Image Reconstruction", ' ', "0.01");
         TCLAP::ValueArg<std::string> argDriverType(
-          "", "driver-type", "Type of diaspora driver", false, "files", "string");
+          "", "driver_type", "Type of diaspora driver", false, "files", "string");
         TCLAP::ValueArg<std::string> argDriverConfigFile(
-          "", "driver-config-file", "Config file for the Diaspora driver", false, "", "string");
+          "", "driver_config_file", "Config file for the Diaspora driver", false, "", "string");
         TCLAP::ValueArg<size_t> argBatchSize(
           "", "batchsize", "Mofka batchsize", false, 1, "size_t");
         TCLAP::ValueArg<std::string> argReconOutputPath(

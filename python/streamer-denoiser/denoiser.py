@@ -176,11 +176,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Denoise HDF5 files using a trained model.')
     parser.add_argument('--input', type=str, required=False, help='Input file or directory path.')
     parser.add_argument('--model', type=str, required=True, help='Path to the saved model.')
-    parser.add_argument('--group_file', type=str, required=True, help='Path to group file')
     parser.add_argument("--batchsize", type=int, required=True, help="Mofka batchsize")
     parser.add_argument("--nproc_sirt", type=int, required=True, help="Number of Sirt Processes")
-
+    parser.add_argument('--driver_type', type=str, default="files", help='Type of Diaspora driver')
+    parser.add_argument('--driver_config_file', type=str, default="", help='JSON config file for Diaspora Driver')
 
     args = parser.parse_args()
-    main(args.input, args.model, args.group_file, args.batchsize, args.nproc_sirt)
+    main(args.input, args.model, args.driver_type, args.driver_config_file, args.batchsize, args.nproc_sirt)
 

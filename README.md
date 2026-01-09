@@ -30,10 +30,10 @@ This will let you execute the DAQStream.py script, which is the main streamer-da
 
 2. streamer-dist: In order to setup the python script, follow the below steps (again from project root directory):
 ```
-mkdir build/python/streamer-dist
+mkdir -p build/python/streamer-dist
 cd build/python/streamer-dist
 cp ../../../python/streamer-dist/ModDistStreamPubDemo.py .
-cp ../../../python/streamer-dist/mofka_dist.py .
+cp ../../../python/streamer-dist/diaspora_dist.py .
 cp -r ../../../python/common ../
 ```
 This will let you execute the ModDistStreamPubDemo.py script, which is the main streamer-dist process. You can check a sample usage of this script in the file ``` [Trace]$ cat tests/dist.cmd.log ```.
@@ -48,7 +48,7 @@ cp ../../../python/streamer-denoiser/* ./
 3. sirt_stream: In order to generate this executable,:
 Setup flatbuffers data structures
 ```
-cd /path/to/include/tracelib
+cd include/traacelib
 flatc -c trace_prot.fbs
 ```
 Run the following commands in project root directory

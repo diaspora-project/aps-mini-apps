@@ -12,6 +12,7 @@ import tomopy as tp
 import signal
 import diaspora_stream.api as diaspora
 import csv
+import json
 from collections import deque
 
 #from memory_profiler import profile
@@ -217,7 +218,7 @@ def simulate_daq(producer,
       buffer.append(serialized_data[index])
       md = {"index": int(index), "Type" : "DATA"}
       f = producer.push(md, buffer[i])
-      #f.wait()
+      #f.wait(timeout_ms=-1)
       # if seq % batchsize == 0:
       #   futures.append(f)
       diaspora_t.append(["push", index, ts, time.perf_counter(), time.perf_counter() - ts, len(str(md)) , len(buffer[i])])
@@ -228,7 +229,7 @@ def simulate_daq(producer,
       if i == 2*batchsize:
         # ts = time.perf_counter()
         # producer.flush()
-        # futures[0].wait()
+        # futures[0].wait(timeout_ms=-1)
         # futures.popleft()
         buffer = buffer[batchsize:]
         i = i - batchsize
@@ -242,7 +243,7 @@ def simulate_daq(producer,
     ts = time.perf_counter()
     producer.flush()
     # while not futures:
-    #   futures[0].wait()
+    #   futures[0].wait(timeout_ms=-1)
     #   futures.popleft()
     diaspora_t.append(["flush_after", index, ts, time.perf_counter(), time.perf_counter() - ts,len(buffer)*len(str(md)), len(buffer[i-1])])
   time1 = time.time()
@@ -413,14 +414,14 @@ def main():
   if args.driver_config_file != "":
       with open(args.driver_config_file) as f:
           driver_options = json.load(f)
-  driver = diaspora.Driver(args.driver_type, options=driver_options)
+  driver = diaspora.Driver(backend=args.driver_type, options=driver_options)
 
   # create a topic
   topic_name = "daq_dist"
   topic = driver.open_topic(topic_name)
   producer_name = "daq_producer"
   batchsize = args.batchsize #diaspora.AdaptiveBatchSize
-  thread_pool = diaspora.ThreadPool(1)
+  thread_pool = driver.make_thread_pool(1)
   ordering = diaspora.Ordering.Strict
   producer = topic.producer(producer_name, batch_size=batchsize, thread_pool=thread_pool, ordering=ordering)
 
@@ -464,7 +465,7 @@ def main():
   else:
     print("Unknown mode: {}".format(args.mode))
   producer.push({"Type": "FIN"}, bytearray(1))
-  producer.flush().wait()
+  producer.flush().wait(timeout_ms=-1)
   time1 = time.time()
   print("Total time (s): {:.2f}".format(time1-time0))
 

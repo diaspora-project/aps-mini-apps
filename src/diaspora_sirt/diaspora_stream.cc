@@ -124,8 +124,11 @@ void DiasporaStream::handshake(int rank, int size){
                                                 batchSize,
                                                 threadCount,
                                                 targets);
-  auto event = hs_consumer.pull().wait(-1).value();
-  diaspora::Metadata m = event.metadata();
+  std::optional<diaspora::Event> event;
+  while(!event) {
+    event = hs_consumer.pull().wait(-1);
+  }
+  diaspora::Metadata m = event->metadata();
   json mdata = m.json();
   setInfo(mdata);
 }
@@ -252,13 +255,16 @@ DataRegionBase<float, TraceMetadata>* DiasporaStream::readSlidingWindow(
   for(int i=0; i<step; ++i) {
     // diaspora messages
     auto start = std::chrono::high_resolution_clock::now();
-    auto event = consumer.pull().wait(-1).value();
+    std::optional<diaspora::Event> event;
+    while(!event) {
+        event = consumer.pull().wait(-1);
+    }
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = end - start;
     setConsumerTimes("wait_t", 1, elapsed.count());
-    diaspora_events.push_back(event);
+    diaspora_events.push_back(event.value());
     //if endMsg break
-    if (event.metadata().json()["Type"].get<std::string>() == "FIN") return nullptr;
+    if (event->metadata().json()["Type"].get<std::string>() == "FIN") return nullptr;
   }
   // TODO: After receiving message corrections might need to be applied
 

@@ -73,7 +73,7 @@ class DiasporaDist:
             driver_options = {
                 "root_path": "./diaspora-data"
             }
-        self.driver = diaspora.Driver(driver_type, options=driver_options)
+        self.driver = diaspora.Driver(backend=driver_type, options=driver_options)
         self.seq = 0
         self.nranks = 1
         self.buffer = []
@@ -110,8 +110,9 @@ class DiasporaDist:
             consumer = topic.consumer(name="handshaker",
                                       thread_pool=self.driver.make_thread_pool(0),
                                       batch_size=self.batch)
-            f = consumer.pull()
-            event = f.wait(timeout_ms=-1)
+            event = None
+            while event is None:
+                event = consumer.pull().wait(timeout_ms=-1)
             self.nranks = json.loads(event.metadata)["comm_size"]
             self.seq += 1
             del event
