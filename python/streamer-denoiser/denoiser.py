@@ -97,7 +97,9 @@ def main(input_path, recon_path, model_path, protocol, group_file, batchsize, nu
                               batch_size=batch_size,
                               data_selector=data_selector,
                               data_broker=data_broker)
-    pending_tasks = num_tasks
+    pending_tasks = set()
+    for task_id in range(num_tasks):
+        pending_tasks.add(task_id)
     mofka_times = []
 
     waiting_metadata = {}
@@ -106,7 +108,12 @@ def main(input_path, recon_path, model_path, protocol, group_file, batchsize, nu
 
     print("Starting receiving data from SIRTs...")
 
-    while pending_tasks > 0 or waiting_metadata.empty() == False:
+    while pending_tasks or len(waiting_metadata) > 0:
+        print("Pending tasks: ", pending_tasks, " Waiting metadata size: ", len(waiting_metadata))
+        if not pending_tasks:
+            for iteration_stream in waiting_metadata.keys():
+                print(f"    --> Waiting iteration {iteration_stream}: Complete tasks: {waiting_metadata[iteration_stream].keys()}")
+
         ts = time.perf_counter()
         f = consumer.pull()
         event = f.wait()
@@ -118,10 +125,14 @@ def main(input_path, recon_path, model_path, protocol, group_file, batchsize, nu
             # print("Receive data without Type: ", m)
             continue
         if m["Type"] == "FIN":
-            print("Received FIN: ", m, " Pending tasks before decrement: ", pending_tasks)
-            pending_tasks -= 1
-            if pending_tasks <= 0:
-                print("All tasks completed. Will exit when all waiting metadata is processed.")
+            task_id = int(m["task_id"])
+            if task_id in pending_tasks:
+                print("Received FIN: ", m, " Number of Pending tasks before decrement: ", len(pending_tasks))
+                pending_tasks.discard(task_id)
+            else:
+                print("WARNING: Receiving duplicated FIN: ", m, " Number of Pending tasks before decrement: ", len(pending_tasks))
+            if not pending_tasks:
+                print("All tasks completed. Will exit when all waiting metadata is processed. Waiting metadata size: ", len(waiting_metadata))
                 continue
         else:
 
@@ -129,9 +140,18 @@ def main(input_path, recon_path, model_path, protocol, group_file, batchsize, nu
 
             iteration_stream = m["iteration_stream"]
             row_id = int(m["rank"])
+
             if iteration_stream in completed_iterations:
-                # Already processed this iteration stream
+                print(f"WARNING: [DUP] Data received for already completed iteration stream {iteration_stream}, task_id: {row_id}. Ignoring data.")
                 continue
+
+            if iteration_stream not in waiting_metadata:
+                waiting_metadata[iteration_stream] = {}
+                waiting_data[iteration_stream] = {}
+
+            if row_id in waiting_metadata[iteration_stream]:
+                print(f"WARNING: [DUP] Duplicate data received for iteration stream {iteration_stream}, rank {row_id}. Overwriting previous data.")
+                # continue
 
             t_data = time.perf_counter()
             dd = event.data[0]
@@ -141,15 +161,6 @@ def main(input_path, recon_path, model_path, protocol, group_file, batchsize, nu
                 dd = dd.reshape(m["rank_dims"])
             except ValueError:
                 dd = np.zeros(m["rank_dims"], dtype=dd.dtype)
-
-            
-
-            if iteration_stream not in waiting_metadata:
-                waiting_metadata[iteration_stream] = {}
-                waiting_data[iteration_stream] = {}
-
-            if row_id in waiting_metadata[iteration_stream]:
-                print(f"WARNING: Duplicate data received for iteration stream {iteration_stream}, rank {row_id}. Overwriting previous data.")
             
             waiting_metadata[iteration_stream][row_id] = m
             waiting_data[iteration_stream][row_id] = dd

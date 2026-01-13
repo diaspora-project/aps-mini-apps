@@ -42,7 +42,7 @@ SSTStream::SSTStream(const std::string &streamName,
         // m_io->SetParameters({{"OpenTimeoutSecs", "30"}});
         // m_io->SetParameter("RendezvousReaderCount", "1");
         m_io->SetParameter("QueueLimit", "1");
-        m_io->SetParameter("OpenTimeoutSecs", "1"); // wait 1 seconds max
+        m_io->SetParameter("OpenTimeoutSecs", "30"); // wait 1 seconds max
 
         // m_engine = std::make_unique<adios2::Engine>(
         //     m_io->Open(m_streamName, adios2::Mode::Read));
@@ -50,22 +50,26 @@ SSTStream::SSTStream(const std::string &streamName,
         // std::cout << "[Task-" << m_partitionId << "] SSTStream initialized." << std::endl;
         // m_is_active.store(true);
 
+        // m_engine = std::make_unique<adios2::Engine>(m_io->Open(m_streamName, adios2::Mode::Read));
+        // m_is_active.store(true);
+
         m_openFuture.emplace(async(std::launch::async, [&] {
             return m_io->Open(m_streamName, adios2::Mode::Read);
         }));
-
-        if (m_openFuture->wait_for(std::chrono::seconds(10)) != std::future_status::ready) {
-            // timed out
-            m_is_active.store(false);
-            m_eos.store(true);
-            std::cout << "[Task-" << m_partitionId << "] SSTStream initialization timeouted." << std::endl;
-            return;
-        }
-
-        m_engine = std::make_unique<adios2::Engine>(m_openFuture->get());
-        std::cout << "[Task-" << m_partitionId << "] SSTStream initialized." << std::endl;
-        m_openFuture.reset();
         m_is_active.store(true);
+
+        // if (m_openFuture->wait_for(std::chrono::seconds(10)) != std::future_status::ready) {
+        //     // timed out
+        //     m_is_active.store(false);
+        //     m_eos.store(true);
+        //     std::cout << "[Task-" << m_partitionId << "] SSTStream initialization timeouted." << std::endl;
+        //     return;
+        // }
+
+        // m_engine = std::make_unique<adios2::Engine>(m_openFuture->get());
+        // std::cout << "[Task-" << m_partitionId << "] SSTStream initialized." << std::endl;
+        // m_openFuture.reset();
+        // m_is_active.store(true);
     }catch (const std::exception &ex) {
         std::cout << "SSTStream initialization failed: " << ex.what();
         m_is_active.store(false);
@@ -75,22 +79,20 @@ SSTStream::SSTStream(const std::string &streamName,
 
 SSTStream::~SSTStream()
 {
-    try {
-        if (m_engine) {
-            // In older ADIOS2 versions there is no Engine::Good().
-            // Close() is safe to call once; if it's already closed
-            // ADIOS2 will generally just ignore it or handle internally.
-            m_engine->Close();
-        }
-    } catch (...) {
-        // Destructors must not throw
-    }
+    this->close();
 }
 
 bool SSTStream::pull_data(SSTPayload &out)
 {
-    if (!is_active()) {
-        return false;
+    if (m_openFuture) {
+        if (m_openFuture->wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+            m_engine = std::make_unique<adios2::Engine>(m_openFuture->get());
+            std::cout << "[Task-" << m_partitionId << "] SSTStream initialized." << std::endl;
+            m_openFuture.reset();
+        } else {
+            // std::cout << "[Task-" << m_partitionId << "] SSTStream not active." << std::endl;
+            return false;
+        }
     }
 
     if (m_eos.load()) {

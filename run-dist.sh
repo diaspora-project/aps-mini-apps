@@ -17,6 +17,10 @@ logdir=$3
 
 trap "echo 'Ctrl+C pressed. Terminating...'; exit 1" SIGINT SIGTERM
 
+# export ADIOS2_DEBUG=1
+# export SST_DEBUG=2
+# export SstVerbose=5
+
 # python -u ./build/python/streamer-dist/ModDistStreamPubDemo.py \
 # python -u ./build/python/streamer-dist/DynamicModDistStreamPubDemo.py \
 # python -u ./build/python/streamer-dist/DynamicModDistStreamPubThreading.py \

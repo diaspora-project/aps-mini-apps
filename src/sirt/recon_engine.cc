@@ -110,7 +110,7 @@ int ReconTask::run() {
 
 
   SSTStream sst_stream = SSTStream{
-    "sirt_stream",
+    config.logdir + "/sirt_stream",
     task_id,
     num_tasks,
     config.sst
@@ -138,6 +138,8 @@ int ReconTask::run() {
   DISPEngineBase<SIRTReconSpace, float> *engine =
     new DISPEngineReductionSIRT(main_recon_space, config.thread_count);
 
+  std::cout << "[Task-" << task_id << "] Setting up VeloC checkpointing." << std::endl;
+
   // Configure the VeloC checkpointing
   unsigned int ckpt_id = 0;
   ckpt_mutex->lock();
@@ -148,6 +150,8 @@ int ReconTask::run() {
   int progress = 0; // Reconstruction progress marked by the projection requence ids
   ckpt_client->mem_protect(0, &progress, 1, sizeof(int), ckpt_name);
   ckpt_client->mem_protect(1, veloc::boost::serializer(recon_image), veloc::boost::deserializer(recon_image), ckpt_name);
+  
+  std::cout << "[Task-" << task_id << "] Testing for checkpoint restart." << std::endl;
 
   // int passes = ckpt_client->restart_test(config.ckpt_name, 0, task_id);
   int passes = ckpt_client->restart_test(ckpt_name, 0, ckpt_id);
@@ -180,12 +184,16 @@ int ReconTask::run() {
     if (killed != 0) {
       std::cout << "[Task-" << task_id << "] Received kill signal: " << killed << ". Exiting..." << std::endl;
       ms.stopDataCollection();
+      producer.flush();
+      ckpt_client->checkpoint_wait();
+      sst_stream.close();
       return killed;
     }
 
     #ifdef TIMERON
     auto datagen_beg = std::chrono::system_clock::now();
     #endif
+    std::cout << "[Task-" << task_id << "] Pass " << passes << ": Reading sliding window ..." << std::endl;
     curr_slices = ms.readSlidingWindow(recon_image, config.window_step, consumer, sst_stream);
     
     if(config.center!=0 && curr_slices!=nullptr)
@@ -209,6 +217,9 @@ int ReconTask::run() {
       if (killed != 0) {
         std::cout << "[Task-" << task_id << "] Received kill signal: " << killed << ". Exiting..." << std::endl;
         ms.stopDataCollection();
+        producer.flush();
+        ckpt_client->checkpoint_wait();
+        sst_stream.close();
         return killed;
       }
 
@@ -334,6 +345,8 @@ int ReconTask::run() {
     if (stop_flag.load()) {
       std::cerr << "[Task-" << task_id << "] Stop flag set. Exiting reconstruction loop and stream..." << std::endl;
       ms.stopDataCollection();
+      producer.flush();
+      ckpt_client->checkpoint_wait();
       // Call the callback if it exists
       if (on_stop_callback) {
         on_stop_callback();
@@ -343,22 +356,22 @@ int ReconTask::run() {
 
   }
 
-
-
-  auto start = std::chrono::high_resolution_clock::now();
-  producer.flush();
-  auto end = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double> elapsed_t = end - start;
-  ms.setProducerTimes("Flush", ms.getBufferSize()*data_size*sizeof(float), elapsed_t.count());
-  std::cout << "Flush " << ms.getBatch() << " Time: " << elapsed_t.count() << " sec" << std::endl;
-  ms.writeTimes(config.logdir, "producer");
-  ms.writeTimes(config.logdir, "consumer");
-  // MPI_Barrier(MPI_COMM_WORLD);
-  json md = {{"Type", "FIN"}};
-  // data part
-  float d = 1;
-  auto future = producer.push(mofka::Metadata{md}, mofka::Data{&d,sizeof(float)});
-  future.wait();
+  if (!stop_flag.load()) {
+    auto start = std::chrono::high_resolution_clock::now();
+    producer.flush();
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed_t = end - start;
+    ms.setProducerTimes("Flush", ms.getBufferSize()*data_size*sizeof(float), elapsed_t.count());
+    std::cout << "Flush " << ms.getBatch() << " Time: " << elapsed_t.count() << " sec" << std::endl;
+    ms.writeTimes(config.logdir, "producer");
+    ms.writeTimes(config.logdir, "consumer");
+    // MPI_Barrier(MPI_COMM_WORLD);
+    json md = {{"Type", "FIN"}, {"task_id", std::to_string(task_id)}};
+    // data part
+    float d = 1;
+    auto future = producer.push(mofka::Metadata{md}, mofka::Data{&d,sizeof(float)});
+    future.wait();
+  }
 
 
   /**************************/

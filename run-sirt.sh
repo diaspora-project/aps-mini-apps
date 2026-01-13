@@ -10,6 +10,7 @@ fi
 
 sirt_ranks=$1
 logdir=$2
+logdir=`pwd`/$logdir
 
 trap "echo 'Ctrl+C pressed. Terminating...'; exit 1" SIGINT SIGTERM
 
@@ -48,6 +49,10 @@ trap "echo 'Ctrl+C pressed. Terminating...'; exit 1" SIGINT SIGTERM
 
 # gdb arguments
 # run --id 0 --np 1 --write-freq 4 --window-iter 1 --window-step 4 --window-length 4 --thread 1 --center 1427 --protocol na+sm --group-file mofka.json --batchsize 4 --reconOutputPath ./output.h5 --recon-output-dir . --reconDatasetPath /data --pub-freq 10000 --ckpt-freq 4 --ckpt-name sirt --ckpt-config veloc.cfg --logdir .
+
+# export ADIOS2_DEBUG=1
+# export SST_DEBUG=2
+# export SstVerbose=5
 
 python -u ./build/python/streamer-sirt/ParslSirt.py \
     --num-workers ${sirt_ranks} \

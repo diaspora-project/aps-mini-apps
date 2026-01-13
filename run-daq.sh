@@ -146,7 +146,7 @@ python -u ./build/python/streamer-daq/DAQStream.py \
 	--batchsize 4 \
 	--publisher_addr tcp://0.0.0.0:50000 \
 	--iteration_sleep 1 \
-	--proj_sleep 0.01 \
+	--proj_sleep 0.1 \
 	--num_sinograms ${num_sinograms} \
 	--synch_addr tcp://0.0.0.0:50001 \
 	--synch_count 1 \

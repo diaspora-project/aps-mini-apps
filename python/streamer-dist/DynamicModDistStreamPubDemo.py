@@ -214,8 +214,8 @@ def flush_mofka_producer(args, shm_name, num_slots, slot_bytes, desc_q, ack_q):
   #     continue
   # print("Exiting mofka producer flush thread ...")
 
-class MofkaShmSender:
-  def __init__(self, num_slots, slot_bytes, init_args, ctx=None):
+class ShmSender:
+  def __init__(self, name, num_slots, slot_bytes, init_args, flush_producer, ctx=None):
     self.ctx = ctx or multiprocessing.get_context("spawn")
     self.init_args = init_args
 
@@ -232,6 +232,9 @@ class MofkaShmSender:
     self.pending_definite = deque()   # safe retries
     self.pending_uncertain = deque()  # avoid resending
 
+    self.flush_producer = flush_producer
+    self.name = name
+
     self.last_ok_or_exc_time = time.time()
     self.proc = self._start_proc()
 
@@ -245,7 +248,7 @@ class MofkaShmSender:
 
   def _start_proc(self):
     p = self.ctx.Process(
-      target=flush_mofka_producer,
+      target=self.flush_producer,
       args=(self.init_args, self.ring.name, self.ring.num_slots, self.ring.slot_bytes,
             self.desc_q, self.ack_q),
       daemon=False
@@ -337,7 +340,7 @@ class MofkaShmSender:
         except Exception:
           pass
 
-      meta_path = os.path.join(outdir, f"{desc.msg_id}.json")
+      meta_path = os.path.join(outdir, f"{self.name}-{desc.msg_id}.json")
       with open(meta_path, "w") as f:
         meta = {
           "msg_id": desc.msg_id,
@@ -500,24 +503,32 @@ class MofkaShmSender:
     print("Starting async sender thread ...")
     while True:
       try:
-        img_msg = self.async_waiting_queue.get()
+        img_msg = self.async_waiting_queue.get(timeout=0.1)
       except queue.Empty:
         img_msg = None
 
-      if img_msg is not None:
-        print(f"Queueing image seq_id {img_msg.sequence_id} to sirt through Mofka")
-        self.enqueue_image(
-          data=img_msg.data,
-          sequence_id=img_msg.sequence_id,
-          num_sinograms=img_msg.num_sinograms,
-          num_columns=img_msg.num_columns,
-          rotation=img_msg.rotation,
-          unique_id=img_msg.unique_id,
-          center=img_msg.center,
-          msg_id=img_msg.msg_id,
-          timeout=img_msg.timeout,
-        )
-        self.maybe_restart_if_stalled()
+      # ALWAYS service + watchdog, even if idle
+      self.poll()
+      self.maybe_restart_if_stalled()
+
+      if img_msg is None:
+        continue
+
+      print(f"Queueing image seq_id {img_msg.sequence_id} to sirt through {self.name}")
+      ok = self.enqueue_image(
+        data=img_msg.data,
+        sequence_id=img_msg.sequence_id,
+        num_sinograms=img_msg.num_sinograms,
+        num_columns=img_msg.num_columns,
+        rotation=img_msg.rotation,
+        unique_id=img_msg.unique_id,
+        center=img_msg.center,
+        msg_id=img_msg.msg_id,
+        timeout=img_msg.timeout,
+      )
+      if not ok:
+        # optional: avoid tight loop if backpressure
+        time.sleep(0.001)
 
   def start_async_sender_thread(self):
     threading.Thread(target=self._async_sender_thread_fn, daemon=True).start()
@@ -569,27 +580,83 @@ class MofkaShmSender:
     self.ring.close()
     self.ring.unlink()
 
-def restart_worker(sender: MofkaShmSender, init_args):
-    # kill old proc
-    if sender.proc.is_alive():
-        sender.proc.terminate()
-        sender.proc.join(timeout=1.0)
+# def restart_worker(sender: ShmSender, init_args):
+#     # kill old proc
+#     if sender.proc.is_alive():
+#         sender.proc.terminate()
+#         sender.proc.join(timeout=1.0)
 
-    # reset queues and free lists conservatively
-    sender.free_slots = list(range(sender.ring.num_slots))
-    sender.inflight.clear()
+#     # reset queues and free lists conservatively
+#     sender.free_slots = list(range(sender.ring.num_slots))
+#     sender.inflight.clear()
 
-    ctx = sender.ctx
-    sender.desc_q = ctx.Queue(maxsize=sender.ring.num_slots * 2)
-    sender.ack_q  = ctx.Queue(maxsize=sender.ring.num_slots * 2)
+#     ctx = sender.ctx
+#     sender.desc_q = ctx.Queue(maxsize=sender.ring.num_slots * 2)
+#     sender.ack_q  = ctx.Queue(maxsize=sender.ring.num_slots * 2)
 
-    sender.proc = ctx.Process(
-        target=flush_mofka_producer,
-        args=(init_args, sender.ring.name, sender.ring.num_slots, sender.ring.slot_bytes,
-              sender.desc_q, sender.ack_q),
-        daemon=False
-    )
-    sender.proc.start()
+#     sender.proc = ctx.Process(
+#         target=self.flush_producer,
+#         args=(init_args, sender.ring.name, sender.ring.num_slots, sender.ring.slot_bytes,
+#               sender.desc_q, sender.ack_q),
+#         daemon=False
+#     )
+#     sender.proc.start()
+
+
+def flush_sst_producer(args, shm_name, num_slots, slot_bytes, desc_q, ack_q):
+    ring = SharedRing(num_slots=num_slots, slot_bytes=slot_bytes, shm_name=shm_name, create=False)
+
+    contact_file = args.logdir + "/sirt_stream"
+    print(f"Setting up SST for data distribution at {contact_file}...")
+    sst_dist = SSTDist(num_sinograms=args.num_sinograms, chunk_size=args.num_columns, 
+                            stream_name=contact_file, max_meta_bytes=65536)
+
+    try:
+      while True:
+        desc = desc_q.get()
+        if desc is None:
+          break
+        
+        if desc.sequence_id < 0:
+          print(f"Received complete signal in SST producer with sequence_id={desc.sequence_id}. Sending FIN message to sirt")
+          sst_dist.done_image()
+          print("Sending keepalive to SST stream ...")
+          sst_dist.keepalive(period_sec=0.5)
+        else:
+          try:
+            mv = ring.slot_view(desc.slot)[:desc.nbytes]
+            n_f32 = desc.nbytes // 4
+            payload = np.frombuffer(mv, dtype=np.float32, count=n_f32).copy()
+            # payload = np.frombuffer(mv, dtype=np.float32, count=n_f32)
+
+            sst_dist.push_image(payload,
+                        desc.sequence_id,
+                        desc.num_sinograms,
+                        desc.num_columns,
+                        desc.rotation,
+                        desc.unique_id,
+                        desc.center)
+
+            ack_q.put(("OK", desc.slot, desc.msg_id, None))
+          except Exception as e:
+            ack_q.put(("EXC", desc.slot, desc.msg_id, repr(e)))
+          finally:
+            try:
+              del payload
+              mv.release()
+              del mv
+            except Exception:
+              pass
+            mv = None
+    finally:
+      # force cleanup before shm close (helps some native libs)
+      try:
+        if sst_dist is not None:
+          sst_dist.close()
+      except Exception:
+          pass
+      ring.close()
+      print("Cleaning up SST stream ...")
 
 
 # def task_to_worker_assignment(action_producer, action_consumer, args, action_mofka_dist):
@@ -791,12 +858,14 @@ def main():
   print("Setting up shared memory sender for producer ...")
   NUM_SLOTS = 64
   SLOT_BYTES = args.num_columns * args.num_sinograms * 4
-  sender = MofkaShmSender(num_slots=NUM_SLOTS, slot_bytes=SLOT_BYTES, init_args=args)
+  mofka_sender = ShmSender(name="Mofka", num_slots=NUM_SLOTS, slot_bytes=SLOT_BYTES, init_args=args, flush_producer=flush_mofka_producer)
 
   # Register a signal handler for this function
   def signal_handler(sig, frame):
     print("\nCtrl+C pressed. Exiting immediately...")
-    sender.stop(force_kill_after=2.0)
+    if args.sst:
+      sst_sender.stop(force_kill_after=2.0)
+    mofka_sender.stop(force_kill_after=2.0)
     sys.exit(0)  # Exit the program immediately
 
   signal.signal(signal.SIGINT, signal_handler)
@@ -848,12 +917,14 @@ def main():
   time0 = time.time()
 
   if args.sst:
-    sst_dist = SSTDist(num_sinograms=args.num_sinograms, chunk_size=args.num_columns, 
-                             stream_name="sirt_stream", max_meta_bytes=65536)
+    sst_sender = ShmSender(name="SST", num_slots=NUM_SLOTS, slot_bytes=SLOT_BYTES,
+                            init_args=args, flush_producer=flush_sst_producer)
 
   print("Starting to receive images ...")
 
-  sender.start_async_sender_thread()
+  if args.sst:
+    sst_sender.start_async_sender_thread()
+  mofka_sender.start_async_sender_thread()
 
   # # Create a new thread to periodically flush the producer
   # flush_thread = threading.Thread(target=flush_mofka_producer, args=(mofka_dist,producer,), daemon=False)
@@ -924,12 +995,27 @@ def main():
         sub[np.where(sub == np.inf)] = 0.00
 
       #to send from mofka:
-      mofka_sub = sub.flatten()
+      # mofka_sub = sub.flatten()
       ncols = sub.shape[2]
+
+      mofka_sub = np.ascontiguousarray(sub, dtype=np.float32).ravel()
+
       if args.sst:
-        print(f"Sending image seq_id {sequence_id} to sirt through SST")
-        tt = sst_dist.push_image(mofka_sub, sequence_id, args.num_sinograms, ncols, rotation,
-                        mofka_read_image.UniqueId(), mofka_read_image.Center())
+        # print(f"Sending image seq_id {sequence_id} to sirt through SST")
+        # tt = sst_dist.push_image(mofka_sub, sequence_id, args.num_sinograms, ncols, rotation,
+        #                 mofka_read_image.UniqueId(), mofka_read_image.Center())
+        sst_sender.async_enqueue_image(
+          data=mofka_sub,
+          sequence_id=sequence_id,
+          num_sinograms=args.num_sinograms,
+          num_columns=ncols,
+          rotation=rotation,
+          unique_id=mofka_read_image.UniqueId(),
+          center=mofka_read_image.Center(),
+          msg_id=f"{run_id}:{sequence_id}",
+          timeout=0.2
+        )
+        
         # print(f"Sending image seq_id {sequence_id} to sirt through Mofka")
         # tt = mofka_dist.push_image(mofka_sub, sequence_id, args.num_sinograms, ncols, rotation,
         #                 mofka_read_image.UniqueId(), mofka_read_image.Center(), producer=producer)
@@ -957,8 +1043,9 @@ def main():
       # if not ok:
       #   # backpressure: pause or spill
       #   time.sleep(0.01)
-      mofka_sub = np.ascontiguousarray(sub, dtype=np.float32).ravel()
-      sender.async_enqueue_image(
+      
+      # mofka_sub = np.ascontiguousarray(sub, dtype=np.float32).ravel()
+      mofka_sender.async_enqueue_image(
         data=mofka_sub,
         sequence_id=sequence_id,
         num_sinograms=args.num_sinograms,
@@ -1002,10 +1089,78 @@ def main():
       tot_dark_imgs += 1
     seq+=1
 
-
-  # Send FIN to SIRT with SST
   if args.sst:
-    sst_dist.done_image()
+    print("Drainning SST stream then sending FIN to sirt")
+    deadline = time.time() + 10.0
+    while time.time() < deadline:
+        sst_sender.poll()
+        sst_sender.maybe_restart_if_stalled()
+        if (not sst_sender.inflight) and (not sst_sender.pending_definite):
+            break
+        time.sleep(0.01)
+    fin_deadline = time.time() + 5.0
+    sent = False
+    while time.time() < fin_deadline and not sent:
+      sst_sender.poll()
+      sent = sst_sender.send_fin(timeout=0.2)
+      if not sent:
+        time.sleep(0.01)
+
+  print("Stopping shared memory mofka_sender ...")
+  # drain until we have no known-safe pending/inflight
+  deadline = time.time() + 10.0
+  while time.time() < deadline:
+    mofka_sender.poll()
+    mofka_sender.maybe_restart_if_stalled()  # optional: keep it alive while draining
+    if (not mofka_sender.inflight) and (not mofka_sender.pending_definite):
+      break
+    time.sleep(0.01)
+
+  if mofka_sender.inflight or mofka_sender.pending_definite:
+    print("[WARN] Still have inflight/pending_definite at shutdown. "
+            "Not sending FIN to avoid loss. Investigate backpressure/hang.")
+  else:
+    fin_deadline = time.time() + 5.0
+    sent = False
+    while time.time() < fin_deadline and not sent:
+      mofka_sender.poll()
+      sent = mofka_sender.send_fin(timeout=0.2)
+      if not sent:
+        time.sleep(0.01)
+
+    if not sent:
+      print("[WARN] Could not enqueue FIN (desc_q full). Forcing stop.")
+    else:
+      mofka_sender.wait_worker_exit(timeout=5.0)
+  if mofka_sender.pending_uncertain:
+    print(f"[WARN] {len(mofka_sender.pending_uncertain)} uncertain messages parked; "
+          "not resent to minimize duplicates.")
+  mofka_sender.stop(force_kill_after=2.0)      # now force if still stuck
+  
+
+  # print("Notifying SIRT that we are done ...")
+  # for w in range(mofka_dist.nworkers):
+  #   action_info = {
+  #       "Type": "SHUTDOWN",
+  #       "worker_id": w
+  #   }
+  #   action_producer.push(action_info)
+  #   action_producer.flush()
+  
+  # del action_producer
+  # del action_consumer
+
+  print("Cleaning up task assignment process ...")
+  # args.dynamic_loadbalancing = "false"
+
+  # Wait for the assignment process to finish
+  assignment_process.join()
+  # if assignment_process.is_alive():
+  #   assignment_process.terminate()
+
+  # print("Complete data disitribution, sleeping until to exit ...")
+  # while True:
+  #   time.sleep(1)
 
   # t = mofka_dist.last_flush(producer)
   # if t is not None:
@@ -1034,65 +1189,9 @@ def main():
   # del producer
   del consumer
 
-  print("Stopping shared memory sender ...")
-  # drain until we have no known-safe pending/inflight
-  deadline = time.time() + 10.0
-  while time.time() < deadline:
-    sender.poll()
-    sender.maybe_restart_if_stalled()  # optional: keep it alive while draining
-    if (not sender.inflight) and (not sender.pending_definite):
-      break
-    time.sleep(0.01)
-
-  if sender.inflight or sender.pending_definite:
-    print("[WARN] Still have inflight/pending_definite at shutdown. "
-            "Not sending FIN to avoid loss. Investigate backpressure/hang.")
-  else:
-    fin_deadline = time.time() + 5.0
-    sent = False
-    while time.time() < fin_deadline and not sent:
-      sender.poll()
-      sent = sender.send_fin(timeout=0.2)
-      if not sent:
-        time.sleep(0.01)
-
-    if not sent:
-      print("[WARN] Could not enqueue FIN (desc_q full). Forcing stop.")
-    else:
-      sender.wait_worker_exit(timeout=5.0)
-  if sender.pending_uncertain:
-    print(f"[WARN] {len(sender.pending_uncertain)} uncertain messages parked; "
-          "not resent to minimize duplicates.")
-  sender.stop(force_kill_after=2.0)      # now force if still stuck
-  
-  # print("Notifying SIRT that we are done ...")
-  # for w in range(mofka_dist.nworkers):
-  #   action_info = {
-  #       "Type": "SHUTDOWN",
-  #       "worker_id": w
-  #   }
-  #   action_producer.push(action_info)
-  #   action_producer.flush()
-  
-  # del action_producer
-  # del action_consumer
-
-  print("Cleaning up task assignment process ...")
-  # args.dynamic_loadbalancing = "false"
-
-  # Wait for the assignment process to finish
-  assignment_process.join()
-  # if assignment_process.is_alive():
-  #   assignment_process.terminate()
-
-  # print("Complete data disitribution, sleeping until to exit ...")
-  # while True:
-  #   time.sleep(1)
-
-  print("Cleaning up SST stream ...")
-
   if args.sst:
-    sst_dist.close()
+    while True:
+      time.sleep(1)
     
   print("Exiting ...")
 

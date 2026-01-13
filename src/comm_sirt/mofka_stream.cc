@@ -77,24 +77,30 @@ std::thread MofkaStream::receiveEventInBackground(mofka::Consumer consumer)
           std::lock_guard<std::mutex> lock(this->mofka_buffer_mutex);
           while (!mofka_buffered_events.empty()) {
             auto &front = mofka_buffered_events.front();
-            const auto type = front.metadata().json().value("Type", "");
-            if (type == "FIN") {
-              std::cout << "[Task-" << getRank()
-                        << "]: Received FIN event in buffered events."
-                        << std::endl;
-              // Re-add FIN at the end to end sure all data events are processed first
-              if (mofka_buffered_events.size() > 1) {
-                std::rotate(mofka_buffered_events.begin(),
-                  mofka_buffered_events.begin() + 1,
-                  mofka_buffered_events.end());
+            try {
+              const auto type = front.metadata().json().value("Type", "");
+              if (type == "FIN") {
+                std::cout << "[Task-" << getRank()
+                          << "]: Received FIN event in buffered events."
+                          << std::endl;
+                // Re-add FIN at the end to end sure all data events are processed first
+                if (mofka_buffered_events.size() > 1) {
+                  std::rotate(mofka_buffered_events.begin(),
+                    mofka_buffered_events.begin() + 1,
+                    mofka_buffered_events.end());
+                }
+                break;
               }
+              if (type != "MSG_DATA_REP") {
+                std::cout << "[Task-" << getRank()
+                          << "]: Received non-DATA event: " << type << std::endl;
+                break;
+              }
+            } catch (...) {
+              std::cout << "[Task-" << getRank() << "]: Error when processing event:" << front.metadata().string() << std::endl;
               break;
             }
-            if (type != "MSG_DATA_REP") {
-              std::cout << "[Task-" << getRank()
-                        << "]: Received non-DATA event: " << type << std::endl;
-              break;
-            }
+            
             int seq = -1;
             try {
               seq = front.metadata().json().at("seq_n").get<int>();
@@ -392,6 +398,9 @@ DataRegionBase<float, TraceMetadata>* MofkaStream::readSlidingWindow(
 
     bool added_new_data = false;
 
+    std::cout << "[Task-" << getRank() << "]: Sliding window step " << i
+              << ", next_seq = " << this->next_seq << std::endl;
+
     while (!added_new_data) {
 
       if (interrupt_signal) {
@@ -399,10 +408,24 @@ DataRegionBase<float, TraceMetadata>* MofkaStream::readSlidingWindow(
         return nullptr; // Exit if interrupt signal is received
       }
 
+      bool got_data_from_sst = false;
+
       // Check SST stream for fast data
       if (!sst_lagging && !getSSTEndOfStream()) {
         // Clean up SST payloads before getting new data
         if (!this->pending_sst_payloads.empty() && pending_sst_payloads[0].stepIndex == this->next_seq) {
+
+          auto metadata_json = json::parse(pending_sst_payloads[0].metadata);
+          if (metadata_json["Type"].get<std::string>() == "FIN") {
+            setSSTEndOfStream(true);
+            std::cout << "[Task-" << getRank() << "]: End of stream detected from pending SST" << std::endl;
+            if (sst_stream.get_success_pulls() > 1) {
+              std::cout << "[Task-" << getRank() << "]: At least one successful pulls from pending SST stream before FIN --> True end of stream, stop Mofka as well." << std::endl;
+              setMofkaEndOfStream(true);
+            }
+            return nullptr;
+          }
+
           std::cout << "[Task-" << getRank() << "]: Processing pending SST stepIndex: " << this->pending_sst_payloads[0].stepIndex << std::endl;
           // Add to stream events
           // stream_events.push_back(StreamEvent(this->pending_sst_payloads[0]));
@@ -416,46 +439,52 @@ DataRegionBase<float, TraceMetadata>* MofkaStream::readSlidingWindow(
         }else{
           SSTPayload sst_payload;
           if (sst_stream.pull_data(sst_payload)) {
-
-            auto metadata_json = json::parse(sst_payload.metadata);
-
-            if (metadata_json["Type"].get<std::string>() == "FIN") {
-              setSSTEndOfStream(true);
-              std::cout << "[Task-" << getRank() << "]: End of stream detected from SST" << std::endl;
-              if (sst_stream.get_success_pulls() > 1) {
-                std::cout << "[Task-" << getRank() << "]: At least one successful pulls from SST stream before FIN --> True end of stream, stop Mofka as well." << std::endl;
-                setMofkaEndOfStream(true);
-              }
-              return nullptr;
-            }
-
-            auto stepIndex = metadata_json["seq_n"].get<uint64_t>();
-            sst_payload.stepIndex = stepIndex;
-
-            if (stepIndex > this->next_seq) {
-              std::cout << "[Task-" << getRank() << "]: Delay processing SST stepIndex: " << stepIndex
-                        << " > " << this->next_seq << " = next_seq" << std::endl;
-              sst_payload.stepIndex = stepIndex;
-              this->pending_sst_payloads.push_back(sst_payload);
-              // we are lagging behind SST stream, mark the sequence then read data from Mofka instead
-              // until we catch up
-              delayed_sst_seq = stepIndex;
-              sst_lagging = true;
-            }else if (stepIndex < this->next_seq) {
-              std::cout << "[Task-" << getRank() << "]: Skipping SST stepIndex: " << stepIndex
-                        << " < " << this->next_seq << " = next_seq" << std::endl;
+            
+            if (!json::accept(sst_payload.metadata)) {
+              std::cerr << "[Task-" << getRank() << "]: Invalid JSON metadata received from SST stream: "
+                        << sst_payload.metadata << "Skipping" << std::endl;
             }else{
+              auto metadata_json = json::parse(sst_payload.metadata);
 
-              std::cout << "[Task-" << getRank() << "]: Received data from SST stream, stepIndex: " << stepIndex << std::endl;
-              this->next_seq = stepIndex + 1;
-              // Add to stream events
-              // stream_events.push_back(StreamEvent(sst_payload));
-              stream_events.emplace_back(std::move(StreamEvent(sst_payload)));
-              added_new_data = true;
+              auto stepIndex = metadata_json["seq_n"].get<uint64_t>();
+              sst_payload.stepIndex = stepIndex;
+
+              if (stepIndex > this->next_seq) {
+                std::cout << "[Task-" << getRank() << "]: Delay processing SST stepIndex: " << stepIndex
+                          << " > " << this->next_seq << " = next_seq" << std::endl;
+                sst_payload.stepIndex = stepIndex;
+                this->pending_sst_payloads.push_back(sst_payload);
+                // we are lagging behind SST stream, mark the sequence then read data from Mofka instead
+                // until we catch up
+                delayed_sst_seq = stepIndex;
+                sst_lagging = true;
+              }else if (stepIndex < this->next_seq) {
+                std::cout << "[Task-" << getRank() << "]: Skipping SST stepIndex: " << stepIndex
+                          << " < " << this->next_seq << " = next_seq" << std::endl;
+              }else if (metadata_json["Type"].get<std::string>() == "FIN") {
+                setSSTEndOfStream(true);
+                std::cout << "[Task-" << getRank() << "]: End of stream detected from SST" << std::endl;
+                if (sst_stream.get_success_pulls() > 1) {
+                  std::cout << "[Task-" << getRank() << "]: At least one successful pulls from SST stream before FIN --> True end of stream, stop Mofka as well." << std::endl;
+                  setMofkaEndOfStream(true);
+                }
+                return nullptr;
+              } else {
+
+                std::cout << "[Task-" << getRank() << "]: Received data from SST stream, stepIndex: " << stepIndex << std::endl;
+                this->next_seq = stepIndex + 1;
+                // Add to stream events
+                // stream_events.push_back(StreamEvent(sst_payload));
+                stream_events.emplace_back(std::move(StreamEvent(sst_payload)));
+                added_new_data = true;
+                got_data_from_sst = true;
+              }
             }
           }
         }
-      }else{
+      }
+      
+      if (!got_data_from_sst) {
         // If no SST data, pull from mofka
         // auto start = std::chrono::high_resolution_clock::now();
         // mofka::Future<mofka::Event> future_event = consumer.pull();
@@ -473,7 +502,9 @@ DataRegionBase<float, TraceMetadata>* MofkaStream::readSlidingWindow(
         if (getMofkaBufferedEvent(event)) {
           //if endMsg break
           if (event.metadata().json()["Type"].get<std::string>() == "FIN") {
+            setSSTEndOfStream(true);
             setMofkaEndOfStream(true);
+            event.acknowledge();
             std::cout << "[Task-" << getRank() << "]: End of stream detected from Mofka" << std::endl;
             return nullptr;
           }

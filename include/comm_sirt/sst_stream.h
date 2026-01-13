@@ -51,6 +51,20 @@ public:
 
     int get_success_pulls() { return success_pull; }
 
+    void close() {
+        try {
+            if (m_engine) {
+                // In older ADIOS2 versions there is no Engine::Good().
+                // Close() is safe to call once; if it's already closed
+                // ADIOS2 will generally just ignore it or handle internally.
+                m_engine->Close();
+                m_engine.reset();
+            }
+        } catch (...) {
+            // Destructors must not throw
+        }
+    }
+
 private:
     std::string m_streamName;
     int m_partitionId;
