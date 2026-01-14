@@ -1,5 +1,6 @@
 #include <mofka_stream.h>
 #include <thread>
+#include <future>
 
 void MofkaStream::addTomoMsg(StreamEvent event){
   if (event.isFromSST()) {
@@ -310,6 +311,9 @@ void MofkaStream::publishImage(json &meta, float *data, size_t size, mofka::Prod
   std::chrono::duration<double> elapsed_flush = end - end;
   // std::cout << "Push " << elapsed.count() << " sec" << std::endl;
   producer_times.emplace_back("Push", size*sizeof(float), elapsed_push.count());
+
+  producer.flush();
+
   if (batch == batchsize){
     start = std::chrono::high_resolution_clock::now();
     producer.flush();
@@ -438,8 +442,16 @@ DataRegionBase<float, TraceMetadata>* MofkaStream::readSlidingWindow(
           setSSTEndOfStream(true);
         }else{
           SSTPayload sst_payload;
-          if (sst_stream.pull_data(sst_payload)) {
-            
+
+          // if (sst_stream.pull_data(sst_payload)) {
+
+          std::future<bool> payload_future = async(std::launch::async, [&] {
+              return sst_stream.pull_data(sst_payload);
+          });
+
+          if (payload_future.wait_for(std::chrono::milliseconds(100)) != std::future_status::ready) {
+            std::cout << "[Task-" << getRank() << "] SSTStream read timeout, switching to Mofka..." << std::endl;
+          }else{
             if (!json::accept(sst_payload.metadata)) {
               std::cerr << "[Task-" << getRank() << "]: Invalid JSON metadata received from SST stream: "
                         << sst_payload.metadata << "Skipping" << std::endl;
