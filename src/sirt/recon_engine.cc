@@ -17,6 +17,9 @@
 // #include <charconv>
 #include <csignal>
 
+#include <thread>
+#include <chrono>
+
 
 #include <veloc.hpp>
 #include <veloc/boost.hpp>
@@ -180,6 +183,11 @@ int ReconTask::run() {
 
   for(; passes < config.num_passes; ++passes){
 
+    // Slow down 1 worker for experiment
+    // if (worker_id == 0) {
+    //   sleep(2);
+    // }
+
     int killed = kill_signal.load();
     if (killed != 0) {
       std::cout << "[Task-" << task_id << "] Received kill signal: " << killed << ". Exiting..." << std::endl;
@@ -221,6 +229,23 @@ int ReconTask::run() {
         ckpt_client->checkpoint_wait();
         sst_stream.close();
         return killed;
+      }
+
+      if (worker_id == 0) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        continue;
+      }else if (worker_id == 1) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(400));
+        continue;
+      }else if (worker_id == 2) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(800));
+        continue;
+      }else if (worker_id == 3) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1600));
+        continue;
+      }else{
+        std::this_thread::sleep_for(std::chrono::milliseconds(3200));
+        continue;
       }
 
       #ifdef TIMERON
@@ -318,12 +343,12 @@ int ReconTask::run() {
             {"app_dims", app_dims},
             {"recon_slice_data_index", recon_slice_data_index}};
 
-        std::stringstream iteration_stream;
-        iteration_stream << ckpt_name << "-" << std::setfill('0') << std::setw(6) << passes;
-        std::string outputpath = config.kReconOutputDir + "/" + 
-          iteration_stream.str() + "-recon.h5";
-        saveAsHDF5(outputpath.c_str(), 
-            &recon[recon_slice_data_index], app_dims);
+        // std::stringstream iteration_stream;
+        // iteration_stream << ckpt_name << "-" << std::setfill('0') << std::setw(6) << passes;
+        // std::string outputpath = config.kReconOutputDir + "/" + 
+        //   iteration_stream.str() + "-recon.h5";
+        // saveAsHDF5(outputpath.c_str(), 
+        //     &recon[recon_slice_data_index], app_dims);
         
         std::cout << "[Task-" << task_id << "] Publishing reconstructed image for iteration " 
                   << passes << ", progress = " << progress << std::endl;

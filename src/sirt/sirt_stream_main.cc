@@ -90,6 +90,7 @@ void start_task(/* mofka::Producer& producer, */ const json& metadata, const Tra
                 mofka::MofkaDriver& driver, std::mutex& ckpt_mutex,
                 int argc, char** argv) {
     int task_id = metadata["task_id"].get<int>();
+    int worker_id = config.worker_index;
     if (running_tasks.find(task_id) != running_tasks.end()) {
         std::cerr << "[Worker-" << config.worker_id << "] Task " << task_id << " is already running. Ignoring START_TASK command." << std::endl;
     }else{
@@ -97,7 +98,7 @@ void start_task(/* mofka::Producer& producer, */ const json& metadata, const Tra
         running_tasks.emplace(
             std::piecewise_construct,
             std::forward_as_tuple(task_id),
-            std::forward_as_tuple(task_id, driver, &ckpt_mutex, argc, argv)
+            std::forward_as_tuple(task_id, worker_id, driver, &ckpt_mutex, argc, argv)
         );
         running_threads.emplace(
             std::piecewise_construct,

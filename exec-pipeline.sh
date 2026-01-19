@@ -53,8 +53,8 @@ echo bash run-daq.sh ${sirt_ranks} ${sirt_tasks} ${num_sinograms} ${logdir}
 sleep 10
 
 echo "Start DIST -----------------------------------------------------------"
-# bash run-dist.sh ${num_sinograms} ${sirt_tasks} ${logdir} > ${logdir}/dist.out 2> ${logdir}/dist.err &
-bash run-dist.sh ${num_sinograms} ${sirt_tasks} ${logdir} > ${logdir}/dist.log 2> ${logdir}/dist.log &
+bash run-dist.sh ${num_sinograms} ${sirt_tasks} ${logdir} > ${logdir}/dist.out 2> ${logdir}/dist.err &
+# bash run-dist.sh ${num_sinograms} ${sirt_tasks} ${logdir} > ${logdir}/dist.log 2> ${logdir}/dist.log &
 echo bash run-dist.sh ${num_sinograms} ${sirt_tasks} ${logdir}
 # sleep 10
 

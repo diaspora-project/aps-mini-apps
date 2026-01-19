@@ -11,6 +11,7 @@ class ReconTask {
   private:
     TraceRuntimeConfig config;
     int task_id = 0;
+    int worker_id = 0;
     // stop flag as atomic variable to handle graceful shutdown
     std::atomic<bool> stop_flag{false};
     std::atomic<int> kill_signal{0};
@@ -22,8 +23,8 @@ class ReconTask {
 
     
   public:
-    ReconTask(int task_id, mofka::MofkaDriver driver, std::mutex *ckpt_mutex, int argc, char **argv)
-    : config(argc, argv), task_id(task_id), driver(driver), ckpt_mutex(ckpt_mutex),
+    ReconTask(int task_id, int worker_id, mofka::MofkaDriver driver, std::mutex *ckpt_mutex, int argc, char **argv)
+    : config(argc, argv), task_id(task_id), worker_id(worker_id), driver(driver), ckpt_mutex(ckpt_mutex),
       ms(driver, config.batchsize, static_cast<uint32_t>(config.window_len), task_id, 0) {}
 
     ReconTask(int task_id, mofka::MofkaDriver driver, const TraceRuntimeConfig &cfg, std::mutex *ckpt_mutex)
