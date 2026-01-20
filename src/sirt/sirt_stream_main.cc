@@ -11,6 +11,7 @@
 #include <mofka_stream.h>
 #include <unordered_map>
 #include <thread>
+#include <filesystem>
 
 std::unordered_map<int, ReconTask> running_tasks;
 std::unordered_map<int, int> task_progresses;
