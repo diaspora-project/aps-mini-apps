@@ -11,7 +11,7 @@
 #include <mofka_stream.h>
 #include <unordered_map>
 #include <thread>
-#include <filesystem>
+#include <experimental/filesystem>
 
 std::unordered_map<int, ReconTask> running_tasks;
 std::unordered_map<int, int> task_progresses;
@@ -74,7 +74,7 @@ void snapshot_running_tasks(int worker_id, std::string& outputpath, const std::v
 std::vector<int> load_running_tasks(int worker_id, std::string& inputpath, int &action_seq) {
     std::cout << "Loading snapshot of running task ids from " << inputpath << std::endl;
     std::vector<int> events;
-    if (std::filesystem::exists(inputpath)) {
+    if (std::experimental::filesystem::exists(inputpath)) {
         std::ifstream ifs(inputpath);
         json md;
         ifs >> md;

@@ -190,6 +190,7 @@ target_link_libraries(sirt_stream
     Threads::Threads
     HDF5::HDF5
     Boost::serialization
+    stdc++fs
 )
 
 # Optional: keep linker from dropping DSOs that are only used indirectly
