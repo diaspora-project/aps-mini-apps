@@ -1,6 +1,6 @@
 import numpy as np
 import json
-import mochi.mofka.client as mofka
+import diaspora_stream.api as diaspora
 import time
 from collections import deque
 
@@ -61,11 +61,19 @@ def assign_data(comm_rank: int, comm_size: int, tot_sino: int, tot_cols: int) ->
     }
     return info_rep
 
-class MofkaDist:
+class DiasporaDist:
 
-    def __init__(self, group_file: str, batchsize: int = 16):
-        # setup mofka
-        self.driver = mofka.MofkaDriver(group_file, use_progress_thread=True)
+    def __init__(self, driver_type: str, driver_config_file: str = "", batchsize: int = 16):
+        # setup diaspora
+        driver_options = {}
+        if driver_config_file != "":
+            with open(driver_config_file) as f:
+                driver_options = json.load(f)
+        elif driver_type == "files":
+            driver_options = {
+                "root_path": "./diaspora-data"
+            }
+        self.driver = diaspora.Driver(backend=driver_type, options=driver_options)
         self.seq = 0
         self.nranks = 1
         self.buffer = []
@@ -73,20 +81,20 @@ class MofkaDist:
         self.batch = batchsize
         self.futures = deque()
 
-    def producer(self, topic_name: str, producer_name: str) -> mofka.Producer:
+    def producer(self, topic_name: str, producer_name: str) -> diaspora.Producer:
         topic = self.driver.open_topic(topic_name)
-        batchsize = self.batch #self.batch #mofka.AdaptiveBatchSize
-        thread_pool = mofka.ThreadPool(1)
-        ordering = mofka.Ordering.Strict
+        batchsize = self.batch #self.batch #diaspora.AdaptiveBatchSize
+        thread_pool = self.driver.make_thread_pool(1)
+        ordering = diaspora.Ordering.Strict
         producer = topic.producer(producer_name,
                                   batch_size=batchsize,
                                   thread_pool=thread_pool,
                                   ordering=ordering)
         return producer
 
-    def consumer(self, topic_name: str, consumer_name: str) -> mofka.Consumer:
-        batch_size = self.batch #mofka.AdaptiveBatchSize
-        thread_pool = mofka.ThreadPool(0)
+    def consumer(self, topic_name: str, consumer_name: str) -> diaspora.Consumer:
+        batch_size = self.batch #diaspora.AdaptiveBatchSize
+        thread_pool = self.driver.make_thread_pool(0)
         topic = self.driver.open_topic(topic_name)
         consumer = topic.consumer(name=consumer_name,
                                   thread_pool=thread_pool,
@@ -100,11 +108,12 @@ class MofkaDist:
             topic_name = "handshake_s_d"
             topic = self.driver.open_topic(topic_name)
             consumer = topic.consumer(name="handshaker",
-                                    thread_pool=mofka.ThreadPool(0),
-                                    batch_size=self.batch)
-            f = consumer.pull()
-            event = f.wait()
-            self.nranks = json.loads(event.metadata)["comm_size"]
+                                      thread_pool=self.driver.make_thread_pool(0),
+                                      batch_size=self.batch)
+            event = None
+            while event is None:
+                event = consumer.pull().wait(timeout_ms=-1)
+            self.nranks = event.metadata["comm_size"]
             self.seq += 1
             del event
             del consumer
@@ -119,26 +128,26 @@ class MofkaDist:
         for p in range(self.nranks):
             info = assign_data(p, self.nranks, row, col)
             f = producer.push(info)
-        producer.flush()
+        producer.flush().wait(timeout_ms=-1)
         self.seq += 1
         del producer
         return "Done"
 
-    def pull_image(self, consumer: mofka.Consumer):
+    def pull_image(self, consumer: diaspora.Consumer):
         ts = time.perf_counter()
         f = consumer.pull()
-        event = f.wait()
+        event = f.wait(timeout_ms=-1)
         t_wait = time.perf_counter()
-        mofka_metadata = event.metadata
+        metadata = event.metadata
         t_meta = time.perf_counter()
-        print("metadata retreived ", mofka_metadata, flush=True)
-        mofka_data = bytearray(event.data[0])
+        print("metadata retreived ", event.metadata, flush=True)
+        data = bytearray(event.data[0])
         t_data = time.perf_counter()
-        return json.loads(mofka_metadata), mofka_data, [t_wait - ts, t_meta- t_wait, len(str(mofka_metadata)), t_data - t_meta, len(mofka_data)]
+        return metadata, data, [t_wait - ts, t_meta- t_wait, len(str(metadata)), t_data - t_meta, len(data)]
 
     def push_image(self, data: np.ndarray, row :int, col: int,
                    theta: float, projection_id: int, center: float,
-                   producer: mofka.Producer) -> int :
+                   producer: diaspora.Producer) -> int :
         dims = [row, col]
 
         center = (dims[1] / 2.0) if center == 0.0 else center
@@ -153,15 +162,15 @@ class MofkaDist:
                                     center,
                                     self.seq)
         self.buffer.append(msgs)
-        mofka_t = []
+        diaspora_t = []
         # Send data to workers
         for i in range(self.nranks):
             ts = time.perf_counter()
             f = producer.push(self.buffer[self.counter][i][0], self.buffer[self.counter][i][1])
-            #f.wait()
+            #f.wait(timeout_ms=-1)
             # if self.counter % self.batch == 0:
             #     self.futures.append(f)
-            mofka_t.append(["push", projection_id, ts, time.perf_counter(), time.perf_counter() - ts, len(str(self.buffer[self.counter][i][0])) ,len(self.buffer[self.counter][i][1])])
+            diaspora_t.append(["push", projection_id, ts, time.perf_counter(), time.perf_counter() - ts, len(str(self.buffer[self.counter][i][0])) ,len(self.buffer[self.counter][i][1])])
 
         self.seq += 1
         self.counter += 1
@@ -169,20 +178,20 @@ class MofkaDist:
             # ts = time.perf_counter()
             # #producer.flush()
             # for i in range(self.nranks):
-            #     self.futures[0].wait()
+            #     self.futures[0].wait(timeout_ms=-1)
             #     self.futures.popleft()
-            #     mofka_t.append(["wait", projection_id, ts, time.perf_counter(), time.perf_counter() - ts, self.nranks*len(self.buffer)* len(str(self.buffer[self.counter-1][0][0])), self.nranks*len(self.buffer)*len(self.buffer[self.counter-1][0][1])])
+            #     diaspora_t.append(["wait", projection_id, ts, time.perf_counter(), time.perf_counter() - ts, self.nranks*len(self.buffer)* len(str(self.buffer[self.counter-1][0][0])), self.nranks*len(self.buffer)*len(self.buffer[self.counter-1][0][1])])
             self.buffer = self.buffer[self.batch:]
             self.counter = self.counter - self.batch
 
-        return mofka_t
+        return diaspora_t
 
     def last_flush(self, producer):
         if len(self.buffer)> 0:
             ts = time.perf_counter()
             producer.flush()
             # while not self.futures:
-            #     self.futures[0].wait()
+            #     self.futures[0].wait(timeout_ms=-1)
             #     self.futures.popleft()
             self.seq += 1
             return ["last_flush","" , ts, time.perf_counter(), time.perf_counter() - ts, self.nranks*len(self.buffer)* len(str(self.buffer[self.counter-1][0][0])), self.nranks*len(self.buffer)*len(self.buffer[self.counter-1][0][1])]

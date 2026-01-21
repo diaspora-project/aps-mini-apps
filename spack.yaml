@@ -5,8 +5,7 @@
 spack:
   # add package specs to the `specs` list
   specs:
-  - mofka@main+mpi+python ^json-c@0.13.0 ^libfabric@1.19.1 ^mercury~boostsys~checksum
-    ^mochi-bedrock~ssg ^mpich@3.4
+  - mofka+python
   - py-mochi-margo
   - py-numpy
   - py-scipy
@@ -25,10 +24,3 @@ spack:
   view: true
   concretizer:
     unify: true
-  repos:
-  # git clone https://github.com/mochi-hpc/mochi-spack-packages.git
-  - /path/to/mochi-spack-packages
-  mirrors:
-    mochi-buildcache:
-      url: oci://ghcr.io/mochi-hpc/mochi-spack-buildcache
-      signed: false

@@ -10,8 +10,9 @@ import h5py as h5
 import dxchange
 import tomopy as tp
 import signal
-import mochi.mofka.client as mofka
+import diaspora_stream.api as diaspora
 import csv
+import json
 from collections import deque
 
 #from memory_profiler import profile
@@ -26,8 +27,11 @@ def parse_arguments():
 
   parser.add_argument("--image_pv", help="EPICS image PV name.")
 
-  parser.add_argument('--group_file', type=str, default="mofka.json",
-                      help='Group file for the mofka server')
+  parser.add_argument('--driver_type', type=str, default="files",
+                      help='Type of Diaspora Driver to use')
+
+  parser.add_argument('--driver_config_file', type=str, default="",
+                      help='JSON config file for the Diaspora Driver')
 
   parser.add_argument('--batchsize', type=int, default=16,
                       help='Mofka batch size')
@@ -187,7 +191,7 @@ def simulate_daq(producer,
   nelems_per_subset = 16
   indices = ordered_subset(serialized_data.shape[0],
                               nelems_per_subset)
-  mofka_t = []
+  diaspora_t = []
   buffer = []
   i = 0
   futures = deque()
@@ -209,15 +213,15 @@ def simulate_daq(producer,
 
       print("Sending projection {}".format(index))
       time.sleep(prj_slp)
-      # mofka send
+      # diaspora send
       ts = time.perf_counter()
       buffer.append(serialized_data[index])
       md = {"index": int(index), "Type" : "DATA"}
       f = producer.push(md, buffer[i])
-      #f.wait()
+      #f.wait(timeout_ms=-1)
       # if seq % batchsize == 0:
       #   futures.append(f)
-      mofka_t.append(["push", index, ts, time.perf_counter(), time.perf_counter() - ts, len(str(md)) , len(buffer[i])])
+      diaspora_t.append(["push", index, ts, time.perf_counter(), time.perf_counter() - ts, len(str(md)) , len(buffer[i])])
       tot_transfer_size+=len(buffer[i])
       seq+=1
       i+=1
@@ -225,11 +229,11 @@ def simulate_daq(producer,
       if i == 2*batchsize:
         # ts = time.perf_counter()
         # producer.flush()
-        # futures[0].wait()
+        # futures[0].wait(timeout_ms=-1)
         # futures.popleft()
         buffer = buffer[batchsize:]
         i = i - batchsize
-        # mofka_t.append(["wait", index, ts, time.perf_counter(), time.perf_counter() - ts, batchsize*len(str(md)), len(buffer)*len(buffer[i-1])])
+        # diaspora_t.append(["wait", index, ts, time.perf_counter(), time.perf_counter() - ts, batchsize*len(str(md)), len(buffer)*len(buffer[i-1])])
 
 
 
@@ -239,22 +243,22 @@ def simulate_daq(producer,
     ts = time.perf_counter()
     producer.flush()
     # while not futures:
-    #   futures[0].wait()
+    #   futures[0].wait(timeout_ms=-1)
     #   futures.popleft()
-    mofka_t.append(["flush_after", index, ts, time.perf_counter(), time.perf_counter() - ts,len(buffer)*len(str(md)), len(buffer[i-1])])
+    diaspora_t.append(["flush_after", index, ts, time.perf_counter(), time.perf_counter() - ts,len(buffer)*len(str(md)), len(buffer[i-1])])
   time1 = time.time()
 
   elapsed_time = time1-time0
   tot_MiBs = (tot_transfer_size*1.)/2**20
   nproj = iteration*len(serialized_data)
-  mofka_t.append(["total", 0, time0, time1, elapsed_time, tot_MiBs])
+  diaspora_t.append(["total", 0, time0, time1, elapsed_time, tot_MiBs])
   print("Sent number of projections: {}; Total size (MiB): {:.2f}; Elapsed time (s): {:.2f}".format(nproj, tot_MiBs, elapsed_time))
   print("Rate (MiB/s): {:.2f}; (msg/s): {:.2f}".format(tot_MiBs/elapsed_time, nproj/elapsed_time))
   fields = ["type", "index", "start", "stop", "duration", "metadata_size", "data_size"]
   with open('Daq_push.csv', 'w') as f:
     write = csv.writer(f)
     write.writerow(fields)
-    write.writerows(mofka_t)
+    write.writerows(diaspora_t)
   return seq
 
 bsignal=False
@@ -406,15 +410,19 @@ def main():
     bsignal = True
   signal.signal(signal.SIGINT, signal_handler)
 
-  driver = mofka.MofkaDriver(args.group_file, use_progress_thread=True)
+  driver_options = {}
+  if args.driver_config_file != "":
+      with open(args.driver_config_file) as f:
+          driver_options = json.load(f)
+  driver = diaspora.Driver(backend=args.driver_type, options=driver_options)
 
   # create a topic
   topic_name = "daq_dist"
   topic = driver.open_topic(topic_name)
   producer_name = "daq_producer"
-  batchsize = args.batchsize #mofka.AdaptiveBatchSize
-  thread_pool = mofka.ThreadPool(1)
-  ordering = mofka.Ordering.Strict
+  batchsize = args.batchsize #diaspora.AdaptiveBatchSize
+  thread_pool = driver.make_thread_pool(1)
+  ordering = diaspora.Ordering.Strict
   producer = topic.producer(producer_name, batch_size=batchsize, thread_pool=thread_pool, ordering=ordering)
 
   time0 = time.time()
@@ -457,7 +465,7 @@ def main():
   else:
     print("Unknown mode: {}".format(args.mode))
   producer.push({"Type": "FIN"}, bytearray(1))
-  producer.flush()
+  producer.flush().wait(timeout_ms=-1)
   time1 = time.time()
   print("Total time (s): {:.2f}".format(time1-time0))
 
