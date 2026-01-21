@@ -113,7 +113,7 @@ class DiasporaDist:
             event = None
             while event is None:
                 event = consumer.pull().wait(timeout_ms=-1)
-            self.nranks = json.loads(event.metadata)["comm_size"]
+            self.nranks = event.metadata["comm_size"]
             self.seq += 1
             del event
             del consumer
@@ -143,7 +143,7 @@ class DiasporaDist:
         print("metadata retreived ", event.metadata, flush=True)
         data = bytearray(event.data[0])
         t_data = time.perf_counter()
-        return json.loads(metadata), data, [t_wait - ts, t_meta- t_wait, len(str(metadata)), t_data - t_meta, len(data)]
+        return metadata, data, [t_wait - ts, t_meta- t_wait, len(str(metadata)), t_data - t_meta, len(data)]
 
     def push_image(self, data: np.ndarray, row :int, col: int,
                    theta: float, projection_id: int, center: float,

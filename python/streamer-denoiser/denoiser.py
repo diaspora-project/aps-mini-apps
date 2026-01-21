@@ -87,7 +87,7 @@ def main(input_path, model_path, driver_type, driver_config_file, batchsize, npr
         driver_options = {
             "root_path": "./diaspora-data"
         }
-    driver = driaspora.Driver(driver_type, options=driver_options)
+    driver = diaspora.Driver(backend=driver_type, options=driver_options)
     batch_size = batchsize # AdaptiveBatchSize
     thread_pool = driver.make_thread_pool(0)
     # create a topic
@@ -107,11 +107,12 @@ def main(input_path, model_path, driver_type, driver_config_file, batchsize, npr
         for i in range(nproc_sirt*batchsize):
             ts = time.perf_counter()
             f = consumer.pull()
-            event = f.wait()
+            event = None
+            while event is None:
+                event = f.wait(timeout_ms=-1)
             t_wait = time.perf_counter()
             m = event.metadata
             t_meta = time.perf_counter()
-            m = json.loads(m)
             m["diaspora_e_id"] = event.event_id
             m["diaspora_e_partition"] = event.partition
             if m["Type"] == "FIN":

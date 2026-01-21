@@ -5,7 +5,7 @@ void DiasporaStream::addTomoMsg(diaspora::Event event){
   diaspora::Metadata metadata = event.metadata();
   auto end_t = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> elapsed = end_t - start_t;
-  setConsumerTimes("mata_t", metadata.string().size(), elapsed.count());
+  setConsumerTimes("meta_t", /* metadata.string().size() */ 0, elapsed.count());
   start_t = std::chrono::high_resolution_clock::now();
   diaspora::DataView data = event.data();
   end_t = std::chrono::high_resolution_clock::now();
@@ -14,7 +14,7 @@ void DiasporaStream::addTomoMsg(diaspora::Event event){
   // event.acknowledge(); // acknowledge event
   vmeta.push_back(metadata.json()); /// Setup metadata
   vtheta.push_back(metadata.json()["theta"].get<float_t>());
-  spdlog::info("Received data {}", metadata.string());
+  spdlog::info("Received data {}", metadata.json().dump());
 
   size_t n_rays_per_proj =
   getInfo()["n_sinograms"].get<int64_t>() *
