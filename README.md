@@ -10,14 +10,14 @@ There are several dependencies, including zmq, swig, python libraries/headers, M
 We have included a spack env file `spack_polaris.yaml` with needed dependencies.
 
 Here are the steps to use spack to install the environment:
-1. Clone spack (use this [repo](https://github.com/GueroudjiAmal/spack/tree/aps) for Polaris)
+1. Clone spack [repo](https://github.com/spack/spack.git)
 2. Clone diaspora spack packages [repo](https://github.com/diaspora-project/diaspora-spack-packages.git)
 3. Clone mochi spack packages [repo](https://github.com/mochi-hpc/mochi-spack-packages.git)
-4. Create a spack env `spack env create APS spack.yaml`
-5. Activate the env `spack env activate APS`
+4. Create a spack env `spack env create APS_ENV spack.yaml`
+5. Activate the env `spack env activate APS_ENV`
 6. Add mochi spack packages to the env `spack repo add mochi-spack-packages`
 7. Add diaspora spack packages to the env `spack repo add diaspora-spack-packages/spack_repo/diaspora`
-8. Concretize and install `spack concretize && spack install`
+8. Concretize and install `spack concretize -f && spack install`
 
 There are 4 main componenets:
 1. streamer-daq: In order to setup the python script, follow the below steps (again from project root directory):
@@ -38,13 +38,6 @@ cp -r ../../../python/common ../
 ```
 This will let you execute the ModDistStreamPubDemo.py script, which is the main streamer-dist process. You can check a sample usage of this script in the file ``` [Trace]$ cat tests/dist.cmd.log ```.
 
-4. streamer-den: In order to setup the python script, follow the below steps (again from project root directory):
-```
-mkdir build/python/streamer-denoiser
-cd build/python/streamer-denoiser
-cp ../../../python/streamer-denoiser/* ./
-```
-
 3. sirt_stream: In order to generate this executable,:
 Setup flatbuffers data structures
 ```
@@ -59,7 +52,21 @@ cmake ..
 make
 ```
 
+4. streamer-den: In order to setup the python script, follow the below steps (again from project root directory):
+```
+mkdir build/python/streamer-denoiser
+cd build/python/streamer-denoiser
+cp ../../../python/streamer-denoiser/* ./
+```
+
+### Run the workflow
+
+Locally, you can run the workflow using `run-local-with-mofka-driver.sh`.
+This will deploy Mofka locally, using in-memory partitions, then deploy and run all the components.
+If all runs well, you should start seeing HDF5 files being generated.
+
 ### Instructions to Run the miniapp in Polaris:
+
 For usage follow steps in `cmd` or use `launcher.sh` to launch experiments in polaris.
 In polaris edit `polaris.sh` and `launcher.sh` with necessary paths and env, then submit jobs by running:
 ```
