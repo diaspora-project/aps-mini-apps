@@ -72,6 +72,8 @@ node_dist=${nodes_array[0]}
 node_sirts=$nodes_array
 node_den=${nodes_array[0]}
 node_mofka="${nodes_array[0]} ${nodes_array[1]}"
+num_node_mofka=${#node_mofka[@]}
+node_mofka="$(printf "%s," "${node_mofka[@]}" | sed 's/,$//')"
 # node_mofka=${nodes_array[0]}
 node_control=${nodes_array[0]}
 
@@ -89,11 +91,11 @@ start_ns=$(date +%s%N)
 start_iso=$(date -Iseconds)
 
 echo "Start Mofka server ---------------------------------------------------"
-mpiexec --no-vni -ppn 1 -d 16 --hosts "$(IFS=,; echo "${node_mofka[*]}")" bash $exec_dir/run-mofka-polaris.sh > "${logdir}/mofka.out" 2> "${logdir}/mofka.err" &
+mpiexec --no-vni -ppn 1 -d 16 --hosts $node_mofka -n $num_node_mofka bash $exec_dir/run-mofka-polaris.sh > "${logdir}/mofka.out" 2> "${logdir}/mofka.err" &
 # mpiexec -ppn 1 -d 16 --hosts $node_mofka bedrock cxi -v trace -c config.json > "${logdir}/mofka.out" 2> "${logdir}/mofka.err" &
 # mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_mofka bedrock na+sm -c config.json > "${logdir}/mofka.out" 2> "${logdir}/mofka.err" &
 # bedrock na+sm -c config.json > "${logdir}/mofka.out" 2> "${logdir}/mofka.err" &
-echo mpiexec --no-vni -ppn 1 -d 16 --hosts "$(IFS=,; echo "${node_mofka[*]}")" bash $exec_dir/run-mofka-polaris.sh
+echo mpiexec --no-vni -ppn 1 -d 16 --hosts $node_mofka -n $num_node_mofka bash $exec_dir/run-mofka-polaris.sh
 sleep 10
 
 echo "Start DAQ ------------------------------------------------------------"
