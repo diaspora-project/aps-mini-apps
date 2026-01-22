@@ -6,6 +6,8 @@ cd "${SCRIPT_DIR}"
 
 GROUPFILE="${SCRIPT_DIR}/mofka.json"
 
+echo $GROUPFILE
+
 # GROUPFILE="mofka.json"
 
 # Check if the number of arguments is correct
