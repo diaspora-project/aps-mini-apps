@@ -231,22 +231,22 @@ int ReconTask::run() {
         return killed;
       }
 
-      if (worker_id == 0) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
-        continue;
-      }else if (worker_id == 1) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(400));
-        continue;
-      }else if (worker_id == 2) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(800));
-        continue;
-      }else if (worker_id == 3) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(1600));
-        continue;
-      }else{
-        std::this_thread::sleep_for(std::chrono::milliseconds(3200));
-        continue;
-      }
+      // if (worker_id == 0) {
+      //   std::this_thread::sleep_for(std::chrono::milliseconds(200));
+      //   continue;
+      // }else if (worker_id == 1) {
+      //   std::this_thread::sleep_for(std::chrono::milliseconds(400));
+      //   continue;
+      // }else if (worker_id == 2) {
+      //   std::this_thread::sleep_for(std::chrono::milliseconds(800));
+      //   continue;
+      // }else if (worker_id == 3) {
+      //   std::this_thread::sleep_for(std::chrono::milliseconds(1600));
+      //   continue;
+      // }else{
+      //   std::this_thread::sleep_for(std::chrono::milliseconds(3200));
+      //   continue;
+      // }
 
       #ifdef TIMERON
       auto recon_beg = std::chrono::system_clock::now();

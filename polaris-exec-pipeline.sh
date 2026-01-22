@@ -38,15 +38,15 @@ pkill -9 -f "FailureInjector" || true
 ckpt_dir=/eagle/Diaspora/ndhai/veloc
 rm -rf $ckpt_dir/tmp/scratch/* $ckpt_dir/tmp/persistent/* || true
 
-# --- Args ---
+# Check if the number of arguments is corre
 if [ "$#" -ne 5 ]; then
-  echo "Usage: $0 <sirt_ranks> <sirt_tasks> <num_sinograms> <failure_mode> <mtbf>" >&2
-  echo "  <sirt_ranks>    Number of SIRT workers/processes" >&2
-  echo "  <sirt_tasks>    Number of SIRT tasks/threads" >&2
-  echo "  <num_sinograms> Number of sinograms to process" >&2
-  echo "  <failure_mode>  single|periodic|random" >&2
-  echo "  <mtbf>          Mean time between failures (seconds)" >&2
-  exit 1
+    echo "Usage: exec-pipeline.sh <sirt_ranks> <num_sinograms>"
+    echo "  <sirt_ranks>    Number of SIRT workers/processes"
+    echo "  <sirt_tasks>    Number of SIRT tasks/threads"
+    echo "  <num_sinograms> Number of sinograms to process"
+    echo "  <failure_mode>  single|periodic|random"
+    echo "  <mtbf>         Mean time between failures (in seconds)"
+    exit 1
 fi
 sirt_ranks=$1
 sirt_tasks=$2
@@ -71,7 +71,8 @@ node_dist=${nodes_array[0]}
 # node_sirts=${nodes_array[0]}
 node_sirts=$nodes_array
 node_den=${nodes_array[0]}
-node_mofka=${nodes_array[0],nodes_array[1]}
+# node_mofka=${nodes_array[0],nodes_array[1]}
+node_mofka=${nodes_array[0]}
 node_control=${nodes_array[0]}
 
 export MARGO_ENABLE_MONITORING=1
