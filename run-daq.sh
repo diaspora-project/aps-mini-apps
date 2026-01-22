@@ -99,13 +99,13 @@ mofkactl partition add handshake_d_s \
 		--metadata "${METADATA_PROVIDER}" \
 		--data "${DATA_PROVIDER}"
 
-echo create dist-sirt action control topics
+# echo create dist-sirt action control topics
 
-# Action channel for flow control and load balancing
-mofkactl topic create dist_sirt_action \
-	--groupfile $GROUPFILE
-mofkactl topic create sirt_dist_action \
-	--groupfile $GROUPFILE
+# # Action channel for flow control and load balancing
+# mofkactl topic create dist_sirt_action \
+# 	--groupfile $GROUPFILE
+# mofkactl topic create sirt_dist_action \
+# 	--groupfile $GROUPFILE
 
 # echo create sirt partitions for dist-sirt and their handshake
 
@@ -130,14 +130,14 @@ echo create sirt-den topics
 mofkactl topic create sirt_den \
 	--groupfile $GROUPFILE
 
-# echo create sirt_den partition
+echo create sirt_den partition
 
-# mofkactl partition add sirt_den \
-# 	--type default \
-# 	--rank 0 \
-# 	--groupfile $GROUPFILE \
-# 	--metadata "${METADATA_PROVIDER}" \
-# 	--data "${DATA_PROVIDER}"
+mofkactl partition add sirt_den \
+	--type default \
+	--rank 0 \
+	--groupfile $GROUPFILE \
+	--metadata "${METADATA_PROVIDER}" \
+	--data "${DATA_PROVIDER}"
 
 echo "Starting DAQ ..."
 
