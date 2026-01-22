@@ -99,6 +99,30 @@ mofkactl partition add handshake_d_s \
 		--metadata "${METADATA_PROVIDER}" \
 		--data "${DATA_PROVIDER}"
 
+echo create dist_sirt_action control topics
+mofkactl topic create dist_sirt_action \
+	--groupfile $GROUPFILE
+
+echo create dist_sirt_action partitions
+mofkactl partition add dist_sirt_action \
+	--type default \
+	--rank 0 \
+	--groupfile $GROUPFILE \
+	--metadata "${METADATA_PROVIDER}" \
+	--data "${DATA_PROVIDER}"
+
+echo create sirt_dist_action topics
+mofkactl topic create sirt_dist_action \
+	--groupfile $GROUPFILE
+
+echo create sirt_dist_action partitions
+mofkactl partition add sirt_dist_action \
+	--type default \
+	--rank 0 \
+	--groupfile $GROUPFILE \
+	--metadata "${METADATA_PROVIDER}" \
+	--data "${DATA_PROVIDER}"
+
 # echo create dist-sirt action control topics
 
 # # Action channel for flow control and load balancing
@@ -126,12 +150,10 @@ mofkactl partition add handshake_d_s \
 # 	--data "${DATA_PROVIDER}"
 
 echo create sirt-den topics
-
 mofkactl topic create sirt_den \
 	--groupfile $GROUPFILE
 
 echo create sirt_den partition
-
 mofkactl partition add sirt_den \
 	--type default \
 	--rank 0 \
