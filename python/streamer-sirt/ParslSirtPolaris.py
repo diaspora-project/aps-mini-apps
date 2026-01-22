@@ -71,7 +71,7 @@ user_opts = {
     "account": "diaspora",
     "queue": "debug-scaling",
     "walltime": "1:00:00",
-    "nodes_per_block": 3,
+    "nodes_per_block": 4,
     "cpus_per_node": 32,
     "available_accelerators": 4,
 }

@@ -32,6 +32,5 @@ python -u ./build/python/streamer-dist/DynamicModDistStreamPubDemo.py \
     --num_sinograms ${num_sinograms} \
     --num_columns 2560 \
     --batchsize 4 \
-    --protocol na+sm \
     --group_file mofka.json \
     --logdir ${logdir}

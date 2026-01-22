@@ -150,7 +150,6 @@ python -u ./build/python/streamer-daq/DAQStream.py \
 	--num_sinograms ${num_sinograms} \
 	--synch_addr tcp://0.0.0.0:50001 \
 	--synch_count 1 \
-	--protocol na+sm \
 	--group_file $GROUPFILE \
 	--logdir ${logdir}
 

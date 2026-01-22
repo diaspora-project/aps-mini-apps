@@ -62,7 +62,6 @@ python -u ./build/python/streamer-sirt/ParslSirt.py \
     --window-length 4 \
     --thread 4 \
     --center 1427 \
-    --protocol na+sm \
     --group-file mofka.json \
     --batchsize 4 \
     --ckpt-freq 4 \

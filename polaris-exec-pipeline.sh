@@ -89,8 +89,8 @@ start_ns=$(date +%s%N)
 start_iso=$(date -Iseconds)
 
 echo "Start Mofka server ---------------------------------------------------"
-# mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_mofka bash $exec_dir/run-mofka-polaris.sh > "${logdir}/mofka.out" 2> "${logdir}/mofka.err" &
-mpiexec -ppn 1 -d 16 --hosts $node_mofka bedrock cxi -v trace -c config.json > "${logdir}/mofka.out" 2> "${logdir}/mofka.err" &
+mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_mofka bash $exec_dir/run-mofka-polaris.sh > "${logdir}/mofka.out" 2> "${logdir}/mofka.err" &
+# mpiexec -ppn 1 -d 16 --hosts $node_mofka bedrock cxi -v trace -c config.json > "${logdir}/mofka.out" 2> "${logdir}/mofka.err" &
 # mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_mofka bedrock na+sm -c config.json > "${logdir}/mofka.out" 2> "${logdir}/mofka.err" &
 # bedrock na+sm -c config.json > "${logdir}/mofka.out" 2> "${logdir}/mofka.err" &
 # echo "mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_mofka bash $exec_dir/run-mofka-polaris.sh"
@@ -98,32 +98,32 @@ sleep 10
 
 echo "Start DAQ ------------------------------------------------------------"
 # bash run-daq.sh "${sirt_ranks}" "${sirt_tasks}" "${num_sinograms}" "${logdir}" > "${logdir}/daq.out" 2> "${logdir}/daq.err" &
-# mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_daq bash $exec_dir/run-daq.sh "${sirt_ranks}" "${sirt_tasks}" "${num_sinograms}" "${logdir}" >> "${logdir}/daq.log" 2>> "${logdir}/daq.log" &
-bash $exec_dir/run-daq.sh "${sirt_ranks}" "${sirt_tasks}" "${num_sinograms}" "${logdir}" >> "${logdir}/daq.log" 2>> "${logdir}/daq.log" &
-echo "mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_daq bash $exec_dir/run-daq.sh ${sirt_ranks} ${sirt_tasks} ${num_sinograms} ${logdir}"
-sleep 20
+mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_daq bash $exec_dir/run-daq.sh "${sirt_ranks}" "${sirt_tasks}" "${num_sinograms}" "${logdir}" > "${logdir}/daq.log" 2> "${logdir}/daq.log" &
+# bash $exec_dir/run-daq.sh "${sirt_ranks}" "${sirt_tasks}" "${num_sinograms}" "${logdir}" >> "${logdir}/daq.log" 2>> "${logdir}/daq.log" &
+echo mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_daq bash $exec_dir/run-daq.sh "${sirt_ranks}" "${sirt_tasks}" "${num_sinograms}" "${logdir}" > "${logdir}/daq.log" 2> "${logdir}/daq.log"
+sleep 10
 
 echo "Start DIST -----------------------------------------------------------"
-# mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_dist bash $exec_dir/run-dist.sh "${num_sinograms}" "${sirt_tasks}" "${logdir}" > "${logdir}/dist.out" 2> "${logdir}/dist.err" &
-bash $exec_dir/run-dist.sh "${num_sinograms}" "${sirt_tasks}" "${logdir}" > "${logdir}/dist.out" 2> "${logdir}/dist.err" &
-echo "mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_dist bash $exec_dir/run-dist.sh ${num_sinograms} ${sirt_tasks} ${logdir}"
+mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_dist bash $exec_dir/run-dist.sh "${num_sinograms}" "${sirt_tasks}" "${logdir}" > "${logdir}/dist.out" 2> "${logdir}/dist.err" &
+# bash $exec_dir/run-dist.sh "${num_sinograms}" "${sirt_tasks}" "${logdir}" > "${logdir}/dist.out" 2> "${logdir}/dist.err" &
+echo mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_dist bash $exec_dir/run-dist.sh "${num_sinograms}" "${sirt_tasks}" "${logdir}" > "${logdir}/dist.out" 2> "${logdir}/dist.err"
 # sleep 10  # intentionally not sleeping to avoid extra idle time
 
 echo "Start SIRT -----------------------------------------------------------"
-# mpiexec --no-vni -n $sirt_ranks -ppn $sirt_ranks -d 16 --hosts $node_sirts bash $exec_dir/run-sirt-polaris.sh "${sirt_ranks}" "${logdir}" > "${logdir}/sirt.out" 2> "${logdir}/sirt.err" &
-bash $exec_dir/run-sirt-polaris.sh "${sirt_ranks}" "${logdir}" > "${logdir}/sirt.out" 2> "${logdir}/sirt.err" &
-echo "mpiexec --no-vni -n $sirt_ranks -ppn $sirt_ranks -d 16 --hosts $node_sirts bash $exec_dir/run-sirt-polaris.sh ${sirt_ranks} ${logdir}"
+mpiexec --no-vni -n $sirt_ranks -ppn $sirt_ranks -d 16 --hosts $node_sirts bash $exec_dir/run-sirt-polaris.sh "${sirt_ranks}" "${logdir}" > "${logdir}/sirt.out" 2> "${logdir}/sirt.err" &
+# bash $exec_dir/run-sirt-polaris.sh "${sirt_ranks}" "${logdir}" > "${logdir}/sirt.out" 2> "${logdir}/sirt.err" &
+echo mpiexec --no-vni -n $sirt_ranks -ppn $sirt_ranks -d 16 --hosts $node_sirts bash $exec_dir/run-sirt-polaris.sh "${sirt_ranks}" "${logdir}" > "${logdir}/sirt.out" 2> "${logdir}/sirt.err"
 
 echo "Start Exp Control ----------------------------------------------------"
 # Note: runs in background; tee ensures logs are written and exit codes propagate via -o pipefail
 bash $exec_dir/run-exp-control.sh "${failure_mode}" "${mtbf}" "${logdir}" 2> "${logdir}/exp-control.err" | tee "${logdir}/exp-control.out" &
-echo "mpiexec --no-vni -n $sirt_ranks -ppn $sirt_ranks -d 16 --hosts $node_control bash $exec_dir/run-exp-control.sh ${failure_mode} ${mtbf} ${logdir}"
+echo mpiexec --no-vni -n $sirt_ranks -ppn $sirt_ranks -d 16 --hosts $node_control bash $exec_dir/run-exp-control.sh ${failure_mode} ${mtbf} ${logdir}
 
 echo "Start DEN ------------------------------------------------------------"
-echo "mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_den $exec_dir/run-den.sh bash ${num_sinograms} ${logdir}"
+echo "mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_den bash $exec_dir/run-den.sh ${sirt_tasks} ${logdir}"
 # IMPORTANT: DEN is the foreground block until pipeline finishes
-# mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_den bash $exec_dir/run-den.sh "${num_sinograms}" "${logdir}" 2> "${logdir}/den.err" | tee "${logdir}/den.out"
-bash $exec_dir/run-den.sh "${num_sinograms}" "${logdir}" 2> "${logdir}/den.err" | tee "${logdir}/den.out"
+mpiexec --no-vni -n 1 -ppn 1 -d 16 --hosts $node_den bash $exec_dir/run-den.sh "${sirt_tasks}" "${logdir}" 2> "${logdir}/den.err" | tee "${logdir}/den.out"
+# bash $exec_dir/run-den.sh "${num_sinograms}" "${logdir}" 2> "${logdir}/den.err" | tee "${logdir}/den.out"
 
 # --- If we reached here, DEN completed; mark end time BEFORE cleanup ---
 end_ns=$(date +%s%N)

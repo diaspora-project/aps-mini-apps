@@ -188,7 +188,7 @@ if __name__ == "__main__":
     parser.add_argument('--input', type=str, required=False, help='Input file or directory path.')
     parser.add_argument('--output', type=str, required=False, help='Output recon path.')
     parser.add_argument('--model', type=str, required=True, help='Path to the saved model.')
-    parser.add_argument('--protocol', type=str, required=True, help='Mofka protocol')
+    parser.add_argument('--protocol', type=str, required=False, help='Mofka protocol')
     parser.add_argument('--group_file', type=str, required=True, help='Path to group file')
     parser.add_argument("--batchsize", type=int, required=True, help="Mofka batchsize")
     parser.add_argument("--num_tasks", type=int, required=True, help="Number of Sinograms")
