@@ -125,19 +125,19 @@ mofkactl topic create sirt_dist_action \
 # 	--metadata "${METADATA_PROVIDER}" \
 # 	--data "${DATA_PROVIDER}"
 
-echo create sirt-den topics and partitions
+echo create sirt-den topics
 
 mofkactl topic create sirt_den \
 	--groupfile $GROUPFILE
 
-echo create sirt_den partition
+# echo create sirt_den partition
 
-mofkactl partition add sirt_den \
-	--type default \
-	--rank 0 \
-	--groupfile $GROUPFILE \
-	--metadata "${METADATA_PROVIDER}" \
-	--data "${DATA_PROVIDER}"
+# mofkactl partition add sirt_den \
+# 	--type default \
+# 	--rank 0 \
+# 	--groupfile $GROUPFILE \
+# 	--metadata "${METADATA_PROVIDER}" \
+# 	--data "${DATA_PROVIDER}"
 
 echo "Starting DAQ ..."
 
