@@ -99,7 +99,19 @@ mofkactl partition add handshake_d_s \
 		--metadata "${METADATA_PROVIDER}" \
 		--data "${DATA_PROVIDER}"
 
-echo create dist_sirt_action control topics
+echo create sirt-den topics
+mofkactl topic create sirt_den \
+	--groupfile $GROUPFILE
+
+echo create sirt_den partition
+mofkactl partition add sirt_den \
+	--type default \
+	--rank 0 \
+	--groupfile $GROUPFILE \
+	--metadata "${METADATA_PROVIDER}" \
+	--data "${DATA_PROVIDER}"
+
+echo create dist_sirt_action topic
 mofkactl topic create dist_sirt_action \
 	--groupfile $GROUPFILE
 
@@ -149,17 +161,17 @@ mofkactl partition add sirt_dist_action \
 # 	--metadata "${METADATA_PROVIDER}" \
 # 	--data "${DATA_PROVIDER}"
 
-echo create sirt-den topics
-mofkactl topic create sirt_den \
-	--groupfile $GROUPFILE
+# echo create sirt-den topics
+# mofkactl topic create sirt_den \
+# 	--groupfile $GROUPFILE
 
-echo create sirt_den partition
-mofkactl partition add sirt_den \
-	--type default \
-	--rank 0 \
-	--groupfile $GROUPFILE \
-	--metadata "${METADATA_PROVIDER}" \
-	--data "${DATA_PROVIDER}"
+# echo create sirt_den partition
+# mofkactl partition add sirt_den \
+# 	--type default \
+# 	--rank 0 \
+# 	--groupfile $GROUPFILE \
+# 	--metadata "${METADATA_PROVIDER}" \
+# 	--data "${DATA_PROVIDER}"
 
 echo "Starting DAQ ..."
 
