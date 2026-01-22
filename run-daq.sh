@@ -1,12 +1,12 @@
 source activate-spack.sh
 # source envpy/bin/activate
 
-# SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# cd "${SCRIPT_DIR}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "${SCRIPT_DIR}"
 
-# GROUPFILE="${SCRIPT_DIR}/mofka.json"
+GROUPFILE="${SCRIPT_DIR}/mofka.json"
 
-GROUPFILE="mofka.json"
+# GROUPFILE="mofka.json"
 
 # Check if the number of arguments is correct
 if [ "$#" -ne 4 ]; then
