@@ -6,7 +6,7 @@ cd "${SCRIPT_DIR}"
 
 GROUPFILE="${SCRIPT_DIR}/mofka.json"
 
-echo $GROUPFILE
+echo group file: $GROUPFILE
 
 # GROUPFILE="mofka.json"
 
