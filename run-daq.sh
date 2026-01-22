@@ -109,7 +109,7 @@ mofkactl topic create sirt_dist_action \
 
 # echo create sirt partitions for dist-sirt and their handshake
 
-echo create dist/sirt action patitions
+echo create dist/sirt action partitions
 
 mofkactl partition add sirt_dist_action \
 	--type default \
