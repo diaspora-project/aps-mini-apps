@@ -71,10 +71,10 @@ node_dist=${nodes_array[0]}
 # node_sirts=${nodes_array[0]}
 node_sirts=$nodes_array
 node_den=${nodes_array[0]}
-node_mofka="${nodes_array[0]} ${nodes_array[1]}"
+# node_mofka=${nodes_array[0]}
+node_mofka=("${nodes_array[0]}" "${nodes_array[1]}")
 num_node_mofka=${#node_mofka[@]}
 node_mofka="$(printf "%s," "${node_mofka[@]}" | sed 's/,$//')"
-# node_mofka=${nodes_array[0]}
 node_control=${nodes_array[0]}
 
 export MARGO_ENABLE_MONITORING=1
