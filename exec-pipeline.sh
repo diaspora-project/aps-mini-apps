@@ -17,6 +17,8 @@ pkill -9 -f "FailureInjector" || true
 # Remove previous checkpoints
 rm -rf /tmp/scratch/*
 rm -rf /tmp/persistent/*
+rm -rf /lus/eagle/projects/APSDataAnalysis/ndhai/veloc/tmp/scratch/*
+rm -rf /lus/eagle/projects/APSDataAnalysis/ndhai/veloc/tmp/persistent/*
 
 # Check if the number of arguments is corre
 if [ "$#" -ne 5 ]; then
