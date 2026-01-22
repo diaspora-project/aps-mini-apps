@@ -100,7 +100,7 @@ sleep 10
 
 echo "Start DAQ ------------------------------------------------------------"
 # bash run-daq.sh "${sirt_ranks}" "${sirt_tasks}" "${num_sinograms}" "${logdir}" > "${logdir}/daq.out" 2> "${logdir}/daq.err" &
-mpiexec --no-vni -ppn 1 -d 16 --hosts $node_daq bash $exec_dir/run-daq.sh "${sirt_ranks}" "${sirt_tasks}" "${num_sinograms}" "${logdir}" > "${logdir}/daq.log" 2> "${logdir}/daq.log" &
+mpiexec --no-vni -ppn 1 -d 16 --hosts $node_daq bash $exec_dir/run-daq.sh "${sirt_ranks}" "${sirt_tasks}" "${num_sinograms}" "${logdir}" >> "${logdir}/daq.log" 2>> "${logdir}/daq.log" &
 # bash $exec_dir/run-daq.sh "${sirt_ranks}" "${sirt_tasks}" "${num_sinograms}" "${logdir}" >> "${logdir}/daq.log" 2>> "${logdir}/daq.log" &
 echo mpiexec --no-vni -ppn 1 -d 16 --hosts $node_daq bash $exec_dir/run-daq.sh "${sirt_ranks}" "${sirt_tasks}" "${num_sinograms}" "${logdir}"
 sleep 10
