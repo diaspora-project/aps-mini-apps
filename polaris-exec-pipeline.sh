@@ -35,7 +35,8 @@ pkill -9 -f "veloc-backend" || true
 pkill -9 -f "FailureInjector" || true
 
 # Remove previous checkpoints
-rm -rf /tmp/scratch/* /tmp/persistent/* || true
+ckpt_dir=/eagle/Diaspora/ndhai/veloc
+rm -rf $ckpt_dir/tmp/scratch/* $ckpt_dir/tmp/persistent/* || true
 
 # --- Args ---
 if [ "$#" -ne 5 ]; then
