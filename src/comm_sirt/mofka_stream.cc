@@ -453,8 +453,8 @@ DataRegionBase<float, TraceMetadata>* MofkaStream::readSlidingWindow(
             std::cout << "[Task-" << getRank() << "] SSTStream read timeout, switching to Mofka..." << std::endl;
           }else{
             if (!json::accept(sst_payload.metadata)) {
-              std::cerr << "[Task-" << getRank() << "]: Invalid JSON metadata received from SST stream: "
-                        << sst_payload.metadata << "Skipping" << std::endl;
+              // std::cerr << "[Task-" << getRank() << "]: Invalid JSON metadata received from SST stream: "
+              //           << sst_payload.metadata << "Skipping" << std::endl;
             }else{
               auto metadata_json = json::parse(sst_payload.metadata);
 
