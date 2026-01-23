@@ -1,6 +1,8 @@
 source activate-spack.sh
 # source envpy/bin/activate
 
+echo $PMI_RANK
+
 # bedrock na+sm -c config.json
 bedrock cxi -v trace -c config.json
 
