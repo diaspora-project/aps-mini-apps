@@ -284,6 +284,7 @@ int ReconTask::run() {
       // ckpt_client->checkpoint_wait();
       if (ckpt_client->checkpoint_wait() != VELOC_SUCCESS) {
         std::cout << "[Task-" << task_id << "] Checkpoint failed, reinitializing" << std::endl;
+        delete ckpt_client;
         ckpt_client = veloc::get_client(ckpt_id, config.ckpt_config);
         std::string ckpt_name = config.ckpt_name + "_" + std::to_string(task_id);
         // Protect reconstruction memory regions
