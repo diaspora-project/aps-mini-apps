@@ -75,6 +75,14 @@ bash run-den.sh ${sirt_tasks} ${logdir} 2> ${logdir}/den.err | tee ${logdir}/den
 
 
 echo "Clean up after run ---------------------------------------------------"
+pkill -9 -f "bedrock" || true
+pkill -9 -f "streamer-daq" || true
+pkill -9 -f "streamer-dist" || true
+pkill -9 -f "streamer-sirt" || true
+pkill -9 -f "sirt_stream" || true
+pkill -9 -f "streamer-den" || true
+pkill -INT -f "veloc" || true
+pkill -9 -f "veloc-backend" || true
 pkill -9 -f "FailureInjector" || true
 echo "COMPLETE"
 
