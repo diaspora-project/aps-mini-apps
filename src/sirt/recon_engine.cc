@@ -371,7 +371,10 @@ int ReconTask::run() {
       std::cerr << "[Task-" << task_id << "] Stop flag set. Exiting reconstruction loop and stream..." << std::endl;
       ms.stopDataCollection();
       producer.flush();
-      ckpt_client->checkpoint_wait();
+      while (ckpt_client->checkpoint_wait() != VELOC_SUCCESS) {
+        std::cerr << "[Task-" << task_id << "] Checkpoint is not completed yet, waiting..." << std::endl;
+        sleep(1);
+      };
       // Call the callback if it exists
       if (on_stop_callback) {
         on_stop_callback();
