@@ -281,7 +281,16 @@ int ReconTask::run() {
     #endif
     if(!(passes%config.ckpt_freq) || stop_flag.load()){
       ckpt_mutex->lock();
-      ckpt_client->checkpoint_wait();
+      // ckpt_client->checkpoint_wait();
+      if (ckpt_client->checkpoint_wait() != VELOC_SUCCESS) {
+        std::cout << "[Task-" << task_id << "] Checkpoint failed, reinitializing" << std::endl;
+        ckpt_client = veloc::get_client(ckpt_id, config.ckpt_config);
+        std::string ckpt_name = config.ckpt_name + "_" + std::to_string(task_id);
+        // Protect reconstruction memory regions
+        int progress = 0; // Reconstruction progress marked by the projection requence ids
+        ckpt_client->mem_protect(0, &progress, 1, sizeof(int), ckpt_name);
+        ckpt_client->mem_protect(1, veloc::boost::serializer(recon_image), veloc::boost::deserializer(recon_image), ckpt_name);
+      }
       progress = passes * config.window_len;
       std::cout << "[Task-" << task_id << "] Updating progress to " << progress << "(pass = " << passes << ", config.window_len = " << config.window_len << ")"<< std::endl;
       ms.updateCkptProgress(progress);
