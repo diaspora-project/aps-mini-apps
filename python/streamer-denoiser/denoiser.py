@@ -114,7 +114,6 @@ def main(input_path, recon_path, model_path, protocol, group_file, batchsize, nu
             if waiting_metadata:
                 for iteration_stream in waiting_metadata.keys():
                     print(f"    --> Waiting iteration {iteration_stream}: Complete tasks: {waiting_metadata[iteration_stream].keys()}")
-            else:
                 print("Complete as all tasks already sent FIN")
                 break
 
