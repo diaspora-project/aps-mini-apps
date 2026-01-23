@@ -905,7 +905,7 @@ def task_to_worker_assignment(args, num_workers):
       if to_task != -1:
         # move a task back if needed
         action_seq = move_task(to_task, to_worker, from_worker, action_producer, action_seq)
-        worker_to_task[to_worker].remove(from_task)
+        worker_to_task[to_worker].remove(to_task)
         # worker_progress[from_worker] += task_progress[to_task]
         # worker_progress[to_worker] -= task_progress[to_task]
         surplus_worker_caps[from_worker] -= task_weights[to_task]
