@@ -109,20 +109,41 @@ class ImagePacket:
 
 from typing import Any, Optional
 class SharedRing:
+  # def __init__(self, num_slots: int, slot_bytes: int, shm_name: Optional[str] = None, create: bool = True):
+  #   self.num_slots = num_slots
+  #   self.slot_bytes = slot_bytes
+  #   self.total_bytes = num_slots * slot_bytes
+
+  #   if create:
+  #     self.shm = shared_memory.SharedMemory(create=True, size=self.total_bytes)
+  #     self.name = self.shm.name
+  #     self._owner = True
+  #   else:
+  #     assert shm_name is not None
+  #     self.shm = shared_memory.SharedMemory(name=shm_name, create=False)
+  #     self.name = shm_name
+  #     self._owner = False
   def __init__(self, num_slots: int, slot_bytes: int, shm_name: Optional[str] = None, create: bool = True):
     self.num_slots = num_slots
     self.slot_bytes = slot_bytes
     self.total_bytes = num_slots * slot_bytes
 
+    # normalize shm name (no leading slash)
+    norm_name = None
+    if shm_name is not None:
+      norm_name = shm_name.lstrip("/")
+
     if create:
-      self.shm = shared_memory.SharedMemory(create=True, size=self.total_bytes)
-      self.name = self.shm.name
+      # If you want deterministic naming, you can pass name=norm_name when norm_name is not None
+      self.shm = shared_memory.SharedMemory(create=True, size=self.total_bytes, name=norm_name)
       self._owner = True
     else:
-      assert shm_name is not None
-      self.shm = shared_memory.SharedMemory(name=shm_name, create=False)
-      self.name = shm_name
+      assert norm_name is not None
+      self.shm = shared_memory.SharedMemory(name=norm_name, create=False)
       self._owner = False
+
+    # Always store normalized name
+    self.name = self.shm.name.lstrip("/")
 
     # self.buf = self.shm.buf  # memoryview
 
