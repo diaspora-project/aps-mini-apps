@@ -183,10 +183,10 @@ int ReconTask::run() {
 
   for(; passes < config.num_passes; ++passes){
 
-    // Slow down 1 worker for experiment
-    // if (worker_id == 0) {
-    //   sleep(2);
-    // }
+    Slow down 1 worker for experiment
+    if (worker_id == 0) {
+      sleep(2);
+    }
 
     int killed = kill_signal.load();
     if (killed != 0) {
