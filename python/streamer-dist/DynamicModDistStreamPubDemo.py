@@ -779,7 +779,6 @@ def task_to_worker_assignment(args, num_workers):
     try:
       f = action_consumer.pull()
       event = f.wait()
-      event.acknowledge()
       metadata = json.loads(event.metadata)
       if metadata["Type"] == "PROGRESS":
         task_id = metadata["task_id"]
