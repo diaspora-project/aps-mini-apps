@@ -64,8 +64,8 @@ class MofkaStream
     int comm_rank;
     // int comm_size;
 
-    int progress;
-    int ckpt_progress;
+    int progress = -1;
+    int ckpt_progress = -1;
     std::mutex ckpt_progress_mutex;
     int next_seq;
     std::vector<mofka::Event> pending_events;
@@ -256,6 +256,7 @@ class MofkaStream
     }
     
     void updateSeqNext(int next_seq) { this->next_seq = next_seq; } // Update next_seq for streaming control
+    int getNextSeq() { return next_seq; }
 
     bool isEndOfStream() { return mofka_eos && sst_eos; }
     bool getSSTEndOfStream() { return sst_eos; }

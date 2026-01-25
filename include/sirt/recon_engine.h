@@ -20,6 +20,7 @@ class ReconTask {
     std::mutex *ckpt_mutex;
     MofkaStream ms;
     int checkpointed_progress = 0;
+    std::atomic<bool> finish{false};
 
     
   public:
@@ -73,6 +74,9 @@ class ReconTask {
     bool isMSCompleted() {
       return ms.isCompleted();
     }
+
+    bool isFinished() { return finish.load(); }
+
 };
 
 #endif // SIRT_RETCON_ENGINE_H

@@ -51,7 +51,7 @@ class TraceRuntimeConfig {
     std::string ckpt_config = "veloc.cfg";
     std::string ckpt_name   = "sirt-ckpt";
     std::string logdir      = ".";
-    bool        sst         = true;
+    bool        sst         = false;
 
     TraceRuntimeConfig(int argc, char **argv) {
       try {

@@ -183,28 +183,18 @@ int main(int argc, char **argv) {
 
         // Check if reconstruction task made, progress
         // If so, notify DIST
+        std::vector<int> to_remove_task_ids;
         for (auto& [task_id, task] : running_tasks) {
-            int progress = task.getCheckpointedProgress();
-            if (progress > task_progresses[task_id]) {
-                json progress_md = {
-                    {"Type", "PROGRESS"},
-                    {"task_id", task_id},
-                    {"progress", progress}
+            if (task.isFinished()) {
+                json end_md = {
+                    {"Type", "FINISHED"},
+                    {"worker_id", config.worker_index},
+                    {"task_id", task_id}
                 };
-                std::cout << "[Worker-" << config.worker_id << "] Report progress for Task " << task_id << ": Progress: " << task_progresses[task_id] << " --> " << progress << std::endl;
-                task_progresses[task_id] = progress;
-                producer.push(progress_md);
-            }
-        }
-        producer.flush();
-
-        auto future_event = consumer.pull();
-        while (!future_event.completed()) {
-            // sleep for 1 ms to avoid busy waiting
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
-
-            // Also check progress if needed while waiting
-            for (auto& [task_id, task] : running_tasks) {
+                std::cout << "[Worker-" << config.worker_id << "] Notify DIST about finished Task " << task_id << std::endl;
+                to_remove_task_ids.push_back(task_id);
+                producer.push(end_md);
+            }else{
                 int progress = task.getCheckpointedProgress();
                 if (progress > task_progresses[task_id]) {
                     json progress_md = {
@@ -215,6 +205,58 @@ int main(int argc, char **argv) {
                     std::cout << "[Worker-" << config.worker_id << "] Report progress for Task " << task_id << ": Progress: " << task_progresses[task_id] << " --> " << progress << std::endl;
                     task_progresses[task_id] = progress;
                     producer.push(progress_md);
+                }
+            }
+        }
+        if (!to_remove_task_ids.empty()) {
+            std::lock_guard<std::mutex> lock(pending_task_ids_mutex);
+            for (const auto& task_id : to_remove_task_ids) {
+                pending_task_ids.push_back(task_id);
+                running_tasks.erase(task_id);
+                running_threads.erase(task_id);
+                task_progresses.erase(task_id);
+            }
+        }
+        producer.flush();
+
+        auto future_event = consumer.pull();
+        while (!future_event.completed()) {
+            // sleep for 1 ms to avoid busy waiting
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+
+            // Also check progress if needed while waiting
+            std::vector<int> to_remove_task_ids;
+            for (auto& [task_id, task] : running_tasks) {
+                if (task.isFinished()) {
+                    json end_md = {
+                        {"Type", "FINISHED"},
+                        {"worker_id", config.worker_index},
+                        {"task_id", task_id}
+                    };
+                    std::cout << "[Worker-" << config.worker_id << "] Notify DIST about finished Task " << task_id << std::endl;
+                    to_remove_task_ids.push_back(task_id);
+                    producer.push(end_md);
+                }else{
+                    int progress = task.getCheckpointedProgress();
+                    if (progress > task_progresses[task_id]) {
+                        json progress_md = {
+                            {"Type", "PROGRESS"},
+                            {"task_id", task_id},
+                            {"progress", progress}
+                        };
+                        std::cout << "[Worker-" << config.worker_id << "] Report progress for Task " << task_id << ": Progress: " << task_progresses[task_id] << " --> " << progress << std::endl;
+                        task_progresses[task_id] = progress;
+                        producer.push(progress_md);
+                    }
+                }
+            }
+            if (!to_remove_task_ids.empty()) {
+                std::lock_guard<std::mutex> lock(pending_task_ids_mutex);
+                for (const auto& task_id : to_remove_task_ids) {
+                    pending_task_ids.push_back(task_id);
+                    running_tasks.erase(task_id);
+                    running_threads.erase(task_id);
+                    task_progresses.erase(task_id);
                 }
             }
             producer.flush();

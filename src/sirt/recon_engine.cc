@@ -145,6 +145,7 @@ int ReconTask::run() {
 
   // Configure the VeloC checkpointing
   unsigned int ckpt_id = 0;
+  // unsigned int ckpt_id = task_id;
   ckpt_mutex->lock();
   // veloc::client_t *ckpt_client = veloc::get_client((unsigned int)task_id, config.ckpt_config);
   veloc::client_t *ckpt_client = veloc::get_client(ckpt_id, config.ckpt_config);
@@ -281,18 +282,20 @@ int ReconTask::run() {
     #endif
     if(!(passes%config.ckpt_freq) || stop_flag.load()){
       ckpt_mutex->lock();
-      // ckpt_client->checkpoint_wait();
-      if (ckpt_client->checkpoint_wait() != VELOC_SUCCESS) {
-        std::cout << "[Task-" << task_id << "] Checkpoint failed, reinitializing" << std::endl;
-        delete ckpt_client;
-        ckpt_client = veloc::get_client(ckpt_id, config.ckpt_config);
-        std::string ckpt_name = config.ckpt_name + "_" + std::to_string(task_id);
-        // Protect reconstruction memory regions
-        int progress = 0; // Reconstruction progress marked by the projection requence ids
-        ckpt_client->mem_protect(0, &progress, 1, sizeof(int), ckpt_name);
-        ckpt_client->mem_protect(1, veloc::boost::serializer(recon_image), veloc::boost::deserializer(recon_image), ckpt_name);
-      }
-      progress = passes * config.window_len;
+      ckpt_client->checkpoint_wait();
+      // if (ckpt_client->checkpoint_wait() != VELOC_SUCCESS) {
+      //   std::cout << "[Task-" << task_id << "] Checkpoint failed, reinitializing" << std::endl;
+      //   // delete ckpt_client;
+      //   ckpt_client = veloc::get_client(ckpt_id, config.ckpt_config);
+      //   std::string ckpt_name = config.ckpt_name + "_" + std::to_string(task_id);
+      //   // Protect reconstruction memory regions
+      //   int progress = 0; // Reconstruction progress marked by the projection requence ids
+      //   ckpt_client->mem_protect(0, &progress, 1, sizeof(int), ckpt_name);
+      //   ckpt_client->mem_protect(1, veloc::boost::serializer(recon_image), veloc::boost::deserializer(recon_image), ckpt_name);
+      // }
+      // progress = passes * config.window_len;
+      progress = ms.getNextSeq()-1;
+      passes = progress / config.window_len;
       std::cout << "[Task-" << task_id << "] Updating progress to " << progress << "(pass = " << passes << ", config.window_len = " << config.window_len << ")"<< std::endl;
       ms.updateCkptProgress(progress);
       ms.acknowledge();
@@ -359,7 +362,7 @@ int ReconTask::run() {
         //   iteration_stream.str() + "-recon.h5";
         // saveAsHDF5(outputpath.c_str(), 
         //     &recon[recon_slice_data_index], app_dims);
-        
+
         std::cout << "[Task-" << task_id << "] Publishing reconstructed image for iteration " 
                   << passes << ", progress = " << progress << std::endl;
         ms.publishImage(md, &recon[recon_slice_data_index], data_size, producer);
@@ -381,10 +384,11 @@ int ReconTask::run() {
       std::cerr << "[Task-" << task_id << "] Stop flag set. Exiting reconstruction loop and stream..." << std::endl;
       ms.stopDataCollection();
       producer.flush();
-      while (ckpt_client->checkpoint_wait() != VELOC_SUCCESS) {
-        std::cerr << "[Task-" << task_id << "] Checkpoint is not completed yet, waiting..." << std::endl;
-        sleep(1);
-      };
+      // while (ckpt_client->checkpoint_wait() != VELOC_SUCCESS) {
+      //   std::cerr << "[Task-" << task_id << "] Checkpoint is not completed yet, waiting..." << std::endl;
+      //   sleep(1);
+      // };
+      ckpt_client->checkpoint_wait();
       // Call the callback if it exists
       if (on_stop_callback) {
         on_stop_callback();
@@ -435,6 +439,7 @@ int ReconTask::run() {
   //delete curr_slices;
   // std::cout << "Deleting comm" << std::endl;
   // delete comm;
+  this->finish.store(true);
   std::cout << "[Task-" << task_id << "] Complete" << std::endl;
   return 0;
 }

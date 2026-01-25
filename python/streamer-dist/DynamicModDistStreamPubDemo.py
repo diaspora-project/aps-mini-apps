@@ -680,26 +680,28 @@ def flush_sst_producer(args, shm_name, num_slots, slot_bytes, desc_q, ack_q):
       print("Cleaning up SST stream ...")
 
 
-def move_task(task_id, from_worker, to_worker, producer, action_seq):
+def move_task(task_id, from_worker, to_worker, producer, action_seq, progress):
   stop_info = {
       "Type": "END_TASK",
       "task_id": task_id,
       "worker_id": from_worker,
+      "progress": progress,
       "action_seq": action_seq
   }
   action_seq += 1
   producer.push(stop_info, bytearray(1), partition=0)
-  print(f"[LB] Stopping task {task_id} on worker {from_worker} for reassignment")
+  print(f"[LB] --> action_seq={action_seq} Stopping task {task_id} on worker {from_worker} for reassignment")
   assign_info = {
       "Type": "START_TASK",
       "task_id": task_id,
       "worker_id": to_worker,
       "from_worker_id": from_worker,
+      "progress": progress,
       "action_seq": action_seq
   }
   action_seq += 1
   producer.push(assign_info, bytearray(1), partition=0)
-  print(f"[LB] Reassigning task {task_id} from worker {from_worker} to worker {to_worker}")
+  print(f"[LB] --> action_seq={action_seq} Reassigning task {task_id} from worker {from_worker} to worker {to_worker}")
   producer.flush()
   return action_seq
 
@@ -716,10 +718,10 @@ def task_to_worker_assignment(args, num_workers):
   num_tasks = args.ntask_sirt
   # assign tasks to workers in round-robin fashion
   task_to_worker = {}
-  worker_to_task = [[] for _ in range(num_workers)]
+  worker_to_task = [set() for _ in range(num_workers)]
   for t in range(num_tasks):
     task_to_worker[t] = t % num_workers
-    worker_to_task[t % num_workers].append(t)
+    worker_to_task[t % num_workers].add(t)
   # for t in range(num_tasks):
   #   task_to_worker[t] = 0
   #   worker_to_task[0].append(t)
@@ -729,11 +731,11 @@ def task_to_worker_assignment(args, num_workers):
 
   for w in range(num_workers):
     print(f"Worker {w} assigned tasks: {worker_to_task[w]}")
-    for t in range(len(worker_to_task[w])):
+    for t in worker_to_task[w]:
       assign_info = {
           "Type": "START_TASK",
           "worker_id": w,
-          "task_id": worker_to_task[w][t],
+          "task_id": t,
           "action_seq": action_seq
       }
       action_seq += 1
@@ -743,7 +745,10 @@ def task_to_worker_assignment(args, num_workers):
 
   # time.sleep(100000000)
 
-  task_progress = np.zeros(num_tasks)
+  task_progress = {}
+  working_tasks = set(range(num_tasks))
+  for task_id in working_tasks:
+    task_progress[task_id] = 0
   worker_progress = np.zeros(num_workers)
 
   total_progress = 0
@@ -756,14 +761,18 @@ def task_to_worker_assignment(args, num_workers):
   
   round = 0
 
-  progress_threshold_window = num_tasks * 16 * 5
-  progress_threshold = 3*progress_threshold_window
+  progress_threshold_window = len(working_tasks) * 16 * 5
+  progress_threshold = progress_threshold_window
 
   worker_active_periods = np.zeros(num_workers)
+
+  last_worst_gap = 0.8
   
   while args.dynamic_loadbalancing.lower() == "true":
     print(f"[LB] Load balancing round {round}: Collecting data from recon tasks ----------- ")
     round += 1
+
+    force_reassignment = False
 
     # time.sleep(1000000)
 
@@ -781,6 +790,13 @@ def task_to_worker_assignment(args, num_workers):
         task_progress[task_id] += improved_progress
         worker_progress[worker_id] += improved_progress
         total_progress += improved_progress
+      elif metadata["Type"] == "FINISHED":
+        task_id = metadata["task_id"]
+        worker_id = metadata["worker_id"]
+        working_tasks.discard(task_id)
+        worker_to_task[worker_id].discard(task_id)
+        print(f"[LB] Task-{task_id} in Worker-{worker_id} has finished")
+        force_reassignment = True
       else:
         print(f"[LB] Unknown metadata received: {event.metadata},")
         continue
@@ -789,7 +805,7 @@ def task_to_worker_assignment(args, num_workers):
       continue
     
     # Make reassignment only if total progress is large enough to reflect performance
-    if total_progress < progress_threshold:
+    if not force_reassignment and total_progress < progress_threshold:
       print(f"[LB] Total progress {total_progress} is less than threshold {progress_threshold}, continue collecting ...")
       continue
 
@@ -797,17 +813,28 @@ def task_to_worker_assignment(args, num_workers):
     progress_threshold = total_progress + progress_threshold_window
 
     # sorting task_id based on progress from smallest to largest
-    sorted_tasks = sorted(range(num_tasks), key=lambda x: task_progress[x])
+    sorted_tasks = sorted(working_tasks, key=lambda x: task_progress[x])
     min_progress = task_progress[sorted_tasks[0]]
     max_progress = task_progress[sorted_tasks[-1]]
-    if min_progress == max_progress:
-      print("[LB] All tasks are at the same progress, no need to reassign")
+    worst_gap = min_progress / max_progress
+    if not force_reassignment and worst_gap > last_worst_gap:
+      print(f"[LB] Progress between tasks are improving: Old: {last_worst_gap:.4f} --> New : {worst_gap:.4f} no need for adjustment")
+      last_worst_gap = worst_gap
       continue
+    else:
+      print(f"[LB] Progress between tasks getting worse: Old: {last_worst_gap:.4f} --> New : {worst_gap:.4f} need for adjustment")
+    last_worst_gap = worst_gap
     # How task are lagging behind the fastest task
-    task_lag = [(max_progress - task_progress[i])/(max_progress - min_progress) for i in range(num_tasks)]
-    sum_lag = sum(task_lag)
-    # weights are normalized lags
-    task_weights = [task_lag[i]*num_tasks/sum_lag for i in range(num_tasks)]
+    task_lag = {}
+    sum_lag = 0
+    for t in working_tasks:
+      task_lag[t] = (max_progress - task_progress[t])/(max_progress - min_progress)
+      sum_lag += task_lag[t]
+    # # weights are normalized lags
+    # task_weights = {}
+    # for t in working_tasks:
+    #   task_weights[t] = task_lag[t]*len(working_tasks)/sum_lag
+    task_weights = np.ones(num_tasks)
     
     # worker_progress = [0 for _ in range(num_workers)]
     # for i in range(num_tasks):
@@ -825,11 +852,13 @@ def task_to_worker_assignment(args, num_workers):
     #   worker_progress[i] *= sum_task_progress / sum_worker_progress
     # # worker capacities are normalized progress
     # worker_caps = [worker_progress[i]*num_tasks/sum_worker_progress for i in range(num_workers)]
+    avg_cap = num_tasks / num_workers
     for i in range(num_workers):
       if len(worker_to_task) > 0:
         worker_active_periods[i] += 1
-    worker_caps = worker_progress / worker_active_periods
-    worker_caps /= np.sum(worker_caps)
+    worker_speeds = worker_progress / worker_active_periods
+    avg_speed = np.sum(worker_progress) / np.max(worker_active_periods) / num_workers
+    worker_caps = worker_speeds * avg_cap / avg_speed
     
     
     # reassign tasks based on their weights and workers' capacities
@@ -845,76 +874,55 @@ def task_to_worker_assignment(args, num_workers):
     print(f"[LB] Progress report:")
     print(f"[LB] min_task_progress: Task-{sorted_tasks[0]} (progress={min_progress}), max_task_progress: Task-{sorted_tasks[-1]} (progress={max_progress})")
     print(f"[LB] sorted task progress: {sorted_tasks}")
+    print(f"[LB] avg_cap={avg_cap:.2f} --> avg_speed={avg_speed:.2f}")
     print(f"[LB] sorted surplus worker caps: {sorted_surplus_worker_caps}")
     for w in range(num_workers):
-      print(f"[LB]  Worker {w}: progress={worker_progress[w]}, capacity={worker_caps[w]:.2f}, weight={worker_weights[w]:.2f}, surplus={surplus_worker_caps[w]:.2f}")
+      print(f"[LB]  Worker {w}: progress={worker_progress[w]}, speed={worker_speeds[w]:.2f} cap={worker_caps[w]:.2f}, weight={worker_weights[w]:.2f}, surplus={surplus_worker_caps[w]:.2f}")
       for t in worker_to_task[w]:
-        print(f"[LB]    --> Task {t}: progress={task_progress[t]}, task_lag={task_lag[t]:.2f}, task_weight={task_weights[t]:.2f}")
+        print(f"[LB]    --> Task {t}: progress={task_progress[t]}, lag={task_lag[t]:.2f}, weight={task_weights[t]:.2f}")
 
     task_assigned = False
 
-    # Move task from worker with negative surplus to worker with positive surplus
-    to_move_tasks = []
-    to_move_tasks_set = set()
-    for w in sorted_surplus_worker_caps:
-      if surplus_worker_caps[w] < 0:
-        # find task with largest weight to move
-        tasks = worker_to_task[w]
-        task_weights_in_worker = [task_weights[t] for t in tasks]
-        max_weight_task = tasks[np.argmax(task_weights_in_worker)]
-        # Only move if the task far behind the fastest one:
-        gap = task_progress[max_weight_task] / max_progress
-        if (gap < 0.8): 
-          print(f"[LB] Tasks to move: {max_weight_task}: gap={gap}")
-          to_move_tasks.append((max_weight_task, w))
-          to_move_tasks_set.add(max_weight_task)
-      else:
-        break
-    # print(f"[LB] Tasks to move: {to_move_tasks}")
-    to_swap_tasks = []
-    for t in reversed(sorted_tasks):
-      if t not in to_move_tasks_set:
-        to_swap_tasks.append((t, task_to_worker[t]))
-      if len(to_swap_tasks) == len(to_move_tasks):
-        break
-    
-    # find workers with positive surplus to receive tasks
-    for from_task, from_worker in to_move_tasks:
-      to_task = -1
-      to_worker = -1
-      for w in sorted_surplus_worker_caps:
-        if surplus_worker_caps[w] >= task_weights[task_id]:
-        # if surplus_worker_caps[w] > 0:
-          to_worker = w
-          break
-      if to_worker == -1 and len(to_swap_tasks) > 0:
-        # If the task is to slow, try to swap it with the fastest one
-        target_task, _ = to_swap_tasks[0]
-        if task_progress[from_task] / task_progress[target_task] < 0.5:
-          to_task, to_worker = to_swap_tasks.pop(0)
-      if to_worker != -1:
-        # move task to this worker
-        action_seq = move_task(from_task, from_worker, to_worker, action_producer, action_seq)
-        # Update related variables
-        worker_to_task[from_worker].remove(from_task)
-        # worker_progress[to_worker] += task_progress[from_task]
-        # worker_progress[from_worker] -= task_progress[from_task]
-        surplus_worker_caps[to_worker] -= task_weights[from_task]
-        worker_to_task[to_worker].append(from_task)
-        task_to_worker[from_task] = to_worker
-      if to_task != -1:
-        # move a task back if needed
-        action_seq = move_task(to_task, to_worker, from_worker, action_producer, action_seq)
-        worker_to_task[to_worker].remove(to_task)
-        # worker_progress[from_worker] += task_progress[to_task]
-        # worker_progress[to_worker] -= task_progress[to_task]
-        surplus_worker_caps[from_worker] -= task_weights[to_task]
-        worker_to_task[from_worker].append(to_task)
-        task_to_worker[to_task] = from_worker
+    # Move min_progress task to the most spacious worker
+    from_task = sorted_tasks[0]
+    from_worker = task_to_worker[from_task]
 
+    to_task = -1
+    to_worker = -1
 
-      # reorder worker by surplus capacity after new assignments
-      sorted_surplus_worker_caps = sorted(range(num_workers), key=lambda x: surplus_worker_caps[x])
+    target_worker = sorted_surplus_worker_caps[-1]
+    if surplus_worker_caps[w] >= task_weights[from_task]:
+    # if surplus_worker_caps[w] > 0:
+      print(f"[LB] Move Task-{from_task} to Worker-{w} with the highest surplus cap = {surplus_worker_caps[w]}")
+      to_worker = w
+    else:
+      # If there is no suitable task, swap the min_progress task with the max_progress task
+      to_task = sorted_tasks[-1]
+      to_worker = task_to_worker[to_task]
+      print(f"[LB] Swap slowest Task-{from_task} on Worker-{from_worker} with the fastest Task-{to_task} on Worker-{to_worker}")
+
+      
+    if to_worker != -1:
+      # move task to this worker
+      action_seq = move_task(from_task, from_worker, to_worker, action_producer, action_seq, task_progress[from_task])
+      # Update related variables
+      worker_to_task[from_worker].discard(from_task)
+      # worker_progress[to_worker] += task_progress[from_task]
+      # worker_progress[from_worker] -= task_progress[from_task]
+      surplus_worker_caps[to_worker] -= task_weights[from_task]
+      worker_to_task[to_worker].add(from_task)
+      task_to_worker[from_task] = to_worker
+    if to_task != -1:
+      # move a task back if needed
+      action_seq = move_task(to_task, to_worker, from_worker, action_producer, action_seq, task_progress[to_task])
+      worker_to_task[to_worker].discard(to_task)
+      # worker_progress[from_worker] += task_progress[to_task]
+      # worker_progress[to_worker] -= task_progress[to_task]
+      surplus_worker_caps[from_worker] -= task_weights[to_task]
+      worker_to_task[from_worker].add(to_task)
+      task_to_worker[to_task] = from_worker
+
+    print("[LB] Complete task to worker assignment")
 
     # if not task_assigned:
     #   print("[LB] No task reassignment is made in this round")
@@ -1247,6 +1255,8 @@ def main():
   # args.dynamic_loadbalancing = "false"
 
   # Wait for the assignment process to finish
+  while args.dynamic_loadbalancing.lower() == "true":
+    time.sleep(1)
   assignment_process.join()
   # if assignment_process.is_alive():
   #   assignment_process.terminate()
