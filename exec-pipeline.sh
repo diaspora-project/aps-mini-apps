@@ -49,10 +49,14 @@ bash run-mofka.sh > ${logdir}/mofka.out 2> ${logdir}/mofka.err &
 echo bash run-mofka.sh
 sleep 10
 
+echo "Start QUEUE SETUP ----------------------------------------------------"
+bash run-queue-setup.sh ${sirt_ranks} ${sirt_tasks} ${num_sinograms} ${logdir}
+echo bash run-daq.sh ${sirt_ranks} ${sirt_tasks} ${num_sinograms} ${logdir}
+
 echo "Start DAQ ------------------------------------------------------------"
 bash run-daq.sh ${sirt_ranks} ${sirt_tasks} ${num_sinograms} ${logdir} >> ${logdir}/daq.out 2>> ${logdir}/daq.err &
 echo bash run-daq.sh ${sirt_ranks} ${sirt_tasks} ${num_sinograms} ${logdir}
-sleep 10
+# sleep 10
 
 echo "Start DIST -----------------------------------------------------------"
 bash run-dist.sh ${num_sinograms} ${sirt_tasks} ${logdir} >> ${logdir}/dist.out 2>> ${logdir}/dist.err &

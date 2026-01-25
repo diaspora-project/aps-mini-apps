@@ -101,12 +101,16 @@ mpiexec --no-vni -ppn $num_node_mofka --hosts $node_mofka -n $num_node_mofka bas
 echo mpiexec --no-vni -ppn $num_node_mofka --hosts $node_mofka -n $num_node_mofka bash $exec_dir/run-mofka-polaris.sh
 sleep 10
 
+echo "Start QUEUE SETUP ----------------------------------------------------"
+bash run-queue-setup.sh ${sirt_ranks} ${sirt_tasks} ${num_sinograms} ${logdir}
+echo bash run-daq.sh ${sirt_ranks} ${sirt_tasks} ${num_sinograms} ${logdir}
+
 echo "Start DAQ ------------------------------------------------------------"
 # bash run-daq.sh "${sirt_ranks}" "${sirt_tasks}" "${num_sinograms}" "${logdir}" > "${logdir}/daq.out" 2> "${logdir}/daq.err" &
 mpiexec --no-vni -ppn 1 -d 16 --hosts $node_daq bash $exec_dir/run-daq.sh "${sirt_ranks}" "${sirt_tasks}" "${num_sinograms}" "${logdir}" >> "${logdir}/daq.log" 2>> "${logdir}/daq.log" &
 # bash $exec_dir/run-daq.sh "${sirt_ranks}" "${sirt_tasks}" "${num_sinograms}" "${logdir}" >> "${logdir}/daq.log" 2>> "${logdir}/daq.log" &
 echo mpiexec --no-vni -ppn 1 -d 16 --hosts $node_daq bash $exec_dir/run-daq.sh "${sirt_ranks}" "${sirt_tasks}" "${num_sinograms}" "${logdir}"
-sleep 10
+# sleep 10
 
 echo "Start DIST -----------------------------------------------------------"
 mpiexec --no-vni -ppn 1 -d 16 --hosts $node_dist bash $exec_dir/run-dist.sh "${num_sinograms}" "${sirt_tasks}" "${logdir}" > "${logdir}/dist.out" 2> "${logdir}/dist.err" &
