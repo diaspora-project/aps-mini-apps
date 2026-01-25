@@ -801,7 +801,7 @@ def task_to_worker_assignment(args, num_workers):
         print(f"[LB] Unknown metadata received: {event.metadata},")
         continue
     except Exception as e:
-      print(f"[LB] Exception while receiving progress update: {e}")
+      print(f"[LB] Exception while processing message: {metadata}: {e}")
       continue
     
     # Make reassignment only if total progress is large enough to reflect performance
