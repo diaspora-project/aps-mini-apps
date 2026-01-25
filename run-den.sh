@@ -13,10 +13,12 @@ logdir=$2
 
 trap "echo 'Ctrl+C pressed. Terminating...'; exit 1" SIGINT SIGTERM
 
-rm ./build/denoise/*.h5
+outputtop=.
+
+rm $outputtop/build/denoise/*.h5
 
 python -u ./build/python/streamer-denoiser/denoiser.py \
-    --output ./build/denoise \
+    --output $outputtop/build/denoise \
     --model ./build/python/streamer-denoiser/testA40GPU-it07500.h5 \
     --group_file mofka.json \
     --batchsize 4 \
