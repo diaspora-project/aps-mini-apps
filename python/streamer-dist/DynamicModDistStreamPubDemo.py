@@ -761,7 +761,7 @@ def task_to_worker_assignment(args, num_workers):
   
   round = 0
 
-  progress_threshold_window = len(working_tasks) * 16 * 5
+  progress_threshold_window = len(working_tasks) * 16 * 3
   progress_threshold = progress_threshold_window
 
   worker_active_periods = np.zeros(num_workers)
