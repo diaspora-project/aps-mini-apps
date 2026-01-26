@@ -209,6 +209,7 @@ int main(int argc, char **argv) {
             }
         }
         if (!to_remove_task_ids.empty()) {
+            std::cout << "[Worker-" << config.worker_id << "] Found finished tasks to be update" << std::endl;
             std::lock_guard<std::mutex> lock(pending_task_ids_mutex);
             for (const auto& task_id : to_remove_task_ids) {
                 pending_task_ids.push_back(task_id);
@@ -251,12 +252,15 @@ int main(int argc, char **argv) {
                 }
             }
             if (!to_remove_task_ids.empty()) {
-                std::lock_guard<std::mutex> lock(pending_task_ids_mutex);
+                std::cout << "[Worker-" << config.worker_id << "] Found finished tasks to be update" << std::endl;
                 for (const auto& task_id : to_remove_task_ids) {
-                    pending_task_ids.push_back(task_id);
+                    std::cout << "[Worker-" << config.worker_id << "] Erasing running Task-" << task_id << std::endl;
                     running_tasks.erase(task_id);
+                    std::cout << "[Worker-" << config.worker_id << "] Erasing running thread Task-" << task_id << std::endl;
                     running_threads.erase(task_id);
+                    std::cout << "[Worker-" << config.worker_id << "] Erasing task progress for Task-" << task_id << std::endl;
                     task_progresses.erase(task_id);
+                    std::cout << "[Worker-" << config.worker_id << "] Completed erasing Task-" << task_id << std::endl;
                 }
             }
             producer.flush();
