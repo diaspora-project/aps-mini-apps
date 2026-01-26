@@ -183,7 +183,6 @@ int main(int argc, char **argv) {
 
         // Check if reconstruction task made, progress
         // If so, notify DIST
-        std::vector<int> to_remove_task_ids;
         for (auto& [task_id, task] : running_tasks) {
             if (task.isFinished()) {
                 json end_md = {
@@ -192,7 +191,8 @@ int main(int argc, char **argv) {
                     {"task_id", task_id}
                 };
                 std::cout << "[Worker-" << config.worker_id << "] Notify DIST about finished Task " << task_id << std::endl;
-                to_remove_task_ids.push_back(task_id);
+                std::lock_guard<std::mutex> lock(pending_task_ids_mutex);
+                pending_task_ids.push_back(task_id);
                 producer.push(end_md);
             }else{
                 int progress = task.getCheckpointedProgress();
@@ -208,16 +208,6 @@ int main(int argc, char **argv) {
                 }
             }
         }
-        if (!to_remove_task_ids.empty()) {
-            std::cout << "[Worker-" << config.worker_id << "] Found finished tasks to be update" << std::endl;
-            std::lock_guard<std::mutex> lock(pending_task_ids_mutex);
-            for (const auto& task_id : to_remove_task_ids) {
-                pending_task_ids.push_back(task_id);
-                running_tasks.erase(task_id);
-                running_threads.erase(task_id);
-                task_progresses.erase(task_id);
-            }
-        }
         producer.flush();
 
         auto future_event = consumer.pull();
@@ -226,7 +216,6 @@ int main(int argc, char **argv) {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
             // Also check progress if needed while waiting
-            std::vector<int> to_remove_task_ids;
             for (auto& [task_id, task] : running_tasks) {
                 if (task.isFinished()) {
                     json end_md = {
@@ -235,7 +224,8 @@ int main(int argc, char **argv) {
                         {"task_id", task_id}
                     };
                     std::cout << "[Worker-" << config.worker_id << "] Notify DIST about finished Task " << task_id << std::endl;
-                    to_remove_task_ids.push_back(task_id);
+                    std::lock_guard<std::mutex> lock(pending_task_ids_mutex);
+                    pending_task_ids.push_back(task_id);
                     producer.push(end_md);
                 }else{
                     int progress = task.getCheckpointedProgress();
@@ -251,41 +241,30 @@ int main(int argc, char **argv) {
                     }
                 }
             }
-            if (!to_remove_task_ids.empty()) {
-                std::cout << "[Worker-" << config.worker_id << "] Found finished tasks to be update" << std::endl;
-                for (const auto& task_id : to_remove_task_ids) {
-                    std::cout << "[Worker-" << config.worker_id << "] Erasing running Task-" << task_id << std::endl;
-                    running_tasks.erase(task_id);
-                    std::cout << "[Worker-" << config.worker_id << "] Erasing running thread Task-" << task_id << std::endl;
-                    running_threads.erase(task_id);
-                    std::cout << "[Worker-" << config.worker_id << "] Erasing task progress for Task-" << task_id << std::endl;
-                    task_progresses.erase(task_id);
-                    std::cout << "[Worker-" << config.worker_id << "] Completed erasing Task-" << task_id << std::endl;
-                }
-            }
             producer.flush();
 
-            while (!pending_task_ids.empty()) {
+            if (!pending_task_ids.empty())
                 std::lock_guard<std::mutex> lock(pending_task_ids_mutex);
-                if (pending_task_ids.empty()) {
-                    break;
+                while (!pending_task_ids.empty()) {
+                    int task_id = pending_task_ids.front();
+                    ReconTask& task = running_tasks.at(task_id);
+                    if (!task.isMSCompleted()) {
+                        break;
+                    }
+                    pending_task_ids.erase(pending_task_ids.begin());
+                    
+                    std::cout << "[Worker-" << config.worker_id << "] Cleaning up task " << task_id << std::endl;
+                    stopped_threads.push_back(std::move(running_threads[task_id]));
+                    std::cout << "[Worker-" << config.worker_id << "] Joined stopped thread for Task " << task_id << std::endl;
+                    running_tasks.erase(task_id);
+                    std::cout << "[Worker-" << config.worker_id << "] Erased running task for Task " << task_id << std::endl;
+                    running_threads.erase(task_id);
+                    std::cout << "[Worker-" << config.worker_id << "] Erased running thread for Task " << task_id << std::endl;
+                    task_progresses.erase(task_id);
+                    std::cout << "[Worker-" << config.worker_id << "] Task " << task_id << " stopped." << std::endl;
                 }
-                int task_id = pending_task_ids.front();
-                ReconTask& task = running_tasks.at(task_id);
-                if (!task.isMSCompleted()) {
-                    break;
-                }
-                pending_task_ids.erase(pending_task_ids.begin());
-                
-                std::cout << "[Worker-" << config.worker_id << "] Cleaning up task " << task_id << std::endl;
-                stopped_threads.push_back(std::move(running_threads[task_id]));
-                std::cout << "[Worker-" << config.worker_id << "] Joined stopped thread for Task " << task_id << std::endl;
-                running_tasks.erase(task_id);
-                std::cout << "[Worker-" << config.worker_id << "] Erased running task for Task " << task_id << std::endl;
-                running_threads.erase(task_id);
-                std::cout << "[Worker-" << config.worker_id << "] Erased running thread for Task " << task_id << std::endl;
-                task_progresses.erase(task_id);
-                std::cout << "[Worker-" << config.worker_id << "] Task " << task_id << " stopped." << std::endl;
+                // Update list of running tasks
+                snapshot_running_tasks(config.worker_index, task_assignment_path, nullptr, action_seq);
             }
 
             if (sigterm_captured) {

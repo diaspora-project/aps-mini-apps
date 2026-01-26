@@ -313,7 +313,7 @@ int ReconTask::run() {
       // ckpt_client->restart(config.ckpt_name, passes);
 
       this->checkpointed_progress = progress;
-      std::cout << "[task-" << task_id << "]: Checkpointed version " << passes << "/" << config.num_passes << ", progress = " << progress << std::endl;
+      std::cout << "[Task-" << task_id << "]: Checkpointed version " << passes << "/" << config.num_passes << ", progress = " << progress << std::endl;
       ckpt_mutex->unlock();
     }
     #ifdef TIMERON
