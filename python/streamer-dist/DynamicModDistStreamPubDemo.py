@@ -705,12 +705,40 @@ def move_task(task_id, from_worker, to_worker, producer, action_seq, progress):
   producer.flush()
   return action_seq
 
+def flush_action_producer(args, shm_name, num_slots, slot_bytes, desc_q, ack_q):
+  ring = SharedRing(num_slots=num_slots, slot_bytes=slot_bytes, shm_name=shm_name, create=False)
+
+  action_mofka_dist = MofkaDist(group_file=args.group_file, batchsize=args.batchsize)
+  action_producer = action_mofka_dist.producer(topic_name="dist_sirt_action", producer_name="dist")
+
+  try:
+    while True:
+      desc = desc_q.get()
+      if desc is None:
+        break
+
+      try:
+        producer.push(desc.assign_info, bytearray(1), partition=0)
+        producer.flush()
+        ack_q.put(("OK", desc.slot, desc.msg_id, None))
+      except Exception as e:
+        ack_q.put(("EXC", desc.slot, desc.msg_id, repr(e)))
+  finally:
+    try:
+      del action_producer
+      del action_mofka_dist
+    except Exception:
+      pass
+    ring.close()
+
 # def task_to_worker_assignment(action_producer, action_consumer, args, action_mofka_dist):
 def task_to_worker_assignment(args, num_workers):
 
   action_mofka_dist = MofkaDist(group_file=args.group_file, batchsize=args.batchsize)
   action_consumer = action_mofka_dist.consumer(topic_name="sirt_dist_action", consumer_name="dist")
-  action_producer = action_mofka_dist.producer(topic_name="dist_sirt_action", producer_name="dist")
+  
+  action_producer_mofka_dist = MofkaDist(group_file=args.group_file, batchsize=args.batchsize)
+  action_producer = action_producer_mofka_dist.producer(topic_name="dist_sirt_action", producer_name="dist")
 
   action_seq = 0
 
@@ -914,6 +942,7 @@ def task_to_worker_assignment(args, num_workers):
         surplus_worker_caps[to_worker] -= task_weights[from_task]
         worker_to_task[to_worker].add(from_task)
         task_to_worker[from_task] = to_worker
+        print(f"[LB] Completed move {from_task} for reassignment")
 
         if to_task != -1:
           print(f"[LB] move {to_task} back")
@@ -925,6 +954,7 @@ def task_to_worker_assignment(args, num_workers):
           surplus_worker_caps[from_worker] -= task_weights[to_task]
           worker_to_task[from_worker].add(to_task)
           task_to_worker[to_task] = from_worker
+          print(f"[LB] Completed move {to_task} back")
         else:
           print(f"[LB] no swap!")
       else:
