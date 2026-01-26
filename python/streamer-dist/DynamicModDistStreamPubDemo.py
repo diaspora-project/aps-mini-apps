@@ -932,6 +932,8 @@ def task_to_worker_assignment(args, num_workers):
         to_task = fastest_task
         to_worker = task_to_worker[to_task]
         print(f"[LB] Swap slowest Task-{from_task} on Worker-{from_worker} with the fastest Task-{to_task} on Worker-{to_worker}")
+      else:
+        print(f"[LB] No suitable worker/task found! Waiting for the next chance...")
 
     try:
       
