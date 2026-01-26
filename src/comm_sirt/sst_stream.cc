@@ -84,6 +84,10 @@ SSTStream::~SSTStream()
 
 bool SSTStream::pull_data(SSTPayload &out)
 {
+    if (m_is_active.load() == false) {
+        return false;
+    }
+
     if (m_openFuture) {
         if (m_openFuture->wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
             m_engine = std::make_unique<adios2::Engine>(m_openFuture->get());
