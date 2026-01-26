@@ -824,7 +824,9 @@ def task_to_worker_assignment(args, num_workers):
         working_tasks.discard(task_id)
         worker_to_task[worker_id].discard(task_id)
         print(f"[LB] Task-{task_id} in Worker-{worker_id} has finished")
-        force_reassignment = True
+        # force_reassignment = True
+        progress_threshold_window = len(working_tasks) * 16 * 3
+        progress_threshold -= 16 * 3
       else:
         print(f"[LB] Unknown metadata received: {event.metadata},")
         continue
@@ -924,7 +926,7 @@ def task_to_worker_assignment(args, num_workers):
     if target_worker != from_worker and surplus_worker_caps[target_worker] >= task_weights[from_task]:
     # if surplus_worker_caps[target_worker] > 0:
       to_worker = target_worker
-      print(f"[LB] Move Task-{from_task} to Worker-{w} with the highest surplus cap = {surplus_worker_caps[w]}")
+      print(f"[LB] Move Task-{from_task} to Worker-{to_worker} with the highest surplus cap = {surplus_worker_caps[to_worker]}")
     else:
       # If there is no suitable task, swap the min_progress task with the max_progress task
       fastest_task = sorted_tasks[-1]
