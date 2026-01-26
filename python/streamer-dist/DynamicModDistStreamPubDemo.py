@@ -901,26 +901,29 @@ def task_to_worker_assignment(args, num_workers):
       to_worker = task_to_worker[to_task]
       print(f"[LB] Swap slowest Task-{from_task} on Worker-{from_worker} with the fastest Task-{to_task} on Worker-{to_worker}")
 
+    try:
       
-    if to_worker != -1:
-      # move task to this worker
-      action_seq = move_task(from_task, from_worker, to_worker, action_producer, action_seq, task_progress[from_task])
-      # Update related variables
-      worker_to_task[from_worker].discard(from_task)
-      # worker_progress[to_worker] += task_progress[from_task]
-      # worker_progress[from_worker] -= task_progress[from_task]
-      surplus_worker_caps[to_worker] -= task_weights[from_task]
-      worker_to_task[to_worker].add(from_task)
-      task_to_worker[from_task] = to_worker
-    if to_task != -1:
-      # move a task back if needed
-      action_seq = move_task(to_task, to_worker, from_worker, action_producer, action_seq, task_progress[to_task])
-      worker_to_task[to_worker].discard(to_task)
-      # worker_progress[from_worker] += task_progress[to_task]
-      # worker_progress[to_worker] -= task_progress[to_task]
-      surplus_worker_caps[from_worker] -= task_weights[to_task]
-      worker_to_task[from_worker].add(to_task)
-      task_to_worker[to_task] = from_worker
+      if to_worker != -1:
+        # move task to this worker
+        action_seq = move_task(from_task, from_worker, to_worker, action_producer, action_seq, task_progress[from_task])
+        # Update related variables
+        worker_to_task[from_worker].discard(from_task)
+        # worker_progress[to_worker] += task_progress[from_task]
+        # worker_progress[from_worker] -= task_progress[from_task]
+        surplus_worker_caps[to_worker] -= task_weights[from_task]
+        worker_to_task[to_worker].add(from_task)
+        task_to_worker[from_task] = to_worker
+      if to_task != -1:
+        # move a task back if needed
+        action_seq = move_task(to_task, to_worker, from_worker, action_producer, action_seq, task_progress[to_task])
+        worker_to_task[to_worker].discard(to_task)
+        # worker_progress[from_worker] += task_progress[to_task]
+        # worker_progress[to_worker] -= task_progress[to_task]
+        surplus_worker_caps[from_worker] -= task_weights[to_task]
+        worker_to_task[from_worker].add(to_task)
+        task_to_worker[to_task] = from_worker
+    except Exception as e:
+      print(f"[LB] Exception while reassigning tasks: {e}")
 
     print("[LB] Complete task to worker assignment")
 
