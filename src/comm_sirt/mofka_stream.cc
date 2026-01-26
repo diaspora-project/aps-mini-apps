@@ -516,7 +516,8 @@ DataRegionBase<float, TraceMetadata>* MofkaStream::readSlidingWindow(
           if (event.metadata().json()["Type"].get<std::string>() == "FIN") {
             setSSTEndOfStream(true);
             setMofkaEndOfStream(true);
-            event.acknowledge();
+            // Dont acknowledge FIN to ensure if the task is restart for any reason, it is done and no further action needed
+            // event.acknowledge();
             std::cout << "[Task-" << getRank() << "]: End of stream detected from Mofka" << std::endl;
             return nullptr;
           }
