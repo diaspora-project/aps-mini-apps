@@ -243,7 +243,7 @@ int main(int argc, char **argv) {
             }
             producer.flush();
 
-            if (!pending_task_ids.empty())
+            if (!pending_task_ids.empty()) {
                 std::lock_guard<std::mutex> lock(pending_task_ids_mutex);
                 while (!pending_task_ids.empty()) {
                     int task_id = pending_task_ids.front();
