@@ -412,7 +412,8 @@ int ReconTask::run() {
     // data part
     float d = 1;
     auto future = producer.push(mofka::Metadata{md}, mofka::Data{&d,sizeof(float)});
-    future.wait();
+    // future.wait();
+    producer.flush();
   }
 
 
