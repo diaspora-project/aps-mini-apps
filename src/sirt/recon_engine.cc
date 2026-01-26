@@ -414,6 +414,7 @@ int ReconTask::run() {
     auto future = producer.push(mofka::Metadata{md}, mofka::Data{&d,sizeof(float)});
     future.wait();
     producer.flush();
+    std::cout << "[Task-" << task_id << "] Published FIN" << std::endl;
   }
 
 
