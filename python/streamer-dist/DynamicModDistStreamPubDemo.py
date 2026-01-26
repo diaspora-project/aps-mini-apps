@@ -827,6 +827,9 @@ def task_to_worker_assignment(args, num_workers):
         # force_reassignment = True
         progress_threshold_window = len(working_tasks) * 16 * 3
         progress_threshold -= 16 * 3
+        if len(working_task) == 1:
+          # Force assignment if only one task left then we can move task to the fastest worker
+          force_reassignment = True
       else:
         print(f"[LB] Unknown metadata received: {event.metadata},")
         continue
