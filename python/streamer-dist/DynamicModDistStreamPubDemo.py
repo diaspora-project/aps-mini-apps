@@ -736,7 +736,7 @@ def task_to_worker_assignment(args, num_workers):
 
   action_mofka_dist = MofkaDist(group_file=args.group_file, batchsize=args.batchsize)
   action_consumer = action_mofka_dist.consumer(topic_name="sirt_dist_action", consumer_name="dist")
-  
+
   action_producer_mofka_dist = MofkaDist(group_file=args.group_file, batchsize=args.batchsize)
   action_producer = action_producer_mofka_dist.producer(topic_name="dist_sirt_action", producer_name="dist")
 
@@ -845,7 +845,9 @@ def task_to_worker_assignment(args, num_workers):
     min_progress = task_progress[sorted_tasks[0]]
     max_progress = task_progress[sorted_tasks[-1]]
     worst_gap = min_progress / max_progress
-    if not force_reassignment and worst_gap > last_worst_gap:
+    if force_reassignment 
+      print(f"[LB] Enforce task assignment due to task/worker structural changes")
+    elif worst_gap > last_worst_gap:
       print(f"[LB] Progress between tasks are improving: Old: {last_worst_gap:.4f} --> New : {worst_gap:.4f} no need for adjustment")
       last_worst_gap = worst_gap
       continue
@@ -919,8 +921,8 @@ def task_to_worker_assignment(args, num_workers):
     to_worker = -1
 
     target_worker = sorted_surplus_worker_caps[-1]
-    if surplus_worker_caps[w] >= task_weights[from_task]:
-    # if surplus_worker_caps[w] > 0:
+    if surplus_worker_caps[target_worker] >= task_weights[from_task]:
+    # if surplus_worker_caps[target_worker] > 0:
       print(f"[LB] Move Task-{from_task} to Worker-{w} with the highest surplus cap = {surplus_worker_caps[w]}")
       to_worker = w
     else:
