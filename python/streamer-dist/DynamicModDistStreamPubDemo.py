@@ -923,8 +923,8 @@ def task_to_worker_assignment(args, num_workers):
     target_worker = sorted_surplus_worker_caps[-1]
     if target_worker != from_worker and surplus_worker_caps[target_worker] >= task_weights[from_task]:
     # if surplus_worker_caps[target_worker] > 0:
+      to_worker = target_worker
       print(f"[LB] Move Task-{from_task} to Worker-{w} with the highest surplus cap = {surplus_worker_caps[w]}")
-      to_worker = w
     else:
       # If there is no suitable task, swap the min_progress task with the max_progress task
       fastest_task = sorted_tasks[-1]
