@@ -105,7 +105,9 @@ class TraceRuntimeConfig {
         TCLAP::ValueArg<std::string> argCkptName(
           "", "ckpt-name", "Checkpoint Name (VeloC)", false, "sirt-ckpt", "string");
         TCLAP::ValueArg<float> argSST(
-          "", "sst", "Get data from SST Stream", false, true, "bool");
+          // "", "sst", "Get data from SST Stream", false, true, "bool");
+          "", "sst", "Get data from SST Stream", false, false, "bool");
+          
 
 
         cmd.add(argWorkerId);
