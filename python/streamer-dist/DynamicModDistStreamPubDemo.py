@@ -845,7 +845,7 @@ def task_to_worker_assignment(args, num_workers):
     min_progress = task_progress[sorted_tasks[0]]
     max_progress = task_progress[sorted_tasks[-1]]
     worst_gap = min_progress / max_progress
-    if force_reassignment 
+    if force_reassignment:
       print(f"[LB] Enforce task assignment due to task/worker structural changes")
     elif worst_gap > last_worst_gap:
       print(f"[LB] Progress between tasks are improving: Old: {last_worst_gap:.4f} --> New : {worst_gap:.4f} no need for adjustment")
