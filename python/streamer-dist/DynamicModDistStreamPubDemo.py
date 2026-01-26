@@ -1236,16 +1236,6 @@ def main():
       tot_dark_imgs += 1
     seq+=1
 
-  print("Cleaning up task assignment process ...")
-  # args.dynamic_loadbalancing = "false"
-
-  # Wait for the assignment process to finish
-  while args.dynamic_loadbalancing.lower() == "true":
-    time.sleep(1)
-  assignment_process.join()
-  # if assignment_process.is_alive():
-  #   assignment_process.terminate()
-
   if args.sst:
     print("Drainning SST stream then sending FIN to sirt")
     deadline = time.time() + 10.0
@@ -1262,6 +1252,16 @@ def main():
       sent = sst_sender.send_fin(timeout=0.2)
       if not sent:
         time.sleep(0.01)
+
+  print("Cleaning up task assignment process ...")
+  # args.dynamic_loadbalancing = "false"
+
+  # Wait for the assignment process to finish
+  while args.dynamic_loadbalancing.lower() == "true":
+    time.sleep(1)
+  assignment_process.join()
+  # if assignment_process.is_alive():
+  #   assignment_process.terminate()
 
   print("Stopping shared memory mofka_sender ...")
   # drain until we have no known-safe pending/inflight
