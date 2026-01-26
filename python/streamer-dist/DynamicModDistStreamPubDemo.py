@@ -1236,6 +1236,16 @@ def main():
       tot_dark_imgs += 1
     seq+=1
 
+  print("Cleaning up task assignment process ...")
+  # args.dynamic_loadbalancing = "false"
+
+  # Wait for the assignment process to finish
+  while args.dynamic_loadbalancing.lower() == "true":
+    time.sleep(1)
+  assignment_process.join()
+  # if assignment_process.is_alive():
+  #   assignment_process.terminate()
+
   if args.sst:
     print("Drainning SST stream then sending FIN to sirt")
     deadline = time.time() + 10.0
@@ -1297,15 +1307,15 @@ def main():
   # del action_producer
   # del action_consumer
 
-  print("Cleaning up task assignment process ...")
-  # args.dynamic_loadbalancing = "false"
+  # print("Cleaning up task assignment process ...")
+  # # args.dynamic_loadbalancing = "false"
 
-  # Wait for the assignment process to finish
-  while args.dynamic_loadbalancing.lower() == "true":
-    time.sleep(1)
-  assignment_process.join()
-  # if assignment_process.is_alive():
-  #   assignment_process.terminate()
+  # # Wait for the assignment process to finish
+  # while args.dynamic_loadbalancing.lower() == "true":
+  #   time.sleep(1)
+  # assignment_process.join()
+  # # if assignment_process.is_alive():
+  # #   assignment_process.terminate()
 
   # print("Complete data disitribution, sleeping until to exit ...")
   # while True:
