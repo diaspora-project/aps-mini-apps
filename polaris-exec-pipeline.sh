@@ -39,13 +39,14 @@ ckpt_dir=/eagle/Diaspora/ndhai/veloc
 rm -rf $ckpt_dir/tmp/scratch/* $ckpt_dir/tmp/persistent/* || true
 
 # Check if the number of arguments is corre
-if [ "$#" -ne 5 ]; then
+if [ "$#" -ne 6 ]; then
     echo "Usage: exec-pipeline.sh <sirt_ranks> <num_sinograms>"
     echo "  <sirt_ranks>    Number of SIRT workers/processes"
     echo "  <sirt_tasks>    Number of SIRT tasks/threads"
     echo "  <num_sinograms> Number of sinograms to process"
     echo "  <failure_mode>  single|periodic|random"
-    echo "  <mtbf>         Mean time between failures (in seconds)"
+    echo "  <mtbf>          Mean time between failures (in seconds)"
+    echo "  <slowdown>      Slowdown sample index"
     exit 1
 fi
 sirt_ranks=$1
@@ -53,6 +54,7 @@ sirt_tasks=$2
 num_sinograms=$3
 failure_mode=$4
 mtbf=$5
+slowdownindex=$6
 
 DATE=$(date +"%Y-%m-%d-%Hh%Mmin%Ssec")
 logdir="build/logs/D${DATE}"
@@ -119,7 +121,7 @@ echo mpiexec --no-vni -ppn 1 -d 16 --hosts $node_dist bash $exec_dir/run-dist.sh
 # sleep 10  # intentionally not sleeping to avoid extra idle time
 
 echo "Start SIRT -----------------------------------------------------------"
-mpiexec --no-vni -n $sirt_ranks -ppn $sirt_ranks -d 16 --hosts $node_sirts bash $exec_dir/run-sirt-polaris.sh "${sirt_ranks}" "${logdir}" > "${logdir}/sirt.out" 2> "${logdir}/sirt.err" &
+mpiexec --no-vni -n $sirt_ranks -ppn $sirt_ranks -d 16 --hosts $node_sirts bash $exec_dir/run-sirt-polaris.sh "${sirt_ranks}" "${logdir}" $slowdownindex > "${logdir}/sirt.out" 2> "${logdir}/sirt.err" &
 # bash $exec_dir/run-sirt-polaris.sh "${sirt_ranks}" "${logdir}" > "${logdir}/sirt.out" 2> "${logdir}/sirt.err" &
 echo mpiexec --no-vni -n $sirt_ranks -ppn $sirt_ranks -d 16 --hosts $node_sirts bash $exec_dir/run-sirt-polaris.sh "${sirt_ranks}" "${logdir}"
 

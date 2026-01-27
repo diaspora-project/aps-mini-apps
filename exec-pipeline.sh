@@ -21,13 +21,14 @@ rm -rf /lus/eagle/projects/APSDataAnalysis/ndhai/veloc/tmp/scratch/*
 rm -rf /lus/eagle/projects/APSDataAnalysis/ndhai/veloc/tmp/persistent/*
 
 # Check if the number of arguments is corre
-if [ "$#" -ne 5 ]; then
+if [ "$#" -ne 6 ]; then
     echo "Usage: exec-pipeline.sh <sirt_ranks> <num_sinograms>"
     echo "  <sirt_ranks>    Number of SIRT workers/processes"
     echo "  <sirt_tasks>    Number of SIRT tasks/threads"
     echo "  <num_sinograms> Number of sinograms to process"
     echo "  <failure_mode>  single|periodic|random"
-    echo "  <mtbf>         Mean time between failures (in seconds)"
+    echo "  <mtbf>          Mean time between failures (in seconds)"
+    echo "  <slowdown>      Slowdown sample index"
     exit 1
 fi
 sirt_ranks=$1
@@ -35,6 +36,7 @@ sirt_tasks=$2
 num_sinograms=$3
 failure_mode=$4
 mtbf=$5
+slowdownindex=$6
 
 DATE=$(date +"%Y-%m-%d-%Hh%Mmin%Ssec")
 logdir=build/logs/D${DATE}
@@ -69,7 +71,7 @@ echo bash run-dist.sh ${num_sinograms} ${sirt_tasks} ${logdir}
 # sleep 10
 
 echo "Start SIRT -----------------------------------------------------------"
-bash run-sirt.sh ${sirt_ranks} ${logdir} >> ${logdir}/sirt.out 2>> ${logdir}/sirt.err &
+bash run-sirt.sh ${sirt_ranks} ${logdir} $slowdownindex >> ${logdir}/sirt.out 2>> ${logdir}/sirt.err &
 echo bash run-sirt.sh ${sirt_ranks} ${logdir}
 
 # echo "Start Exp Control ----------------------------------------------------"
