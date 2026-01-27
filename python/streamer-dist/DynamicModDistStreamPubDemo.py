@@ -996,6 +996,8 @@ def task_to_worker_assignment(args, num_workers):
 def main():
   args = parse_arguments()
 
+  # print("load_balancing:", args.dynamic_loadbalancing)
+
   # Setup mofka
   print("Setup Mofka ...")
   mofka_dist = MofkaDist(group_file=args.group_file, batchsize=args.batchsize)

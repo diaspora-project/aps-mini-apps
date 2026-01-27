@@ -39,7 +39,7 @@ ckpt_dir=/eagle/Diaspora/ndhai/veloc
 rm -rf $ckpt_dir/tmp/scratch/* $ckpt_dir/tmp/persistent/* || true
 
 # Check if the number of arguments is corre
-if [ "$#" -ne 6 ]; then
+if [ "$#" -ne 7 ]; then
     echo "Usage: exec-pipeline.sh <sirt_ranks> <num_sinograms>"
     echo "  <sirt_ranks>    Number of SIRT workers/processes"
     echo "  <sirt_tasks>    Number of SIRT tasks/threads"
@@ -47,6 +47,7 @@ if [ "$#" -ne 6 ]; then
     echo "  <failure_mode>  single|periodic|random"
     echo "  <mtbf>          Mean time between failures (in seconds)"
     echo "  <slowdown>      Slowdown sample index"
+    echo "  <load-balance>  enable load balancing"
     exit 1
 fi
 sirt_ranks=$1
@@ -55,6 +56,7 @@ num_sinograms=$3
 failure_mode=$4
 mtbf=$5
 slowdownindex=$6
+load_balance=$7
 
 DATE=$(date +"%Y-%m-%d-%Hh%Mmin%Ssec")
 logdir="build/logs/D${DATE}"
@@ -115,7 +117,7 @@ echo mpiexec --no-vni -ppn 1 -d 16 --hosts $node_daq bash $exec_dir/run-daq.sh "
 # sleep 10
 
 echo "Start DIST -----------------------------------------------------------"
-mpiexec --no-vni -ppn 1 -d 16 --hosts $node_dist bash $exec_dir/run-dist.sh "${num_sinograms}" "${sirt_tasks}" "${logdir}" > "${logdir}/dist.out" 2> "${logdir}/dist.err" &
+mpiexec --no-vni -ppn 1 -d 16 --hosts $node_dist bash $exec_dir/run-dist.sh "${num_sinograms}" "${sirt_tasks}" ${load_balance} "${logdir}" > "${logdir}/dist.out" 2> "${logdir}/dist.err" &
 # bash $exec_dir/run-dist.sh "${num_sinograms}" "${sirt_tasks}" "${logdir}" > "${logdir}/dist.out" 2> "${logdir}/dist.err" &
 echo mpiexec --no-vni -ppn 1 -d 16 --hosts $node_dist bash $exec_dir/run-dist.sh "${num_sinograms}" "${sirt_tasks}" "${logdir}"
 # sleep 10  # intentionally not sleeping to avoid extra idle time

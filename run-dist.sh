@@ -5,15 +5,16 @@ adios2_path=`find $(spack location -i adios2) -maxdepth 4 -type d -name "site-pa
 export PYTHONPATH=${adios2_path}:${PYTHONPATH}
 
 # Check if the number of parameters is correct
-if [ "$#" -ne 3 ]; then
+if [ "$#" -ne 4 ]; then
     echo "Illegal number of parameters"
-    echo "Usage: run-dist.sh <number of sinograms> <number of tasks> <logdir>"
+    echo "Usage: run-dist.sh <number of sinograms> <number of tasks> <load-balance> <logdir>"
     exit 1
 fi
 
 num_sinograms=$1
 num_tasks=$2
-logdir=$3
+load_balance=$3
+logdir=$4
 
 trap "echo 'Ctrl+C pressed. Terminating...'; exit 1" SIGINT SIGTERM
 
@@ -33,4 +34,5 @@ python -u ./build/python/streamer-dist/DynamicModDistStreamPubDemo.py \
     --num_columns 2560 \
     --batchsize 4 \
     --group_file mofka.json \
-    --logdir ${logdir}
+    --logdir ${logdir} \
+    --dynamic_loadbalancing $load_balance
