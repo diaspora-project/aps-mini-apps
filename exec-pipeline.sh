@@ -53,6 +53,10 @@ echo "Start QUEUE SETUP ----------------------------------------------------"
 bash run-queue-setup.sh ${sirt_ranks} ${sirt_tasks} ${num_sinograms} ${logdir}
 echo bash run-daq.sh ${sirt_ranks} ${sirt_tasks} ${num_sinograms} ${logdir}
 
+# --- Start timing just before orchestration ---
+start_ns=$(date +%s%N)
+start_iso=$(date -Iseconds)
+
 echo "Start DAQ ------------------------------------------------------------"
 bash run-daq.sh ${sirt_ranks} ${sirt_tasks} ${num_sinograms} ${logdir} >> ${logdir}/daq.out 2>> ${logdir}/daq.err &
 echo bash run-daq.sh ${sirt_ranks} ${sirt_tasks} ${num_sinograms} ${logdir}
@@ -77,6 +81,26 @@ echo "Start DEN ------------------------------------------------------------"
 echo bash run-den.sh ${sirt_tasks} ${logdir}
 bash run-den.sh ${sirt_tasks} ${logdir} 2>> ${logdir}/den.err | tee ${logdir}/den.out
 
+# --- If we reached here, DEN completed; mark end time BEFORE cleanup ---
+end_ns=$(date +%s%N)
+end_iso=$(date -Iseconds)
+dur_ns=$(( end_ns - start_ns ))
+dur_ms=$(( dur_ns / 1000000 ))
+dur_s_whole=$(( dur_ns / 1000000000 ))
+ms=$(( (dur_ns / 1000000) % 1000 ))
+
+# format H:M:S.mmm
+h=$(( dur_s_whole / 3600 ))
+m=$(( (dur_s_whole % 3600) / 60 ))
+s=$(( dur_s_whole % 60 ))
+duration_fmt=$(printf "%02d:%02d:%02d.%03d" "$h" "$m" "$s" "$ms")
+
+{
+  echo "E2E_START: ${start_iso}"
+  echo "E2E_END:   ${end_iso}"
+  echo "E2E_MS:    ${dur_ms}"
+  echo "E2E_HMS:   ${duration_fmt}"
+} | tee "${logdir}/e2e_time.txt"
 
 echo "Clean up after run ---------------------------------------------------"
 pkill -9 -f "bedrock" || true

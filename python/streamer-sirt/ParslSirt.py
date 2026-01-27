@@ -224,6 +224,8 @@ def parse_arguments():
 
     return parser.parse_args()
 
+slow_down = [0, 500, 1000, 2000]
+
 # ---------------------------------------------------------------------------
 # Parsl app
 # ---------------------------------------------------------------------------
@@ -248,7 +250,7 @@ def run_sirt(id, logdir=".", args=None, launcher_env=None, sirt_bin_path=""):
     cmd = " && ".join(
         env_exports
         + diag
-        + [f'{sirt_bin_path} --worker-id {id} ' + " ".join(args) + f' >> "{stdout}" 2>> "{stderr}"']
+        + [f'{sirt_bin_path} --worker-id {id} --slowdown {slow_down[int(id)]} ' + " ".join(args) + f' >> "{stdout}" 2>> "{stderr}"']
     )
     return cmd
 

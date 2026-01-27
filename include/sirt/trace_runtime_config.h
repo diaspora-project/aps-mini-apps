@@ -52,6 +52,7 @@ class TraceRuntimeConfig {
     std::string ckpt_name   = "sirt-ckpt";
     std::string logdir      = ".";
     bool        sst         = false;
+    int         slow_down   = 0;
 
     TraceRuntimeConfig(int argc, char **argv) {
       try {
@@ -107,6 +108,8 @@ class TraceRuntimeConfig {
         TCLAP::ValueArg<float> argSST(
           // "", "sst", "Get data from SST Stream", false, true, "bool");
           "", "sst", "Get data from SST Stream", false, false, "bool");
+        TCLAP::ValueArg<int> argSlowDown(
+          "", "slowdown", "Slowdown per iteration in ms, 0 = no slowdown", false, 0, "int");
           
 
 
@@ -137,6 +140,7 @@ class TraceRuntimeConfig {
         cmd.add(argCkptName);
 
         cmd.add(argSST);
+        cmd.add(argSlowDown);
 
         cmd.parse(argc, argv);
 
@@ -170,6 +174,7 @@ class TraceRuntimeConfig {
         pub_freq   = static_cast<int>(argPubFreq.getValue()); // actually store it
 
         sst        = argSST.getValue();
+        slow_down  = argSlowDown.getValue();
 
         std::cout << "Worker ID: " << worker_id
                   << " Worker Index: " << worker_index
@@ -192,6 +197,7 @@ class TraceRuntimeConfig {
           std::cout << "Mofka batchsize=" << batchsize << std::endl;
           std::cout << "Group file=" << group_file << std::endl;
           std::cout << "SST Stream=" << (sst ? "true" : "false") << std::endl;
+          std::cout << "Slowdown=" << slow_down << std::endl;
         }
       } catch (TCLAP::ArgException &e) {
         std::cerr << "error: " << e.error() << " for arg " << e.argId() << std::endl;

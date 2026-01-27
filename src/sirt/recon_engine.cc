@@ -183,17 +183,17 @@ int ReconTask::run() {
   auto msthread = ms.receiveEventInBackground(consumer);
   msthread.detach();
 
-  double slowdown_mean = 20;
+  // double slowdown_mean = 20;
 
-  // generate random slowdown periods base on slowdown mean
-  std::random_device rd;
-  std::mt19937 gen(rd());
-  std::exponential_distribution<double> slowdown_dist(1/slowdown_mean);
-  bool is_slowdown = false;
+  // // generate random slowdown periods base on slowdown mean
+  // std::random_device rd;
+  // std::mt19937 gen(rd());
+  // std::exponential_distribution<double> slowdown_dist(1/slowdown_mean);
+  // bool is_slowdown = false;
 
-  double effect_period = slowdown_dist(gen);
-  auto slowdown_clock = std::chrono::system_clock::now();
-  std::cout << "[Task-" << task_id << "] Effect period = " << effect_period << " is_slowdown: " << is_slowdown << std::endl;
+  // double effect_period = slowdown_dist(gen);
+  // auto slowdown_clock = std::chrono::system_clock::now();
+  // std::cout << "[Task-" << task_id << "] Effect period = " << effect_period << " is_slowdown: " << is_slowdown << std::endl;
 
   for(; passes < config.num_passes; ++passes){
 
@@ -202,16 +202,23 @@ int ReconTask::run() {
     //   sleep(2);
     // }
 
-    auto effect_progress = std::chrono::system_clock::now() - slowdown_clock;
-    if (effect_progress.count() >= effect_period) {
-      is_slowdown = !is_slowdown;
-      effect_period = slowdown_dist(gen);
-      std::cout << "[Task-" << task_id << "] Effect period is end, new period = " << effect_period << " is_slowdown: " << is_slowdown << std::endl;
+    // auto effect_progress = std::chrono::system_clock::now() - slowdown_clock;
+    // if (effect_progress.count() >= effect_period) {
+    //   is_slowdown = !is_slowdown;
+    //   effect_period = slowdown_dist(gen);
+    //   std::cout << "[Task-" << task_id << "] Effect period is end, new period = " << effect_period << " is_slowdown: " << is_slowdown << std::endl;
+    // }else{
+    //   std::cout << "[Task-" << task_id << "] Effect period = " << effect_period << " progress: " << effect_progress.count() << " is_slowdown: " << is_slowdown << std::endl;
+    // }
+    // if (is_slowdown) {
+    //   sleep(2);
+    // }
+
+    if (config.slow_down > 0) {
+      std::cout << "[Task-" << task_id << "] Sleeping for " << config.slow_down << " ms" << std::endl;
+      std::this_thread::sleep_for(std::chrono::milliseconds(config.slow_down));
     }else{
-      std::cout << "[Task-" << task_id << "] Effect period = " << effect_period << " progress: " << effect_progress.count() << " is_slowdown: " << is_slowdown << std::endl;
-    }
-    if (is_slowdown) {
-      sleep(2);
+      std::cout << "[Task-" << task_id << "] No sleep " << std::endl;
     }
 
 
