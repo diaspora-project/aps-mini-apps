@@ -19,6 +19,7 @@
 
 #include <thread>
 #include <chrono>
+#include <random>
 
 
 #include <veloc.hpp>
@@ -182,12 +183,37 @@ int ReconTask::run() {
   auto msthread = ms.receiveEventInBackground(consumer);
   msthread.detach();
 
+  double slowdown_mean = 20;
+
+  // generate random slowdown periods base on slowdown mean
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::exponential_distribution<double> slowdown_dist(1/slowdown_mean);
+  bool is_slowdown = false;
+
+  double effect_period = slowdown_dist(gen);
+  auto slowdown_clock = std::chrono::system_clock::now();
+  std::cout << "[Task-" << task_id << "] Effect period = " << effect_period << " is_slowdown: " << is_slowdown << std::endl;
+
   for(; passes < config.num_passes; ++passes){
 
-    // Slow down 1 worker for experiment
-    if (worker_id == 0) {
+    // // Slow down 1 worker for experiment
+    // if (worker_id == 0) {
+    //   sleep(2);
+    // }
+
+    auto effect_progress = std::chrono::system_clock::now() - slowdown_clock;
+    if (effect_progress.count() >= effect_period) {
+      is_slowdown = !is_slowdown;
+      effect_period = slowdown_dist(gen);
+      std::cout << "[Task-" << task_id << "] Effect period is end, new period = " << effect_period << " is_slowdown: " << is_slowdown << std::endl;
+    }else{
+      std::cout << "[Task-" << task_id << "] Effect period = " << effect_period << " progress: " << effect_progress.count() << " is_slowdown: " << is_slowdown << std::endl;
+    }
+    if (is_slowdown) {
       sleep(2);
     }
+
 
     int killed = kill_signal.load();
     if (killed != 0) {
