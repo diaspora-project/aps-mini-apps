@@ -3,7 +3,7 @@ import numpy as np
 # Parameters
 num_sets = 100
 samples_per_set = 10_000
-slow_down_mean = 500
+slow_down_mean = 2000
 seed = 42
 
 # RNG
@@ -20,7 +20,7 @@ samples_int = samples.astype(np.int64)
 samples_int = np.vstack([np.zeros(samples_per_set), samples_int])
 
 # Save as text (integers, space-separated)
-output_file = "slow_down_samples.txt"
+output_file = "slow_down_" + str(slow_down_mean) + ".txt"
 np.savetxt(output_file, samples_int, fmt="%d")
 
 print(f"Saved integer samples with shape {samples_int.shape} to {output_file}")
