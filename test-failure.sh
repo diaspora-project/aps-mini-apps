@@ -51,8 +51,8 @@ for num_sirt in "${num_sirts[@]}"; do
   for failure_period in "${failure_periods[@]}"; do
     for failure_mode in "${failure_modes[@]}"; do
 
-      num_task=$(( num_sirt / 2 ))
-      num_sinogram=$(( num_sirt / 2 ))
+      num_task=$(( num_sirt * 2 ))
+      num_sinogram=$(( num_sirt * 2 ))
       
       bash exec-pipeline.sh \
           $num_sirt \
