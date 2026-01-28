@@ -30,6 +30,7 @@ if [ "$#" -ne 7 ]; then
     echo "  <mtbf>          Mean time between failures (in seconds)"
     echo "  <slowdown>      Slowdown sample index"
     echo "  <load-balance>  enable load balancing"
+    echo "  <ckpt-freq>     Checkpoint frequency iteration per ckpt"
     exit 1
 fi
 sirt_ranks=$1
@@ -39,6 +40,7 @@ failure_mode=$4
 mtbf=$5
 slowdownindex=$6
 load_balance=$7
+ckpt_freq=$8
 
 DATE=$(date +"%Y-%m-%d-%Hh%Mmin%Ssec")
 logdir=build/logs/D${DATE}
@@ -73,7 +75,7 @@ echo bash run-dist.sh ${num_sinograms} ${sirt_tasks} ${logdir}
 # sleep 10
 
 echo "Start SIRT -----------------------------------------------------------"
-bash run-sirt.sh ${sirt_ranks} ${logdir} $slowdownindex >> ${logdir}/sirt.out 2>> ${logdir}/sirt.err &
+bash run-sirt.sh ${sirt_ranks} ${logdir} $slowdownindex $ckpt_freq >> ${logdir}/sirt.out 2>> ${logdir}/sirt.err &
 echo bash run-sirt.sh ${sirt_ranks} ${logdir}
 
 # echo "Start Exp Control ----------------------------------------------------"

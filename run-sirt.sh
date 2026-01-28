@@ -2,9 +2,9 @@ source activate-spack.sh
 # source envpy/bin/activate
 
 # Check if the number of parameters is correct
-if [ "$#" -ne 3 ]; then
+if [ "$#" -ne 4 ]; then
     echo "Illegal number of parameters"
-    echo "Usage: run-sirt.sh <number of processes> <logdir> <slowdown>"
+    echo "Usage: run-sirt.sh <number of processes> <logdir> <slowdown> <ckpt_freq>"
     exit 1
 fi
 
@@ -12,6 +12,7 @@ sirt_ranks=$1
 logdir=$2
 logdir=`pwd`/$logdir
 slowdownindex=$3
+ckpt_freq=$4
 
 trap "echo 'Ctrl+C pressed. Terminating...'; exit 1" SIGINT SIGTERM
 
@@ -65,7 +66,7 @@ python -u ./build/python/streamer-sirt/ParslSirt.py \
     --center 1427 \
     --group-file mofka.json \
     --batchsize 4 \
-    --ckpt-freq 4 \
+    --ckpt-freq ${ckpt_freq} \
     --ckpt-name sirt \
     --ckpt-config veloc.cfg \
     --recon-output-dir ./build/denoise \
