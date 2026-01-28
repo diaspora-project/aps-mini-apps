@@ -54,7 +54,7 @@ for num_sirt in "${num_sirts[@]}"; do
       num_task=$(( num_sirt / 2 ))
       num_sinogram=$(( num_sirt / 2 ))
       
-      echo bash exec-pipeline.sh \
+      bash exec-pipeline.sh \
           $num_sirt \
           $num_task \
           $num_sinogram \
