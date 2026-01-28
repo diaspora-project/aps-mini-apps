@@ -21,7 +21,7 @@ rm -rf /lus/eagle/projects/APSDataAnalysis/ndhai/veloc/tmp/scratch/*
 rm -rf /lus/eagle/projects/APSDataAnalysis/ndhai/veloc/tmp/persistent/*
 
 # Check if the number of arguments is corre
-if [ "$#" -ne 7 ]; then
+if [ "$#" -ne 8 ]; then
     echo "Usage: exec-pipeline.sh <sirt_ranks> <num_sinograms>"
     echo "  <sirt_ranks>    Number of SIRT workers/processes"
     echo "  <sirt_tasks>    Number of SIRT tasks/threads"
