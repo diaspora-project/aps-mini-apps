@@ -93,7 +93,6 @@ int ReconTask::run() {
     datagen_tot(0.);
   std::chrono::duration<double> write_tot(0.);
   std::chrono::duration<double> e2e_tot(0.);
-  std::chrono::duration<double> ckpt_tot(0.);
   #endif
   DataRegionBase<float, TraceMetadata> *curr_slices = nullptr;
   /// Reconstructed image
@@ -195,7 +194,9 @@ int ReconTask::run() {
   // auto slowdown_clock = std::chrono::system_clock::now();
   // std::cout << "[Task-" << task_id << "] Effect period = " << effect_period << " is_slowdown: " << is_slowdown << std::endl;
 
-  double ckpt_time = 0;
+  std::chrono::duration<double> ckpt_tot(0.);
+  int ckpt_count = 0;
+  auto next_ckpt_timestamp = std::chrono::system_clock::now();
 
   for(; passes < config.num_passes; ++passes){
 
@@ -312,10 +313,10 @@ int ReconTask::run() {
     
 
     // Checkpoint
-    #ifdef TIMERON
-    auto ckpt_beg = std::chrono::system_clock::now();
-    #endif
-    if(!(passes%config.ckpt_freq) || stop_flag.load()){
+    if((config.ckpt_freq > 0 && !(passes%config.ckpt_freq)) // fixed duration checkpoint
+          || (config.ckpt_freq == 0 && std::chrono::system_clock::now() > next_ckpt_timestamp) // Dynamic duration checkpoint
+          || stop_flag.load()){
+      auto ckpt_beg = std::chrono::system_clock::now();
       ckpt_mutex->lock();
       ckpt_client->checkpoint_wait();
       // if (ckpt_client->checkpoint_wait() != VELOC_SUCCESS) {
@@ -337,14 +338,10 @@ int ReconTask::run() {
       std::cout << "[Task-" << task_id << "] Checkpointing at iteration " << passes << ", progress = " << progress << std::endl;
       // if (!ckpt_client->checkpoint(config.ckpt_name, passes)) {
 
-      auto ckpt_beg = std::chrono::system_clock::now();
-
       if (!ckpt_client->checkpoint(ckpt_name, passes)) {
         std::cout << "[Task-" << task_id << "] Cannot checkpoint. passes: " << passes << std::endl;
         throw std::runtime_error("Checkpointing failured");
       }
-
-      ckpt_time += (std::chrono::system_clock::now() - ckpt_beg).count();
 
       // // Clean reconstruction image before restart
       // for(size_t i=0; i<recon_image.count(); ++i)
@@ -355,10 +352,24 @@ int ReconTask::run() {
       this->checkpointed_progress = progress;
       std::cout << "[Task-" << task_id << "]: Checkpointed version " << passes << "/" << config.num_passes << ", progress = " << progress << std::endl;
       ckpt_mutex->unlock();
+
+      if (config.ckpt_freq == 0) {
+        auto overhead = std::chrono::system_clock::now()-ckpt_beg;
+        ckpt_tot += overhead;
+        double total_ckpt_time = ckpt_tot.count();
+        ckpt_count++;
+        double avg_ckpt_time = total_ckpt_time / ckpt_count;
+        int ckpt_interval = sqrt(2 * config.mttf / config.num_workers * avg_ckpt_time);
+        next_ckpt_timestamp = std::chrono::system_clock::now() + std::chrono::seconds(ckpt_interval);
+
+        std::cout << "[Task-" << task_id << "]: CKPT-UPDATE #" << ckpt_count
+            << ": overhead: " << overhead.count() << ", avg overhead = " << avg_ckpt_time
+            << " next ckpt in " << ckpt_interval << " sec"
+            << std::endl;
+      }
+      ckpt_mutex->unlock();
+
     }
-    #ifdef TIMERON
-    ckpt_tot += (std::chrono::system_clock::now()-ckpt_beg);
-    #endif
 
 
     /* Emit reconstructed data */
@@ -475,8 +486,6 @@ int ReconTask::run() {
                                           (recon_tot.count()+inplace_tot.count()+update_tot.count()) << std::endl;
   }
   #endif
-
-  std::cout << "[Task-" << task_id << " Checkpoint overhead=" << ckpt_tot.count() << std::endl;
 
   /* Clean-up the resources */
   std::cout << "[Task-" << task_id << "] Releasing local resources" << std::endl;

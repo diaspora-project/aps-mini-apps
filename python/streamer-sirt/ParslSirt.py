@@ -221,6 +221,7 @@ def parse_arguments():
     parser.add_argument('--ckpt-name', type=str, default="sirt", help='Checkpoint name')
     parser.add_argument('--ckpt-config', type=str, default="veloc.cfg", help='Checkpoint configuration (VeLoC)')
     parser.add_argument('--slowdownindex', type=int, default=0, help='Slowdown index')
+    parser.add_argument('--mttf', type=float, default=10, help='Mean time to failure')
 
     # Optional extra LD paths
     parser.add_argument('--extra-ld-paths', type=str, default="", help='Colon-separated extra library paths to prepend')
