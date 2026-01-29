@@ -476,7 +476,7 @@ int ReconTask::run() {
   }
   #endif
 
-  std::cout << "[Task-" << task_id << " Checkpoint overhead=" << ckpt_time << std::endl;
+  std::cout << "[Task-" << task_id << " Checkpoint overhead=" << ckpt_tot << std::endl;
 
   /* Clean-up the resources */
   std::cout << "[Task-" << task_id << "] Releasing local resources" << std::endl;
