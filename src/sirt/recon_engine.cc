@@ -463,8 +463,6 @@ int ReconTask::run() {
   if(task_id==0){
     e2e_tot += (std::chrono::system_clock::now()-e2e_beg);
 
-    std::cout << "Checkpoint overhead=" << ckpt_time << std::endl;
-
     std::cout << "End-to-End Reconstruction time=" << e2e_tot.count() << std::endl;
 
     std::cout << "Reconstruction time=" << recon_tot.count() << std::endl;
@@ -477,6 +475,9 @@ int ReconTask::run() {
                                           (recon_tot.count()+inplace_tot.count()+update_tot.count()) << std::endl;
   }
   #endif
+
+  std::cout << "[Task-" << task_id << " Checkpoint overhead=" << ckpt_time << std::endl;
+
   /* Clean-up the resources */
   std::cout << "[Task-" << task_id << "] Releasing local resources" << std::endl;
   delete [] h5md.dims;
