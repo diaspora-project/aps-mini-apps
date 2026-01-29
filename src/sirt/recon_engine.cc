@@ -17,6 +17,8 @@
 // #include <charconv>
 #include <csignal>
 
+#include <algorithm>
+
 #include <thread>
 #include <chrono>
 #include <random>
@@ -197,7 +199,7 @@ int ReconTask::run() {
   std::chrono::duration<double> ckpt_tot(0.);
   int ckpt_count = 0;
   auto next_ckpt_timestamp = std::chrono::system_clock::now();
-  int max_ckpt_gap = std::max(8, config.num_workers / num_tasks); // ensure the load balancing is updated timely
+  int max_ckpt_gap = std::max(8L, config.num_workers / num_tasks); // ensure the load balancing is updated timely
 
   for(; passes < config.num_passes; ++passes){
 
@@ -315,7 +317,7 @@ int ReconTask::run() {
 
     // Checkpoint
     if((config.ckpt_freq > 0 && !(passes%config.ckpt_freq)) // fixed duration checkpoint
-          || (config.ckpt_freq == 0 && (std::chrono::system_clock::now() > next_ckpt_timestamp || !(passes % max_ckpt_gap)) // Dynamic duration checkpoint
+          || (config.ckpt_freq == 0 && (std::chrono::system_clock::now() > next_ckpt_timestamp || !(passes % max_ckpt_gap))) // Dynamic duration checkpoint
           || stop_flag.load()){
       auto ckpt_beg = std::chrono::system_clock::now();
       ckpt_mutex->lock();
