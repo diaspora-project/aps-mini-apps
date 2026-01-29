@@ -233,7 +233,7 @@ int ReconTask::run() {
       std::cout << "[Task-" << task_id << "] Received kill signal: " << killed << ". Exiting..." << std::endl;
       ms.stopDataCollection();
       producer.flush();
-      // ckpt_client->checkpoint_wait();
+      ckpt_client->checkpoint_wait();
       sst_stream.close();
       return killed;
     }
@@ -266,7 +266,7 @@ int ReconTask::run() {
         std::cout << "[Task-" << task_id << "] Received kill signal: " << killed << ". Exiting..." << std::endl;
         ms.stopDataCollection();
         producer.flush();
-        // ckpt_client->checkpoint_wait();
+        ckpt_client->checkpoint_wait();
         sst_stream.close();
         return killed;
       }
@@ -321,7 +321,7 @@ int ReconTask::run() {
           || stop_flag.load()){
       auto ckpt_beg = std::chrono::system_clock::now();
       ckpt_mutex->lock();
-      // ckpt_client->checkpoint_wait();
+      ckpt_client->checkpoint_wait();
       // if (ckpt_client->checkpoint_wait() != VELOC_SUCCESS) {
       //   std::cout << "[Task-" << task_id << "] Checkpoint failed, reinitializing" << std::endl;
       //   // delete ckpt_client;
@@ -442,7 +442,7 @@ int ReconTask::run() {
       //   std::cerr << "[Task-" << task_id << "] Checkpoint is not completed yet, waiting..." << std::endl;
       //   sleep(1);
       // };
-      // ckpt_client->checkpoint_wait();
+      ckpt_client->checkpoint_wait();
       // Call the callback if it exists
       if (on_stop_callback) {
         on_stop_callback();
