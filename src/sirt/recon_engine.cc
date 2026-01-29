@@ -490,6 +490,13 @@ int ReconTask::run() {
   }
   #endif
 
+  double total_ckpt_time = ckpt_tot.count();
+  double avg_ckpt_time = total_ckpt_time / ckpt_count;
+  std::cout << "[Task-" << task_id << "]: CKPT-INFO #" << ckpt_count
+            << ": Total overhead: " << ckpt_tot.count() << " " << total_ckpt_time
+            << ", avg overhead = " << avg_ckpt_time
+            << std::endl;
+
   /* Clean-up the resources */
   std::cout << "[Task-" << task_id << "] Releasing local resources" << std::endl;
   delete [] h5md.dims;
