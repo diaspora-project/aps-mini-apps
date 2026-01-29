@@ -204,6 +204,7 @@ class TraceRuntimeConfig {
           std::cout << "SST Stream=" << (sst ? "true" : "false") << std::endl;
           std::cout << "Slowdown=" << slow_down << std::endl;
           std::cout << "MTTF=" << mttf << std::endl;
+          std::cout << "Checkpoint frequency=" << ckpt_freq << std::endl;
         }
       } catch (TCLAP::ArgException &e) {
         std::cerr << "error: " << e.error() << " for arg " << e.argId() << std::endl;
