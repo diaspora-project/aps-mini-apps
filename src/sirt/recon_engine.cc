@@ -356,21 +356,18 @@ int ReconTask::run() {
       std::cout << "[Task-" << task_id << "]: Checkpointed version " << passes << "/" << config.num_passes << ", progress = " << progress << std::endl;
       ckpt_mutex->unlock();
 
-      if (config.ckpt_freq == 0) {
-        auto overhead = std::chrono::system_clock::now()-ckpt_beg;
-        ckpt_tot += overhead;
-        double total_ckpt_time = ckpt_tot.count();
-        ckpt_count++;
-        double avg_ckpt_time = total_ckpt_time / ckpt_count;
-        int ckpt_interval = sqrt(2 * config.mttf / config.num_workers * avg_ckpt_time);
-        next_ckpt_timestamp = std::chrono::system_clock::now() + std::chrono::seconds(ckpt_interval);
+      auto overhead = std::chrono::system_clock::now()-ckpt_beg;
+      ckpt_tot += overhead;
+      double total_ckpt_time = ckpt_tot.count();
+      ckpt_count++;
+      double avg_ckpt_time = total_ckpt_time / ckpt_count;
+      int ckpt_interval = sqrt(2 * config.mttf / config.num_workers * avg_ckpt_time);
+      next_ckpt_timestamp = std::chrono::system_clock::now() + std::chrono::seconds(ckpt_interval);
 
-        std::cout << "[Task-" << task_id << "]: CKPT-UPDATE #" << ckpt_count
-            << ": overhead: " << overhead.count() << ", avg overhead = " << avg_ckpt_time
-            << " next ckpt in " << ckpt_interval << " sec"
-            << std::endl;
-      }
-      ckpt_mutex->unlock();
+      std::cout << "[Task-" << task_id << "]: CKPT-UPDATE #" << ckpt_count
+          << ": overhead: " << overhead.count() << ", avg overhead = " << avg_ckpt_time
+          << " next ckpt in " << ckpt_interval << " sec"
+          << std::endl;
 
     }
 
