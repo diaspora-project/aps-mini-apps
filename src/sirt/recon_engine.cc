@@ -321,7 +321,6 @@ int ReconTask::run() {
           || stop_flag.load()){
       auto ckpt_beg = std::chrono::system_clock::now();
       ckpt_mutex->lock();
-      ckpt_client->checkpoint_wait();
       // if (ckpt_client->checkpoint_wait() != VELOC_SUCCESS) {
       //   std::cout << "[Task-" << task_id << "] Checkpoint failed, reinitializing" << std::endl;
       //   // delete ckpt_client;
@@ -340,6 +339,7 @@ int ReconTask::run() {
       ms.acknowledge();
       std::cout << "[Task-" << task_id << "] Checkpointing at iteration " << passes << ", progress = " << progress << std::endl;
       // if (!ckpt_client->checkpoint(config.ckpt_name, passes)) {
+      ckpt_client->checkpoint_wait();
 
       if (!ckpt_client->checkpoint(ckpt_name, passes)) {
         std::cout << "[Task-" << task_id << "] Cannot checkpoint. passes: " << passes << std::endl;
@@ -361,7 +361,7 @@ int ReconTask::run() {
       double total_ckpt_time = ckpt_tot.count();
       ckpt_count++;
       double avg_ckpt_time = total_ckpt_time / ckpt_count;
-      int ckpt_interval = sqrt(2 * config.mttf / config.num_workers * avg_ckpt_time);
+      int ckpt_interval = sqrt(2 * config.mttf * avg_ckpt_time);
       next_ckpt_timestamp = std::chrono::system_clock::now() + std::chrono::seconds(ckpt_interval);
 
       std::cout << "[Task-" << task_id << "]: CKPT-UPDATE #" << ckpt_count
