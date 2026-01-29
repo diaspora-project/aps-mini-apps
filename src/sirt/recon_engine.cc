@@ -195,6 +195,8 @@ int ReconTask::run() {
   // auto slowdown_clock = std::chrono::system_clock::now();
   // std::cout << "[Task-" << task_id << "] Effect period = " << effect_period << " is_slowdown: " << is_slowdown << std::endl;
 
+  double ckpt_time = 0;
+
   for(; passes < config.num_passes; ++passes){
 
     // // Slow down 1 worker for experiment
@@ -315,7 +317,7 @@ int ReconTask::run() {
     #endif
     if(!(passes%config.ckpt_freq) || stop_flag.load()){
       ckpt_mutex->lock();
-      // ckpt_client->checkpoint_wait();
+      ckpt_client->checkpoint_wait();
       // if (ckpt_client->checkpoint_wait() != VELOC_SUCCESS) {
       //   std::cout << "[Task-" << task_id << "] Checkpoint failed, reinitializing" << std::endl;
       //   // delete ckpt_client;
@@ -334,10 +336,15 @@ int ReconTask::run() {
       ms.acknowledge();
       std::cout << "[Task-" << task_id << "] Checkpointing at iteration " << passes << ", progress = " << progress << std::endl;
       // if (!ckpt_client->checkpoint(config.ckpt_name, passes)) {
+
+      auto ckpt_beg = std::chrono::system_clock::now();
+
       if (!ckpt_client->checkpoint(ckpt_name, passes)) {
         std::cout << "[Task-" << task_id << "] Cannot checkpoint. passes: " << passes << std::endl;
         throw std::runtime_error("Checkpointing failured");
       }
+
+      ckpt_time += (std::chrono::system_clock::now() - ckpt_beg).count();
 
       // // Clean reconstruction image before restart
       // for(size_t i=0; i<recon_image.count(); ++i)
@@ -455,6 +462,9 @@ int ReconTask::run() {
   #ifdef TIMERON
   if(task_id==0){
     e2e_tot += (std::chrono::system_clock::now()-e2e_beg);
+
+    std::cout << "Checkpoint overhead=" << ckpt_time << std::endl;
+
     std::cout << "End-to-End Reconstruction time=" << e2e_tot.count() << std::endl;
 
     std::cout << "Reconstruction time=" << recon_tot.count() << std::endl;
