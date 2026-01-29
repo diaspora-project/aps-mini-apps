@@ -315,7 +315,7 @@ int ReconTask::run() {
     #endif
     if(!(passes%config.ckpt_freq) || stop_flag.load()){
       ckpt_mutex->lock();
-      ckpt_client->checkpoint_wait();
+      // ckpt_client->checkpoint_wait();
       // if (ckpt_client->checkpoint_wait() != VELOC_SUCCESS) {
       //   std::cout << "[Task-" << task_id << "] Checkpoint failed, reinitializing" << std::endl;
       //   // delete ckpt_client;
