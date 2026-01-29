@@ -150,9 +150,11 @@ int ReconTask::run() {
   // unsigned int ckpt_id = task_id;
   ckpt_mutex->lock();
   // veloc::client_t *ckpt_client = veloc::get_client((unsigned int)task_id, config.ckpt_config);
+  std::cout << "[Task-" << task_id << "] Getting checkpoint client..." << std::endl;
   veloc::client_t *ckpt_client = veloc::get_client(ckpt_id, config.ckpt_config);
   std::string ckpt_name = config.ckpt_name + "_" + std::to_string(task_id);
   // Protect reconstruction memory regions
+  std::cout << "[Task-" << task_id << "] Protecting memory..." << std::endl;
   int progress = 0; // Reconstruction progress marked by the projection requence ids
   ckpt_client->mem_protect(0, &progress, 1, sizeof(int), ckpt_name);
   ckpt_client->mem_protect(1, veloc::boost::serializer(recon_image), veloc::boost::deserializer(recon_image), ckpt_name);
@@ -230,6 +232,7 @@ int ReconTask::run() {
 
     int killed = kill_signal.load();
     if (killed != 0) {
+      std::lock_guard<std::mutex> lock(*ckpt_mutex);
       std::cout << "[Task-" << task_id << "] Received kill signal: " << killed << ". Exiting..." << std::endl;
       ms.stopDataCollection();
       producer.flush();
@@ -263,6 +266,7 @@ int ReconTask::run() {
 
       int killed = kill_signal.load();
       if (killed != 0) {
+        std::lock_guard<std::mutex> lock(*ckpt_mutex);
         std::cout << "[Task-" << task_id << "] Received kill signal: " << killed << ". Exiting..." << std::endl;
         ms.stopDataCollection();
         producer.flush();
@@ -319,8 +323,8 @@ int ReconTask::run() {
     if((config.ckpt_freq > 0 && !(passes%config.ckpt_freq)) // fixed duration checkpoint
           || (config.ckpt_freq == 0 && (std::chrono::system_clock::now() > next_ckpt_timestamp || !(passes % max_ckpt_gap))) // Dynamic duration checkpoint
           || stop_flag.load()){
+      std::lock_guard<std::mutex> lock(*ckpt_mutex);
       auto ckpt_beg = std::chrono::system_clock::now();
-      ckpt_mutex->lock();
       // if (ckpt_client->checkpoint_wait() != VELOC_SUCCESS) {
       //   std::cout << "[Task-" << task_id << "] Checkpoint failed, reinitializing" << std::endl;
       //   // delete ckpt_client;
@@ -354,7 +358,6 @@ int ReconTask::run() {
 
       this->checkpointed_progress = progress;
       std::cout << "[Task-" << task_id << "]: Checkpointed version " << passes << "/" << config.num_passes << ", progress = " << progress << std::endl;
-      ckpt_mutex->unlock();
 
       auto overhead = std::chrono::system_clock::now()-ckpt_beg;
       ckpt_tot += overhead;
@@ -432,6 +435,7 @@ int ReconTask::run() {
     delete curr_slices;
 
     if (stop_flag.load()) {
+      std::lock_guard<std::mutex> lock(*ckpt_mutex);
       std::cerr << "[Task-" << task_id << "] Stop flag set. Exiting reconstruction loop and stream..." << std::endl;
       ms.stopDataCollection();
       producer.flush();
