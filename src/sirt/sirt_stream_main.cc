@@ -36,6 +36,10 @@ void cleanup() {
 
 volatile std::sig_atomic_t sigterm_captured = 0;
 void handle_sigterm(int signum) {
+    if (sigterm_captured != 0) {
+        std::cerr << "SIGTERM already sent but the process still haven't stopped, force exitting..." << std::endl;
+        std::_Exit(1);
+    }
     std::cerr << "Received SIGTERM, stoping reconstruction..." << std::endl;
     sigterm_captured = signum;
     // Kill running tasks
@@ -43,12 +47,12 @@ void handle_sigterm(int signum) {
     for (auto& [task_id, task] : running_tasks) {
         task.kill(sigterm_captured);
     }
-    // give it a short grace period
-    std::this_thread::sleep_for(std::chrono::seconds(2));
-    // std::this_thread::sleep_for(std::chrono::seconds(10));
+    // // give it a short grace period
+    // std::this_thread::sleep_for(std::chrono::seconds(2));
+    // // std::this_thread::sleep_for(std::chrono::seconds(10));
 
-    // if still not exiting (e.g., SST Open stuck), force exit
-    std::_Exit(1);   // or _exit(1)
+    // // if still not exiting (e.g., SST Open stuck), force exit
+    // std::_Exit(1);   // or _exit(1)
 }
 
 void snapshot_running_tasks(int worker_id, std::string& outputpath, const std::vector<int>* tasks, int action_seq = 0) {
