@@ -148,34 +148,35 @@ int ReconTask::run() {
   // Configure the VeloC checkpointing
   unsigned int ckpt_id = 0;
   // unsigned int ckpt_id = task_id;
-  ckpt_mutex->lock();
-  // veloc::client_t *ckpt_client = veloc::get_client((unsigned int)task_id, config.ckpt_config);
-  std::cout << "[Task-" << task_id << "] Getting checkpoint client..." << std::endl;
-  veloc::client_t *ckpt_client = veloc::get_client(ckpt_id, config.ckpt_config);
-  std::string ckpt_name = config.ckpt_name + "_" + std::to_string(task_id);
-  // Protect reconstruction memory regions
-  std::cout << "[Task-" << task_id << "] Protecting memory..." << std::endl;
-  int progress = 0; // Reconstruction progress marked by the projection requence ids
-  ckpt_client->mem_protect(0, &progress, 1, sizeof(int), ckpt_name);
-  ckpt_client->mem_protect(1, veloc::boost::serializer(recon_image), veloc::boost::deserializer(recon_image), ckpt_name);
-  
-  std::cout << "[Task-" << task_id << "] Testing for checkpoint restart." << std::endl;
+  {
+    std::lock_guard<std::mutex> lock(*ckpt_mutex);
+    // veloc::client_t *ckpt_client = veloc::get_client((unsigned int)task_id, config.ckpt_config);
+    std::cout << "[Task-" << task_id << "] Getting checkpoint client..." << std::endl;
+    veloc::client_t *ckpt_client = veloc::get_client(ckpt_id, config.ckpt_config);
+    std::string ckpt_name = config.ckpt_name + "_" + std::to_string(task_id);
+    // Protect reconstruction memory regions
+    std::cout << "[Task-" << task_id << "] Protecting memory..." << std::endl;
+    int progress = 0; // Reconstruction progress marked by the projection requence ids
+    ckpt_client->mem_protect(0, &progress, 1, sizeof(int), ckpt_name);
+    ckpt_client->mem_protect(1, veloc::boost::serializer(recon_image), veloc::boost::deserializer(recon_image), ckpt_name);
+    
+    std::cout << "[Task-" << task_id << "] Testing for checkpoint restart." << std::endl;
 
-  // int passes = ckpt_client->restart_test(config.ckpt_name, 0, task_id);
-  int passes = ckpt_client->restart_test(ckpt_name, 0, ckpt_id);
-  // Checkpoint restart if any
-  if(passes>0){
-    std::cout << "[Task-" << task_id << "] Checkpoint found at " << passes << ". Restarting from checkpoint" << std::endl;
-    ckpt_client->restart(ckpt_name, passes);
-    ms.updateProgress(progress);
-    ms.updateSeqNext(progress + 1);
-    this->checkpointed_progress = progress;
-    std::cout << "[Task-" << task_id << "] Restarted from checkpoint at iteration " << passes << ", progress = " << progress << std::endl;
-  }else{
-    std::cout << "[Task-" << task_id << "] No checkpoint found. Starting from scratch" << std::endl;
-    passes = 0;
+    // int passes = ckpt_client->restart_test(config.ckpt_name, 0, task_id);
+    int passes = ckpt_client->restart_test(ckpt_name, 0, ckpt_id);
+    // Checkpoint restart if any
+    if(passes>0){
+      std::cout << "[Task-" << task_id << "] Checkpoint found at " << passes << ". Restarting from checkpoint" << std::endl;
+      ckpt_client->restart(ckpt_name, passes);
+      ms.updateProgress(progress);
+      ms.updateSeqNext(progress + 1);
+      this->checkpointed_progress = progress;
+      std::cout << "[Task-" << task_id << "] Restarted from checkpoint at iteration " << passes << ", progress = " << progress << std::endl;
+    }else{
+      std::cout << "[Task-" << task_id << "] No checkpoint found. Starting from scratch" << std::endl;
+      passes = 0;
+    }
   }
-  ckpt_mutex->unlock();
 
   #ifdef TIMERON
   auto e2e_beg = std::chrono::system_clock::now();

@@ -44,7 +44,8 @@ void handle_sigterm(int signum) {
         task.kill(sigterm_captured);
     }
     // give it a short grace period
-    std::this_thread::sleep_for(std::chrono::seconds(2));
+    // std::this_thread::sleep_for(std::chrono::seconds(2));
+    std::this_thread::sleep_for(std::chrono::seconds(10));
 
     // if still not exiting (e.g., SST Open stuck), force exit
     std::_Exit(1);   // or _exit(1)
