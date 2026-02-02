@@ -104,7 +104,7 @@ def main(input_path, recon_path, model_path, protocol, group_file, batchsize, nu
 
     waiting_metadata = {}
     waiting_data = {}
-    completed_iterations = {}
+    completed_iterations = set()
 
     completed_metadata = {}
     completed_data = {}
