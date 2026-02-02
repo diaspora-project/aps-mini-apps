@@ -188,7 +188,7 @@ def main(input_path, recon_path, model_path, protocol, group_file, batchsize, nu
                     h5_output.create_dataset('/data', data=np.concatenate(sorted_data, axis=0))
                 
                 completed_metadata[iteration_stream] = waiting_metadata[iteration_stream]
-                completed_data[iteration_stream] = waiting_metadata[iteration_stream]
+                completed_data[iteration_stream] = waiting_data[iteration_stream]
                 del waiting_metadata[iteration_stream]
                 del waiting_data[iteration_stream]
                 completed_iterations.add(iteration_stream)
