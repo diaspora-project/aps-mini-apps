@@ -146,6 +146,13 @@ def main(input_path, recon_path, model_path, protocol, group_file, batchsize, nu
 
             if iteration_stream in completed_iterations:
                 print(f"WARNING: [DUP] Data received for already completed iteration stream {iteration_stream}, task_id: {row_id}. Ignoring data.")
+                sorted_ranks = sorted(completed_iterations[iteration_stream].keys())
+                sorted_data = [completed_iterations[iteration_stream][r] for r in sorted_ranks]
+                
+                print(f"Denoising and saving iteration stream {iteration_stream}...")
+                out_path = os.path.join(recon_path, f"{iteration_stream}-denoised.h5")
+                with h5py.File(out_path, 'w') as h5_output:
+                    h5_output.create_dataset('/data', data=np.concatenate(sorted_data, axis=0))
                 continue
 
             if iteration_stream not in waiting_metadata:
