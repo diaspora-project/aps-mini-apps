@@ -104,7 +104,10 @@ def main(input_path, recon_path, model_path, protocol, group_file, batchsize, nu
 
     waiting_metadata = {}
     waiting_data = {}
-    completed_iterations = set()
+    completed_iterations = {}
+
+    completed_metadata = {}
+    completed_data = {}
 
     print("Starting receiving data from SIRTs...")
 
@@ -146,8 +149,8 @@ def main(input_path, recon_path, model_path, protocol, group_file, batchsize, nu
 
             if iteration_stream in completed_iterations:
                 print(f"WARNING: [DUP] Data received for already completed iteration stream {iteration_stream}, task_id: {row_id}. Ignoring data.")
-                sorted_ranks = sorted(completed_iterations[iteration_stream].keys())
-                sorted_data = [completed_iterations[iteration_stream][r] for r in sorted_ranks]
+                sorted_ranks = sorted(completed_metadata[iteration_stream].keys())
+                sorted_data = [completed_data[iteration_stream][r] for r in sorted_ranks]
                 
                 print(f"Denoising and saving iteration stream {iteration_stream}...")
                 out_path = os.path.join(recon_path, f"{iteration_stream}-denoised.h5")
@@ -183,7 +186,9 @@ def main(input_path, recon_path, model_path, protocol, group_file, batchsize, nu
                 out_path = os.path.join(recon_path, f"{iteration_stream}-denoised.h5")
                 with h5py.File(out_path, 'w') as h5_output:
                     h5_output.create_dataset('/data', data=np.concatenate(sorted_data, axis=0))
-
+                
+                completed_metadata[iteration_stream] = waiting_metadata[iteration_stream]
+                completed_data[iteration_stream] = waiting_metadata[iteration_stream]
                 del waiting_metadata[iteration_stream]
                 del waiting_data[iteration_stream]
                 completed_iterations.add(iteration_stream)
