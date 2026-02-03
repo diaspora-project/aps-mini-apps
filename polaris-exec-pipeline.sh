@@ -37,6 +37,9 @@ pkill -9 -f "FailureInjector" || true
 # Remove previous checkpoints
 ckpt_dir=/eagle/Diaspora/ndhai/veloc
 rm -rf $ckpt_dir/tmp/scratch/* $ckpt_dir/tmp/persistent/* || true
+rm -rf /lus/eagle/projects/APSDataAnalysis/ndhai/veloc/tmp/scratch/*
+rm -rf /lus/eagle/projects/APSDataAnalysis/ndhai/veloc/tmp/persistent/*
+
 
 # Check if the number of arguments is corre
 if [ "$#" -ne 8 ]; then
