@@ -43,7 +43,7 @@ TOP=$DIR
 # trap cleanup_cluster EXIT
 
 # Set up compoenents
-cd $DIR
+# cd $DIR
 bash setup.sh
 
 ccount=0
@@ -54,6 +54,15 @@ for num_sirt in "${num_sirts[@]}"; do
       num_task=$(( num_sirt * 2 ))
       num_sinogram=$(( num_sirt * 2 ))
       
+      echo bash polaris-exec-pipeline.sh \
+          $num_sirt \
+          $num_task \
+          $num_sinogram \
+          $failure_mode \
+          $failure_period \
+          0 \
+          true > build/logs/latest/cmd-$count
+
       bash polaris-exec-pipeline.sh \
           $num_sirt \
           $num_task \
@@ -63,15 +72,6 @@ for num_sirt in "${num_sirts[@]}"; do
           0 \
           true
       # sleep 1
-
-      echo bash polaris-exec-pipeline.sh \
-          $num_sirt \
-          $num_task \
-          $num_sinogram \
-          $failure_mode \
-          $failure_period \
-          0 \
-          true > build/logs/latest/cmd-$count
     count=$((count + 1))
     done
   done

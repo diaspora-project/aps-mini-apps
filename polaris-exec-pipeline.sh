@@ -3,10 +3,10 @@
 # --- Safety ---
 set -eE -o pipefail
 
-# Load modules and activate spack env
-source activate-spack.sh
-# Activate python virtualenv
-source pyvenv/bin/activate
+# # Load modules and activate spack env
+# source activate-spack.sh
+# # Activate python virtualenv
+# source pyvenv/bin/activate
 
 # Kill all related processes on error/ctrl-c
 cleanup_on_error() {
@@ -176,8 +176,8 @@ pkill -9 -f "streamer-den" || true
 pkill -INT -f "veloc" || true
 pkill -9 -f "veloc-backend" || true
 
-echo "COMPLETE (E2E ${duration_fmt}, ${dur_ms} ms)  Logs: ${logdir}"
+# echo "COMPLETE (E2E ${duration_fmt}, ${dur_ms} ms)  Logs: ${logdir}"
 
-# Clear error trap so normal exit doesn’t run cleanup_on_error
-trap - SIGINT SIGTERM ERR
-exit 0
+# # Clear error trap so normal exit doesn’t run cleanup_on_error
+# trap - SIGINT SIGTERM ERR
+# exit 0
