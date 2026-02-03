@@ -27,6 +27,8 @@ failure_periods=(1000000 160 80 40 20 10)
 failure_modes=(periodic random)
 #failure_modes=(periodic)
 
+ckpt_freq=0
+
 # --- tiny helper: update ntask_sirt in a JSON file using jq (atomic write)
 
 # DIR="$HOME/diaspora/src/aps-mini-apps"
@@ -63,7 +65,8 @@ for num_sirt in "${num_sirts[@]}"; do
           $failure_mode \
           $failure_period \
           0 \
-          true
+          true \
+          $ckpt_freq
       # sleep 1
 
       echo bash exec-pipeline.sh \
@@ -73,7 +76,8 @@ for num_sirt in "${num_sirts[@]}"; do
           $failure_mode \
           $failure_period \
           0 \
-          true > build/logs/latest/cmd-$count
+          true \
+          $ckpt_freq > build/logs/latest/cmd-$count
     count=$((count + 1))
     done
   done
