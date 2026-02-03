@@ -16,9 +16,11 @@
 # Time to relaunch a new task manager after terminating one
 recover_interval=1
 # Number of reconstruction processes (consumer/main computation tasks)
-num_sirts=(2 4 8 16)
+# num_sirts=(2 4 8 16)
+num_sirts=(2)
 # Mean time between failures
-failure_periods=(160 80 40 20)
+# failure_periods=(160 80 40 20)
+failure_periods=(1000000)
 # Failure modes:
 #   - periodic: failures happen once every a fixed interval
 #   - singe:    failure happen only once
