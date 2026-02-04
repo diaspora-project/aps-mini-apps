@@ -18,7 +18,7 @@ recover_interval=1
 num_tasks_per_sirt=1
 num_sinogram_per_task=1
 # Number of reconstruction processes (consumer/main computation tasks)
-num_sirts=(32 16 8 4 2)
+num_sirts=(2 32 16 8 4)
 # Mean time between failures
 failure_periods=(100000000 1000 100)
 # failure_periods=(5)
@@ -56,10 +56,10 @@ bash setup.sh
 
 
 count=0
-for num_sirt in "${num_sirts[@]}"; do
-  for failure_period in "${failure_periods[@]}"; do
-    for failure_mode in "${failure_modes[@]}"; do
-      for slowdown in "${slowdowns[@]}"; do
+for slowdown in "${slowdowns[@]}"; do
+  for num_sirt in "${num_sirts[@]}"; do
+    for failure_period in "${failure_periods[@]}"; do
+      for failure_mode in "${failure_modes[@]}"; do
 
         cp slow_down_$slowdown.txt slow_down_samples.txt
         slowdownindex=1

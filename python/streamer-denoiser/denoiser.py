@@ -111,6 +111,13 @@ def main(input_path, recon_path, model_path, protocol, group_file, batchsize, nu
 
     print("Starting receiving data from SIRTs...")
 
+    savedata = True
+    if os.path.isdir(recon_path):
+        print(f"Cannot find a directory at {recon_path}, skip saving data to disk")
+        savedata = False
+    else:
+        print(f"Will save data to disk to {recon_path}")
+
     while pending_tasks or len(waiting_metadata) > 0:
         print("Pending tasks: ", pending_tasks, " Waiting metadata size: ", len(waiting_metadata))
         if not pending_tasks:
@@ -149,9 +156,9 @@ def main(input_path, recon_path, model_path, protocol, group_file, batchsize, nu
 
             if iteration_stream in completed_iterations:
                 print(f"WARNING: [DUP] Data received for already completed iteration stream {iteration_stream}, task_id: {row_id}. Ignoring data.")
-                waiting_metadata[iteration_stream] = completed_metadata[iteration_stream]
-                waiting_data[iteration_stream] = completed_data[iteration_stream]
-                # continue
+                # waiting_metadata[iteration_stream] = completed_metadata[iteration_stream]
+                # waiting_data[iteration_stream] = completed_data[iteration_stream]
+                continue
 
             if iteration_stream not in waiting_metadata:
                 waiting_metadata[iteration_stream] = {}
@@ -174,13 +181,14 @@ def main(input_path, recon_path, model_path, protocol, group_file, batchsize, nu
             waiting_data[iteration_stream][row_id] = dd
         
             if len(waiting_metadata[iteration_stream]) == num_tasks:
-                sorted_ranks = sorted(waiting_metadata[iteration_stream].keys())
-                sorted_data = [waiting_data[iteration_stream][r] for r in sorted_ranks]
-                
-                print(f"Denoising and saving iteration stream {iteration_stream}...")
-                out_path = os.path.join(recon_path, f"{iteration_stream}-denoised.h5")
-                with h5py.File(out_path, 'w') as h5_output:
-                    h5_output.create_dataset('/data', data=np.concatenate(sorted_data, axis=0))
+                if savedata:
+                    sorted_ranks = sorted(waiting_metadata[iteration_stream].keys())
+                    sorted_data = [waiting_data[iteration_stream][r] for r in sorted_ranks]
+                    
+                    print(f"Denoising and saving iteration stream {iteration_stream}...")
+                    out_path = os.path.join(recon_path, f"{iteration_stream}-denoised.h5")
+                    with h5py.File(out_path, 'w') as h5_output:
+                        h5_output.create_dataset('/data', data=np.concatenate(sorted_data, axis=0))
                 
                 completed_metadata[iteration_stream] = waiting_metadata[iteration_stream]
                 completed_data[iteration_stream] = waiting_data[iteration_stream]
@@ -203,6 +211,7 @@ if __name__ == "__main__":
     parser.add_argument("--batchsize", type=int, required=True, help="Mofka batchsize")
     parser.add_argument("--num_tasks", type=int, required=True, help="Number of Sinograms")
     parser.add_argument("--logdir", type=str, required=True, help="Log directory")
+
 
 
     args = parser.parse_args()
