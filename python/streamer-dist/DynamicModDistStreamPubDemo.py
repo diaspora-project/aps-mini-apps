@@ -718,8 +718,8 @@ def flush_action_producer(args, shm_name, num_slots, slot_bytes, desc_q, ack_q):
         break
 
       try:
-        producer.push(desc.assign_info, bytearray(1), partition=0)
-        producer.flush()
+        action_producer.push(desc.assign_info, bytearray(1), partition=0)
+        action_producer.flush()
         ack_q.put(("OK", desc.slot, desc.msg_id, None))
       except Exception as e:
         ack_q.put(("EXC", desc.slot, desc.msg_id, repr(e)))
@@ -1305,6 +1305,13 @@ def main():
   # del action_producer
   # del action_consumer
 
+  # Profile information
+  elapsed_time = time1-time0
+  tot_MiBs = (total_size*1.)/2**20
+  print("Received number of projections: {}; Total size (MiB): {:.2f}; Elapsed time (s): {:.2f}".format(total_received, tot_MiBs, elapsed_time))
+  print("Rate (MiB/s): {:.2f}; (msg/s): {:.2f}".format(
+            tot_MiBs/elapsed_time, total_received/elapsed_time))
+  
   print("Cleaning up task assignment process ...")
   # args.dynamic_loadbalancing = "false"
 
@@ -1324,12 +1331,12 @@ def main():
   #   mofka_producing_time.append(t)
   time1 = time.time()
 
-  # Profile information
-  elapsed_time = time1-time0
-  tot_MiBs = (total_size*1.)/2**20
-  print("Received number of projections: {}; Total size (MiB): {:.2f}; Elapsed time (s): {:.2f}".format(total_received, tot_MiBs, elapsed_time))
-  print("Rate (MiB/s): {:.2f}; (msg/s): {:.2f}".format(
-            tot_MiBs/elapsed_time, total_received/elapsed_time))
+  # # Profile information
+  # elapsed_time = time1-time0
+  # tot_MiBs = (total_size*1.)/2**20
+  # print("Received number of projections: {}; Total size (MiB): {:.2f}; Elapsed time (s): {:.2f}".format(total_received, tot_MiBs, elapsed_time))
+  # print("Rate (MiB/s): {:.2f}; (msg/s): {:.2f}".format(
+  #           tot_MiBs/elapsed_time, total_received/elapsed_time))
 
   # mofka_dist.done_image(producer)
 
