@@ -112,7 +112,7 @@ def main(input_path, recon_path, model_path, protocol, group_file, batchsize, nu
     print("Starting receiving data from SIRTs...")
 
     savedata = True
-    if os.path.isdir(recon_path):
+    if not os.path.isdir(recon_path):
         print(f"Cannot find a directory at {recon_path}, skip saving data to disk")
         savedata = False
     else:
