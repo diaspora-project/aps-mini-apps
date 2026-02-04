@@ -173,6 +173,9 @@ def flush_mofka_producer(args, shm_name, num_slots, slot_bytes, desc_q, ack_q):
     md.handshake(args.ntask_sirt, args.num_sinograms, args.num_columns)
     p = md.producer(topic_name="dist_sirt", producer_name="dist")
 
+    import time
+    start_time = time.time()
+
     try:
       while True:
         desc = desc_q.get()
@@ -181,6 +184,8 @@ def flush_mofka_producer(args, shm_name, num_slots, slot_bytes, desc_q, ack_q):
         
         if desc.sequence_id < 0:
           print(f"Received complete signal in mofka producer with sequence_id={desc.sequence_id}. Exiting ...")
+          send_time = time.time() - start_time
+          print(f"Data Distribution Time: {send_time}")
           break
         else:
           try:
