@@ -91,8 +91,12 @@ export MARGO_ENABLE_MONITORING=1
 export MARGO_MONITORING_FILENAME_PREFIX=mofka
 export MARGO_MONITORING_DISABLE_TIME_SERIES=true
 
-export HG_LOG_LEVEL=error
-export FI_LOG_LEVEL=Trace
+# export HG_LOG_LEVEL=error
+# export FI_LOG_LEVEL=Trace
+export HG_LOG_LEVEL=debug
+export FI_LOG_LEVEL=Debug
+
+export PALS_LOCAL_LAUNCH=0
 
 exec_dir=`pwd`
 
