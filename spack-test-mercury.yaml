@@ -100,4 +100,4 @@ spack:
       - spec: ncurses@6.1
         prefix: /usr
   repos:
-    mochi: /home/ndhai/diaspora/src/mochi-spack-packages
+    - /home/ndhai/diaspora/src/mochi-spack-packages
