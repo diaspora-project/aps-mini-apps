@@ -1,0 +1,103 @@
+spack:
+  specs:
+  - mercury
+  - mochi-bedrock~flock~python~mpi
+  concretizer:
+    unify: true
+  modules:
+    prefix_inspections:
+      lib: [LD_LIBRARY_PATH]
+      lib64: [LD_LIBRARY_PATH]
+  packages:
+    gcc:
+      externals:
+      - spec: gcc@14.2.0 languages:='c,c++,fortran'
+        prefix: /opt/cray/pe/gcc-native/14
+        extra_attributes:
+          compilers:
+            c: /opt/cray/pe/gcc-native/14/bin/gcc
+            cxx: /opt/cray/pe/gcc-native/14/bin/g++
+            fortran: /opt/cray/pe/gcc-native/14/bin/gfortran
+    mpi:
+      require:
+      - cray-mpich
+    pkgconfig:
+      require:
+      - pkg-config
+    cray-mpich:
+      buildable: false
+      externals:
+      - spec: cray-mpich@9.0.1
+        prefix: /opt/cray/pe/mpich/9.0.1/ofi/gnu/12.3
+        modules:
+        - PrgEnv-gnu/8.6.0
+        - libfabric/2.2.0rc1
+        - cray-mpich/9.0.1
+    mercury:
+      require:
+      - +ofi
+      - ~boostsys
+      - ~checksum
+    libfabric:
+      buildable: false
+      externals:
+      - spec: libfabric@2.2.0
+        modules:
+        - libfabric/2.2.0rc1
+    autoconf:
+      buildable: false
+      externals:
+      - spec: autoconf@2.69
+        prefix: /usr
+    automake:
+      buildable: false
+      externals:
+      - spec: automake@1.15.1
+        prefix: /usr
+    gmake:
+      buildable: false
+      externals:
+      - spec: gmake@4.2.1
+        prefix: /usr
+    libtool:
+      buildable: false
+      externals:
+      - spec: libtool@2.4.6
+        prefix: /usr
+    openssl:
+      buildable: false
+      externals:
+      - spec: openssl@3.1.4
+        prefix: /usr
+    m4:
+      buildable: false
+      externals:
+      - spec: m4@1.4.18
+        prefix: /usr
+    pkg-config:
+      buildable: false
+      externals:
+      - spec: pkg-config@0.29.2
+        prefix: /usr
+    git:
+      buildable: false
+      externals:
+      - spec: git@2.43.0
+        prefix: /usr
+    cmake:
+      buildable: false
+      externals:
+      - spec: cmake@3.30.5
+        prefix: /soft/spack/pe/0.10.0/base/install/linux-sles15-x86_64/gcc-13.3.1/cmake-3.30.5-x6hbone32yqfjegmlb2zrf4xa6xbfx3y
+    libxml2:
+      buildable: false
+      externals:
+      - spec: libxml2@2.10.3
+        prefix: /usr
+    ncurses:
+      buildable: false
+      externals:
+      - spec: ncurses@6.1
+        prefix: /usr
+  repos:
+    mochi: /home/mdorier/vni-issue/mochi-spack-packages
