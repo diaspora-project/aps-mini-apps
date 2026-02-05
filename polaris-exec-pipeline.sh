@@ -93,8 +93,8 @@ export MARGO_MONITORING_DISABLE_TIME_SERIES=true
 
 # export HG_LOG_LEVEL=error
 # export FI_LOG_LEVEL=Trace
-export HG_LOG_LEVEL=debug
-export FI_LOG_LEVEL=Debug
+# export HG_LOG_LEVEL=debug
+# export FI_LOG_LEVEL=Debug
 
 export PALS_LOCAL_LAUNCH=0
 
@@ -119,8 +119,8 @@ echo mpiexec -ppn 1 --hosts $node_mofka -n $num_node_mofka bash $exec_dir/run-mo
 sleep 10
 
 echo "Start QUEUE SETUP ----------------------------------------------------"
-bash run-queue-setup.sh ${sirt_ranks} ${sirt_tasks} ${num_sinograms} ${logdir}
-echo bash run-daq.sh ${sirt_ranks} ${sirt_tasks} ${num_sinograms} ${logdir}
+mpiexec -ppn 1 -d 16 --hosts $node_daq bash run-queue-setup.sh ${sirt_ranks} ${sirt_tasks} ${num_sinograms} ${logdir}
+echo mpiexec -ppn 1 -d 16 --hosts $node_daq bash run-daq.sh ${sirt_ranks} ${sirt_tasks} ${num_sinograms} ${logdir}
 
 echo "Start DAQ ------------------------------------------------------------"
 # bash run-daq.sh "${sirt_ranks}" "${sirt_tasks}" "${num_sinograms}" "${logdir}" > "${logdir}/daq.out" 2> "${logdir}/daq.err" &
