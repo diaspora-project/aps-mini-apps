@@ -125,14 +125,14 @@ echo mpiexec -ppn 1 ${VNI_OPTS} --hosts $node_mofka -n $num_node_mofka bash $exe
 sleep 10
 
 echo "Start QUEUE SETUP ----------------------------------------------------"
-echo mpiexec -ppn 1 -d 16 ${VNI_OPTS} --hosts $node_daq bash run-queue-setup.sh ${sirt_ranks} ${sirt_tasks} ${num_sinograms} ${logdir}
-mpiexec -ppn 1 -d 16 ${VNI_OPTS} --hosts $node_daq bash run-queue-setup.sh ${sirt_ranks} ${sirt_tasks} ${num_sinograms} ${logdir}
+echo mpiexec -ppn 1 ${VNI_OPTS} --hosts $node_daq bash run-queue-setup.sh ${sirt_ranks} ${sirt_tasks} ${num_sinograms} ${logdir}
+mpiexec -ppn 1 ${VNI_OPTS} --hosts $node_daq bash run-queue-setup.sh ${sirt_ranks} ${sirt_tasks} ${num_sinograms} ${logdir}
 
 echo "Start DAQ ------------------------------------------------------------"
 # bash run-daq.sh "${sirt_ranks}" "${sirt_tasks}" "${num_sinograms}" "${logdir}" > "${logdir}/daq.out" 2> "${logdir}/daq.err" &
-mpiexec -ppn 1 -d 16 ${VNI_OPTS} --hosts $node_daq bash $exec_dir/run-daq.sh "${sirt_ranks}" "${sirt_tasks}" "${num_sinograms}" "${logdir}" >> "${logdir}/daq.log" 2>> "${logdir}/daq.log" &
+mpiexec -ppn 1 ${VNI_OPTS} --hosts $node_daq bash $exec_dir/run-daq.sh "${sirt_ranks}" "${sirt_tasks}" "${num_sinograms}" "${logdir}" >> "${logdir}/daq.log" 2>> "${logdir}/daq.log" &
 # bash $exec_dir/run-daq.sh "${sirt_ranks}" "${sirt_tasks}" "${num_sinograms}" "${logdir}" >> "${logdir}/daq.log" 2>> "${logdir}/daq.log" &
-echo mpiexec -ppn 1 -d 16 ${VNI_OPTS} --hosts $node_daq bash $exec_dir/run-daq.sh "${sirt_ranks}" "${sirt_tasks}" "${num_sinograms}" "${logdir}"
+echo mpiexec -ppn 1 ${VNI_OPTS} --hosts $node_daq bash $exec_dir/run-daq.sh "${sirt_ranks}" "${sirt_tasks}" "${num_sinograms}" "${logdir}"
 
 echo "Start DIST -----------------------------------------------------------"
 mpiexec -ppn 1 -d 16 ${VNI_OPTS} --hosts $node_dist bash $exec_dir/run-dist.sh "${num_sinograms}" "${sirt_tasks}" ${load_balance} "${logdir}" > "${logdir}/dist.out" 2> "${logdir}/dist.err" &
@@ -151,9 +151,9 @@ bash $exec_dir/run-exp-control.sh "${failure_mode}" "${mtbf}" "${logdir}" 2> "${
 echo mpiexec -n $sirt_ranks -ppn $sirt_ranks -d 16 --hosts $node_control bash $exec_dir/run-exp-control.sh ${failure_mode} ${mtbf} ${logdir}
 
 echo "Start DEN ------------------------------------------------------------"
-echo mpiexec -ppn 1 -d 16 ${VNI_OPTS} --hosts $node_den bash $exec_dir/run-den.sh "${sirt_tasks}" "${logdir}"
+echo mpiexec -ppn 1 -d 1 ${VNI_OPTS} --hosts $node_den bash $exec_dir/run-den.sh "${sirt_tasks}" "${logdir}"
 # IMPORTANT: DEN is the foreground block until pipeline finishes
-mpiexec -ppn 1 -d 16 ${VNI_OPTS} --hosts $node_den bash $exec_dir/run-den.sh "${sirt_tasks}" "${logdir}" 2> "${logdir}/den.err" | tee "${logdir}/den.out"
+mpiexec -ppn 1 -d 1 ${VNI_OPTS} --hosts $node_den bash $exec_dir/run-den.sh "${sirt_tasks}" "${logdir}" 2> "${logdir}/den.err" | tee "${logdir}/den.out"
 # bash $exec_dir/run-den.sh "${num_sinograms}" "${logdir}" 2> "${logdir}/den.err" | tee "${logdir}/den.out"
 
 # --- If we reached here, DEN completed; mark end time BEFORE cleanup ---
