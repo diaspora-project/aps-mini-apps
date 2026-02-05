@@ -3,11 +3,6 @@
 # --- Safety ---
 set -eE -o pipefail
 
-# # Load modules and activate spack env
-source activate-spack.sh
-# # Activate python virtualenv
-# source pyvenv/bin/activate
-
 # Kill all related processes on error/ctrl-c
 cleanup_on_error() {
   echo "!! Aborting, cleaning up processes..." >&2
@@ -33,6 +28,11 @@ pkill -9 -f "streamer-den" || true
 pkill -INT -f "veloc" || true
 pkill -9 -f "veloc-backend" || true
 pkill -9 -f "FailureInjector" || true
+
+# # Load modules and activate spack env
+source activate-spack.sh
+# # Activate python virtualenv
+# source pyvenv/bin/activate
 
 # Remove previous checkpoints
 ckpt_dir=/eagle/Diaspora/ndhai/veloc
