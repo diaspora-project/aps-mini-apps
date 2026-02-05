@@ -125,7 +125,7 @@ echo mpiexec -ppn 1 ${VNI_OPTS} --hosts $node_mofka -n $num_node_mofka bash $exe
 sleep 10
 
 echo "Start QUEUE SETUP ----------------------------------------------------"
-echo mpiexec -ppn 1 -d 16 ${VNI_OPTS} --hosts $node_daq bash run-daq.sh ${sirt_ranks} ${sirt_tasks} ${num_sinograms} ${logdir}
+echo mpiexec -ppn 1 -d 16 ${VNI_OPTS} --hosts $node_daq bash run-queue-setup.sh ${sirt_ranks} ${sirt_tasks} ${num_sinograms} ${logdir}
 mpiexec -ppn 1 -d 16 ${VNI_OPTS} --hosts $node_daq bash run-queue-setup.sh ${sirt_ranks} ${sirt_tasks} ${num_sinograms} ${logdir}
 
 echo "Start DAQ ------------------------------------------------------------"
