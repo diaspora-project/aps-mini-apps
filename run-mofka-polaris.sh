@@ -10,7 +10,7 @@ source activate-spack.sh
 # fi
 
 # bedrock na+sm -c config.json
-bedrock cxi -v trace -c config-polaris.json
+bedrock "ofi+cxi" -v trace -c config-polaris.json
 
 # Run the following if needed
 # /usr/sbin/sysctl kernel.yama.ptrace_scope=0
