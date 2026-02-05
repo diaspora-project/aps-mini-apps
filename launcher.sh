@@ -5,5 +5,5 @@ TOP=/lus/eagle/projects/Diaspora/ndhai/aps-mini-apps/failure-injection/periodic/
 mkdir -p $TOP
 echo $TOP > recent-run
 cd $TOP
-qsub -o $TOP $HOME/diaspora/src/aps-mini-apps/polaris-test-failure.sh
+qsub -o $TOP $HOME/diaspora/src/aps-mini-apps/polaris-test-scale.sh
 

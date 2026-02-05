@@ -75,18 +75,24 @@ echo "Updated symlink: build/logs/latest -> ${logdir}"
 nodes=$(cat "$PBS_NODEFILE")
 nodes_array=($nodes)
 
+# node_daq=${nodes_array[1]}
+# node_dist=${nodes_array[2]}
+# # node_sirts=${nodes_array[0]}
+# node_sirts=$nodes_array
+# node_den=${nodes_array[3]}
+# #node_mofka=${nodes_array[0]}
+# #num_node_mofka=$sirt_ranks
+# #node_mofka=("${nodes_array[0]}" "${nodes_array[1]}")
+# node_mofka=("${nodes_array[0]}")
+# num_node_mofka=${#node_mofka[@]}
+# node_mofka="$(printf "%s," "${node_mofka[@]}" | sed 's/,$//')"
+# node_control=${nodes_array[0]}
+node_mofka=${nodes_array[0]}
 node_daq=${nodes_array[1]}
-node_dist=${nodes_array[1]}
-# node_sirts=${nodes_array[0]}
-node_sirts=$nodes_array
-node_den=${nodes_array[1]}
-#node_mofka=${nodes_array[0]}
-#num_node_mofka=$sirt_ranks
-#node_mofka=("${nodes_array[0]}" "${nodes_array[1]}")
-node_mofka=("${nodes_array[0]}")
-num_node_mofka=${#node_mofka[@]}
-node_mofka="$(printf "%s," "${node_mofka[@]}" | sed 's/,$//')"
-node_control=${nodes_array[0]}
+node_dist=${nodes_array[2]}
+node_den=${nodes_array[3]}
+node_sirt=("${nodes_array[@]:4}")
+node_control=$node_sirts
 
 export MARGO_ENABLE_MONITORING=1
 export MARGO_MONITORING_FILENAME_PREFIX=mofka
