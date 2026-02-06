@@ -20,7 +20,7 @@ num_sinogram_per_task=1
 # Number of reconstruction processes (consumer/main computation tasks)
 num_sirts=(32)
 # Mean time between failures
-failure_periods=(100000000 1000 100)
+failure_periods=(100000000)
 # failure_periods=(5)
 # Failure modes:
 #   - periodic: failures happen once every a fixed interval
@@ -34,8 +34,8 @@ ckpt_freq=0
 
 # --- tiny helper: update ntask_sirt in a JSON file using jq (atomic write)
 
-# DIR="$HOME/diaspora/src/aps-mini-apps"
-DIR=`pwd`
+DIR="$HOME/diaspora/src/aps-mini-apps"
+# DIR=`pwd`
 echo "DIR: $DIR"
 
 TOP=$DIR
