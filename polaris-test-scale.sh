@@ -34,11 +34,10 @@ ckpt_freq=0
 
 # --- tiny helper: update ntask_sirt in a JSON file using jq (atomic write)
 
-# DIR="/diaspora/src/aps-mini-apps"
-DIR=`pwd`
+DIR="$HOME/diaspora/src/aps-mini-apps"
 echo "DIR: $DIR"
 
-TOP=$DIR
+TOP=TOP="$(cat "$DIR/recent-run")"
 
 # # optional: ensure we clean up the cluster if something fails mid-loop
 # cleanup_cluster() {
@@ -50,7 +49,7 @@ TOP=$DIR
 # trap cleanup_cluster EXIT
 
 # Set up compoenents
-cd $DIR
+cd $TOP/aps-mini-apps
 bash setup.sh
 
 
