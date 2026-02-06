@@ -148,14 +148,14 @@ echo mpiexec -ppn 1 -d 16 ${VNI_OPTS} --hosts $node_dist bash $exec_dir/run-dist
 # sleep 10  # intentionally not sleeping to avoid extra idle time
 
 echo "Start SIRT -----------------------------------------------------------"
-mpiexec -n $sirt_ranks -ppn $sirt_ranks -d 16 ${VNI_OPTS} --hosts $node_sirts bash $exec_dir/run-sirt-polaris.sh "${sirt_ranks}" "${logdir}" $slowdownindex $ckpt_freq $mtbf > "${logdir}/sirt.out" 2> "${logdir}/sirt.err" &
+mpiexec -n $sirt_ranks -ppn $sirt_ranks -d 16 ${VNI_OPTS} --hosts $node_sirts bash $exec_dir/run-sirt-polaris.sh "${sirt_ranks}" "${logdir}" $slowdownindex $ckpt_freq $mtbf $failure_mode > "${logdir}/sirt.out" 2> "${logdir}/sirt.err" &
 # bash $exec_dir/run-sirt-polaris.sh "${sirt_ranks}" "${logdir}" > "${logdir}/sirt.out" 2> "${logdir}/sirt.err" &
-echo mpiexec -n $sirt_ranks -ppn $sirt_ranks -d 16 ${VNI_OPTS} --hosts $node_sirts bash $exec_dir/run-sirt-polaris.sh "${sirt_ranks}" "${logdir}" $slowdownindex $ckpt_freq $mtbf
+echo mpiexec -n $sirt_ranks -ppn $sirt_ranks -d 16 ${VNI_OPTS} --hosts $node_sirts bash $exec_dir/run-sirt-polaris.sh "${sirt_ranks}" "${logdir}" $slowdownindex $ckpt_freq $mtbf $failure_mode
 
-echo "Start Exp Control ----------------------------------------------------"
-# Note: runs in background; tee ensures logs are written and exit codes propagate via -o pipefail
-bash $exec_dir/run-exp-control.sh "${failure_mode}" "${mtbf}" "${logdir}" 2> "${logdir}/exp-control.err" | tee "${logdir}/exp-control.out" &
-echo mpiexec -n $sirt_ranks -ppn $sirt_ranks -d 16 --hosts $node_control bash $exec_dir/run-exp-control.sh ${failure_mode} ${mtbf} ${logdir}
+# echo "Start Exp Control ----------------------------------------------------"
+# # Note: runs in background; tee ensures logs are written and exit codes propagate via -o pipefail
+# bash $exec_dir/run-exp-control.sh "${failure_mode}" "${mtbf}" "${logdir}" 2> "${logdir}/exp-control.err" | tee "${logdir}/exp-control.out" &
+# # echo mpiexec -n $sirt_ranks -ppn $sirt_ranks -d 16 --hosts $node_control bash $exec_dir/run-exp-control.sh ${failure_mode} ${mtbf} ${logdir}
 
 echo "Start DEN ------------------------------------------------------------"
 echo mpiexec -ppn 1 -d 1 ${VNI_OPTS} --hosts $node_den bash $exec_dir/run-den.sh "${sirt_tasks}" "${logdir}"
