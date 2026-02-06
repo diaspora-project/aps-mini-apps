@@ -37,7 +37,7 @@ ckpt_freq=0
 DIR="$HOME/diaspora/src/aps-mini-apps"
 echo "DIR: $DIR"
 
-TOP=TOP="$(cat "$DIR/recent-run")"
+TOP="$(cat "$DIR/recent-run")"
 
 # # optional: ensure we clean up the cluster if something fails mid-loop
 # cleanup_cluster() {
