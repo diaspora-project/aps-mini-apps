@@ -34,8 +34,8 @@ ckpt_freq=0
 
 # --- tiny helper: update ntask_sirt in a JSON file using jq (atomic write)
 
-DIR="$HOME/diaspora/src/aps-mini-apps"
-# DIR=`pwd`
+# DIR="/diaspora/src/aps-mini-apps"
+DIR=`pwd`
 echo "DIR: $DIR"
 
 TOP=$DIR
