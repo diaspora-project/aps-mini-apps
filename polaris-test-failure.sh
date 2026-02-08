@@ -1,7 +1,7 @@
 #!/bin/bash
-#PBS -l select=1:system=polaris
+#PBS -l select=6:system=polaris
 #PBS -l walltime=01:00:00
-#PBS -N Flink
+#PBS -N aps-mini-apps
 #PBS -q debug-scaling
 
 #file systems used by the job
@@ -10,7 +10,7 @@
 #Project name
 #PBS -A diaspora
 
-# set -euo pipefail
+#set -euo pipefail
 
 # Key Exp parameters, change these parameters to generate data
 # Time to relaunch a new task manager after terminating one
@@ -34,20 +34,19 @@ ckpt_freq=0
 DIR="$HOME/diaspora/src/aps-mini-apps"
 echo "DIR: $DIR"
 
-# TOP="$(cat "$DIR/recent-run")"
-TOP=$DIR
+TOP="$(cat "$DIR/recent-run")"
 
 # # optional: ensure we clean up the cluster if something fails mid-loop
 # cleanup_cluster() {
 #   # best-effort stop if the script dies in the middle
-#   if [[ -x "$WORKSPACE/polaris-exec-pipeline.sh" ]]; then
-#     (cd "$WORKSPACE" && bash polaris-exec-pipeline.sh) || true
+#   if [[ -x "$WORKSPACE/test-failure.sh" ]]; then
+#     (cd "$WORKSPACE" && bash test-failure.sh) || true
 #   fi
 # }
 # trap cleanup_cluster EXIT
 
 # Set up compoenents
-# cd $DIR
+cd $TOP/aps-mini-apps
 bash setup.sh
 
 ccount=0
