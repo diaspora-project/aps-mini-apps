@@ -41,7 +41,7 @@ This will let you execute the ModDistStreamPubDemo.py script, which is the main 
 3. sirt_stream: In order to generate this executable,:
 Setup flatbuffers data structures
 ```
-cd include/traacelib
+cd include/tracelib
 flatc -c trace_prot.fbs
 ```
 Run the following commands in project root directory
