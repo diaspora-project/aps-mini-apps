@@ -298,7 +298,7 @@ int main(int argc, char **argv)
   // }
   auto end = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> elapsed_t = end - start;
-  ms.setProducerTimes("Flush", ms.getBufferSize()*data_size*sizeof(float), elapsed_t.count());
+  ms.setProducerTimes("Flush", 0, elapsed_t.count());
 
 
   // try {

@@ -34,12 +34,9 @@ class DiasporaStream
     std::vector<float> vproj;
     std::vector<float> vtheta;
     std::vector<json> vmeta;
-    std::queue<diaspora::Future<std::optional<diaspora::EventID>>> futures;
     json info;
 
     diaspora::Driver driver;
-    size_t batch = 0;
-    std::vector<float*> buffer;
     std::vector<std::tuple<std::string, uint64_t, float>> producer_times; // type, size, duration
     std::vector<std::tuple<std::string, uint64_t, float>> consumer_times; // type, size, duration
 
@@ -149,10 +146,6 @@ class DiasporaStream
 
     int getRank();
 
-    int getBufferSize();
-
-    uint32_t getBatch();
-
     uint32_t getCounter();
 
     void setInfo(json &j);
@@ -164,8 +157,6 @@ class DiasporaStream
     void setConsumerTimes(std::string op, uint64_t size, float time);
 
     std::vector<std::tuple<std::string, uint64_t, float>> getProducerTimes();
-
-    std::queue<diaspora::Future<std::optional<diaspora::EventID>>>& getFutures();
 
     void setProducerTimes(std::string op, uint64_t size, float time);
 

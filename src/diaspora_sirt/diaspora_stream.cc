@@ -147,51 +147,15 @@ void DiasporaStream::publishImage(
   diaspora::Metadata metadata{meta};
   float* copy = new float[size];
   std::memcpy(copy, data, size * sizeof(float));
-  buffer.push_back(copy);
-  auto data_m = diaspora::DataView(buffer[buffer.size()-1], size*sizeof(float));
+  auto free_cb = [](diaspora::DataView::UserContext ctx) {
+      delete[] static_cast<float*>(ctx);
+  };
   auto start = std::chrono::high_resolution_clock::now();
-  auto f  = producer.push(metadata, data_m);
-  batch++;
+  auto data_m = diaspora::DataView(static_cast<void*>(copy), size * sizeof(float), copy, free_cb);
+  producer.push(metadata, data_m);
   auto end = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> elapsed_push = end - start;
-  std::chrono::duration<double> elapsed_flush = end - end;
-  // std::cout << "Push " << elapsed.count() << " sec" << std::endl;
   producer_times.emplace_back("Push", size*sizeof(float), elapsed_push.count());
-  if (batch % batchsize == 0) futures.push(std::move(f));
-
-  if (futures.size() == 3){
-    // start = std::chrono::high_resolution_clock::now();
-    // producer.flush();
-    // futures.front().wait();
-    // futures.pop();
-    // end = std::chrono::high_resolution_clock::now();
-    // elapsed_flush = end - start;
-    // // std::cout << "Flush " << batch << " Time: " << elapsed_flush.count() << " sec" << std::endl;
-    // producer_times.emplace_back("Wait", buffer.size()*size*sizeof(float), elapsed_flush.count());
-
-    // try {
-    //   for(auto& f : futures){
-    //     start = std::chrono::high_resolution_clock::now();
-    //     f.wait();
-    //     end = std::chrono::high_resolution_clock::now();
-    //     elapsed_flush = end - start;
-    //     producer_times.emplace_back("Wait", buffer.size()*size*sizeof(float), elapsed_flush.count());
-
-    //   }
-    // } catch(const diaspora::Exception& ex) {
-    //     std::cerr << "MOFKA EXCEPTION: " << ex.what() << std::endl;
-    // }
-    size_t c=0;
-    for (float* ptr : buffer) {
-        if (ptr==nullptr) continue;
-        else delete[] ptr;
-        c++;
-        if (c==batchsize) break;
-
-    }
-    buffer.clear();
-    batch=0;
-  }
 }
 
 
@@ -319,13 +283,7 @@ json DiasporaStream::getInfo(){ return info;}
 
 int DiasporaStream::getRank() {return comm_rank;}
 
-int DiasporaStream::getBufferSize() {return buffer.size();}
-
-uint32_t DiasporaStream::getBatch() {return batch;}
-
 uint32_t DiasporaStream::getCounter(){ return counter;}
-
-std::queue<diaspora::Future<std::optional<diaspora::EventID>>>& DiasporaStream::getFutures(){ return futures;}
 
 void DiasporaStream::setInfo(json &j) {info = j;}
 

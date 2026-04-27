@@ -53,7 +53,7 @@ add_library(trace_utils ${Trace_SOURCE_DIR}/src/tracelib/trace_utils.cc)
 add_library(trace_h5io ${Trace_SOURCE_DIR}/src/tracelib/trace_h5io.cc)
 
 add_library(diaspora_stream ${Trace_SOURCE_DIR}/src/diaspora_sirt/diaspora_stream.cc)
-target_link_libraries(diaspora_stream PRIVATE diaspora-stream-api)
+target_link_libraries(diaspora_stream PRIVATE diaspora-stream-api fmt::fmt)
 add_library(sirt ${CMAKE_CURRENT_LIST_DIR}/sirt.cc)
 
 add_executable(sirt_stream sirt_stream_main.cc)

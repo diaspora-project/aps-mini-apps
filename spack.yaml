@@ -20,7 +20,7 @@ spack:
   - py-h5py
   - flatbuffers
   - py-flatbuffers
-  - py-tensorflow # it takes up to 8h to install :) comment if not needed
+#  - py-tensorflow # it takes up to 8h to install :) comment if not needed
   view: true
   concretizer:
     unify: true
