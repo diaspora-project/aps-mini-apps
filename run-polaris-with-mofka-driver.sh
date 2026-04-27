@@ -193,9 +193,8 @@ running=("${PIDS[@]}")
 
 while ((${#running[@]})); do
     # Wait for any process to exit
-    wait -n "${running[@]}"
+    wait -n -p exited_pid "${running[@]}"
     status=$?
-    exited_pid=$!
 
     name=${NAME[$exited_pid]}
     errfile=${ERR[$exited_pid]}

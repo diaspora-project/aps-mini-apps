@@ -1,6 +1,8 @@
 #!/bin/bash
 
-eval `spack env activate --sh aps-env`
+PROTOCOL=${PROTOCOL:-"na+sm"}
+
+eval `spack env activate --sh tekapp-env`
 
 SIRT_RANKS=2
 
@@ -42,7 +44,7 @@ cat >mofka.json <<EOL
 EOL
 
 echo "Deploying Mofka"
-bedrock na+sm -c mofka.json 1> mofka.out 2> mofka.err &
+bedrock $PROTOCOL -c mofka.json -v trace 1> mofka.out 2> mofka.err &
 MOFKA_PID=$!
 
 sleep 2
@@ -125,9 +127,8 @@ running=("${PIDS[@]}")
 
 while ((${#running[@]})); do
     # Wait for any process to exit
-    wait -n "${running[@]}"
+    wait -n -p exited_pid "${running[@]}"
     status=$?
-    exited_pid=$!
 
     name=${NAME[$exited_pid]}
     errfile=${ERR[$exited_pid]}
