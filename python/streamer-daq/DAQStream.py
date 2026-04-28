@@ -14,6 +14,7 @@ import diaspora_stream.api as diaspora
 import csv
 import json
 from collections import deque
+from ts_collector import TimestampCollector
 
 #from memory_profiler import profile
 
@@ -174,7 +175,8 @@ def simulate_daq(producer,
                  slp=0,
                  iteration=1,
                  save_after_serialize=False,
-                 prj_slp=0):
+                 prj_slp=0,
+                 ts=None):
   global bsignal
 
   serialized_data = None
@@ -214,14 +216,16 @@ def simulate_daq(producer,
       print("Sending projection {}".format(index))
       time.sleep(prj_slp)
       # diaspora send
-      ts = time.perf_counter()
+      ts_push = time.perf_counter()
       buffer.append(serialized_data[index])
       md = {"index": int(index), "Type" : "DATA"}
+      if ts is not None: ts.record(f"PUSH_START topic=daq_dist,data_size={len(buffer[i])}")
       f = producer.push(md, buffer[i])
+      if ts is not None: ts.record("PUSH_END topic=daq_dist")
       #f.wait(timeout_ms=-1)
       # if seq % batchsize == 0:
       #   futures.append(f)
-      diaspora_t.append(["push", index, ts, time.perf_counter(), time.perf_counter() - ts, len(str(md)) , len(buffer[i])])
+      diaspora_t.append(["push", index, ts_push, time.perf_counter(), time.perf_counter() - ts_push, len(str(md)) , len(buffer[i])])
       tot_transfer_size+=len(buffer[i])
       seq+=1
       i+=1
@@ -240,12 +244,14 @@ def simulate_daq(producer,
     time.sleep(slp)
   #Last flush if buffer was not full
   if len(buffer)>0:
-    ts = time.perf_counter()
+    ts_flush = time.perf_counter()
+    if ts is not None: ts.record("FLUSH_START topic=daq_dist")
     producer.flush()
+    if ts is not None: ts.record("FLUSH_END topic=daq_dist")
     # while not futures:
     #   futures[0].wait(timeout_ms=-1)
     #   futures.popleft()
-    diaspora_t.append(["flush_after", index, ts, time.perf_counter(), time.perf_counter() - ts,len(buffer)*len(str(md)), len(buffer[i-1])])
+    diaspora_t.append(["flush_after", index, ts_flush, time.perf_counter(), time.perf_counter() - ts_flush,len(buffer)*len(str(md)), len(buffer[i-1])])
   time1 = time.time()
 
   elapsed_time = time1-time0
@@ -269,12 +275,13 @@ def test_daq(producer,
              num_sinogram_columns=2048,
              seq=0,
              num_sinogram_projections=1440,
-             slp=0):
+             slp=0,
+             ts=None):
   print("Sending projections")
   if num_sinograms<1: num_sinograms=2048
   # Randomly generate image data
   dims=(num_sinograms, num_sinogram_columns)
-  image = np.array(np.random.randint(2, size=dims), dtype='uint16')
+  image = np.array(np.random.rand(*dims), dtype='float32')
 
   serializer = TraceSerializer.ImageSerializer()
 
@@ -283,7 +290,9 @@ def test_daq(producer,
                                       itype=serializer.ITypes.Projection,
                                       rotation_step=rotation_step, seq=seq)
     seq+=1
-    producer.push({"index": uniqueId}, serialized_data)
+    if ts is not None: ts.record(f"PUSH_START topic=daq_dist,data_size={len(serialized_data)}")
+    producer.push({"index": uniqueId, "Type": "DATA"}, serialized_data)
+    if ts is not None: ts.record("PUSH_END topic=daq_dist")
     time.sleep(slp)
 
   return seq
@@ -425,6 +434,7 @@ def main():
   ordering = diaspora.Ordering.Strict
   producer = topic.producer(producer_name, batch_size=batchsize, thread_pool=thread_pool, ordering=ordering)
 
+  ts = TimestampCollector()
   time0 = time.time()
   if args.mode == 0: # Read data from PV
 
@@ -455,17 +465,24 @@ def main():
                   num_sinograms=args.num_sinograms,
                   iteration=args.d_iteration,
                   slp=args.iteration_sleep,
-                  prj_slp=0)
+                  prj_slp=0,
+                  ts=ts)
   elif args.mode == 2: # Test data acquisition
     test_daq( producer=producer,
               num_sinograms=args.num_sinograms,                       # Y
               num_sinogram_columns=args.num_sinogram_columns,         # X
               num_sinogram_projections=args.num_sinogram_projections, # Z
-              slp=args.iteration_sleep)
+              slp=args.iteration_sleep,
+              ts=ts)
   else:
     print("Unknown mode: {}".format(args.mode))
+  ts.record("PUSH_START topic=daq_dist,data_size=1")
   producer.push({"Type": "FIN"}, bytearray(1))
+  ts.record("PUSH_END topic=daq_dist")
+  ts.record("FLUSH_START topic=daq_dist")
   producer.flush().wait(timeout_ms=-1)
+  ts.record("FLUSH_END topic=daq_dist")
+  ts.write("daq.0.ts.txt")
   time1 = time.time()
   print("Total time (s): {:.2f}".format(time1-time0))
 

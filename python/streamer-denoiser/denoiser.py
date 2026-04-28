@@ -1,11 +1,13 @@
 import os
 import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '../common'))
 import time
 import json
 import numpy as np
 import h5py
 import diaspora_stream.api as diaspora
 import csv
+from ts_collector import TimestampCollector
 #import keras
 import argparse
 import matplotlib.pyplot as plt
@@ -99,14 +101,18 @@ def main(input_path, model_path, driver_type, driver_config_file, batchsize, npr
                               batch_size=batch_size)
     more_data = True
     diaspora_times = []
+    ts_collector = TimestampCollector()
     time0 = time.perf_counter()
     cpt = nproc_sirt
     while more_data:
         data = []
         metadata = []
         for i in range(nproc_sirt*batchsize):
-            ts = time.perf_counter()
+            ts_t = time.perf_counter()
+            ts_collector.record("PULL_START topic=sirt_den")
             f = consumer.pull()
+            ts_collector.record("PULL_END topic=sirt_den")
+            ts_collector.record("PULL_WAIT_START topic=sirt_den")
             event = None
             while event is None:
                 event = f.wait(timeout_ms=-1)
@@ -116,6 +122,7 @@ def main(input_path, model_path, driver_type, driver_config_file, batchsize, npr
             m["diaspora_e_id"] = event.event_id
             m["diaspora_e_partition"] = event.partition
             if m["Type"] == "FIN":
+                ts_collector.record(f"PULL_WAIT_END topic=sirt_den,event_id={event.event_id},data_size=0")
                 cpt = cpt-1
                 if cpt==0:
                     more_data = False
@@ -124,7 +131,8 @@ def main(input_path, model_path, driver_type, driver_config_file, batchsize, npr
                 metadata.append(m)
                 t_data = time.perf_counter()
                 dd = bytearray(event.data[0])
-                diaspora_times.append([t_wait - ts, t_meta - t_wait, len(str(m)), time.perf_counter() - t_data, len(dd)])
+                ts_collector.record(f"PULL_WAIT_END topic=sirt_den,event_id={event.event_id},data_size={len(dd)}")
+                diaspora_times.append([t_wait - ts_t, t_meta - t_wait, len(str(m)), time.perf_counter() - t_data, len(dd)])
                 dd = np.frombuffer(dd, dtype=np.float32)
                 try:
                     dd = dd.reshape(metadata[i]["rank_dims"])
@@ -168,11 +176,17 @@ def main(input_path, model_path, driver_type, driver_config_file, batchsize, npr
 
     print("Time to solution: ", time.perf_counter()-time0, flush=True)
 
+    ts_collector.write("den.0.ts.txt")
     fields = ["t_wait", "t_metadata", "metadata_size" ,"t_data", "data_size"]
     with open('Den_pull.csv', 'w') as f:
         write = csv.writer(f)
         write.writerow(fields)
         write.writerows(diaspora_times)
+    consumer.unsubscribe()
+    del consumer
+    del topic
+    del thread_pool
+    del driver
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Denoise HDF5 files using a trained model.')
     parser.add_argument('--input', type=str, required=False, help='Input file or directory path.')

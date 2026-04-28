@@ -15,6 +15,7 @@
 #include <diaspora_stream.h>
 #include "trace_data.h"
 #include <vector>
+#include <fmt/format.h>
 
 class TraceRuntimeConfig {
   public:
@@ -290,7 +291,9 @@ int main(int argc, char **argv)
       delete curr_slices;
   }
   auto start = std::chrono::high_resolution_clock::now();
+  ms.recordTs("FLUSH_START topic=sirt_den");
   producer.flush();
+  ms.recordTs("FLUSH_END topic=sirt_den");
   // auto futures = ms.getFutures();
   // while(!futures.empty()) {
   //   futures.front().wait();
@@ -319,8 +322,13 @@ int main(int argc, char **argv)
   json md = {{"Type", "FIN"}};
   // data part
   float d = 1;
+  ms.recordTs(fmt::format("PUSH_START topic=sirt_den,data_size={}", sizeof(float)));
   auto future = producer.push(diaspora::Metadata{md}, diaspora::DataView{&d,sizeof(float)});
-  future.wait(-1);
+  ms.recordTs("PUSH_END topic=sirt_den");
+  ms.recordTs("PUSH_WAIT_START topic=sirt_den");
+  auto eid = future.wait(-1);
+  ms.recordTs(fmt::format("PUSH_WAIT_END topic=sirt_den,event_id={}",
+      eid.has_value() ? std::to_string(static_cast<uint64_t>(*eid)) : std::string("N/A")));
 
   /**************************/
   #ifdef TIMERON
@@ -341,6 +349,7 @@ int main(int argc, char **argv)
   std::cout << "Deleting main_recon_space" << std::endl;
   delete main_recon_space;
   //delete curr_slices;
+  ms.writeTs(comm->rank());
   std::cout << "Deleting comm" << std::endl;
   delete comm;
   std::cout << "Exiting" << std::endl;

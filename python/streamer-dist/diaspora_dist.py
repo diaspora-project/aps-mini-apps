@@ -1,8 +1,12 @@
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '../common'))
 import numpy as np
 import json
 import diaspora_stream.api as diaspora
 import time
 from collections import deque
+from ts_collector import TimestampCollector
 
 def generate_worker_msgs(data: np.ndarray, dims: list, projection_id: int, theta: float,
                          n_ranks: int, center: float, seq: int) -> list:
@@ -80,6 +84,7 @@ class DiasporaDist:
         self.counter = 0
         self.batch = batchsize
         self.futures = deque()
+        self.ts = TimestampCollector()
 
     def producer(self, topic_name: str, producer_name: str) -> diaspora.Producer:
         topic = self.driver.open_topic(topic_name)
@@ -116,6 +121,7 @@ class DiasporaDist:
             self.nranks = event.metadata["comm_size"]
             self.seq += 1
             del event
+            consumer.unsubscribe()
             del consumer
             del topic
         elif nproc_sirt< 0:
@@ -134,16 +140,21 @@ class DiasporaDist:
         return "Done"
 
     def pull_image(self, consumer: diaspora.Consumer):
-        ts = time.perf_counter()
+        ts_t = time.perf_counter()
+        self.ts.record("PULL_START topic=daq_dist")
         f = consumer.pull()
+        self.ts.record("PULL_END topic=daq_dist")
+        self.ts.record("PULL_WAIT_START topic=daq_dist")
         event = f.wait(timeout_ms=-1)
         t_wait = time.perf_counter()
+        data_size = len(event.data[0]) if event.data else 0
+        self.ts.record(f"PULL_WAIT_END topic=daq_dist,event_id={event.event_id},data_size={data_size}")
         metadata = event.metadata
         t_meta = time.perf_counter()
         print("metadata retreived ", event.metadata, flush=True)
         data = bytearray(event.data[0])
         t_data = time.perf_counter()
-        return metadata, data, [t_wait - ts, t_meta- t_wait, len(str(metadata)), t_data - t_meta, len(data)]
+        return metadata, data, [t_wait - ts_t, t_meta- t_wait, len(str(metadata)), t_data - t_meta, len(data)]
 
     def push_image(self, data: np.ndarray, row :int, col: int,
                    theta: float, projection_id: int, center: float,
@@ -165,12 +176,15 @@ class DiasporaDist:
         diaspora_t = []
         # Send data to workers
         for i in range(self.nranks):
-            ts = time.perf_counter()
+            ts_t = time.perf_counter()
+            data_sz = len(self.buffer[self.counter][i][1])
+            self.ts.record(f"PUSH_START topic=dist_sirt,data_size={data_sz}")
             f = producer.push(self.buffer[self.counter][i][0], self.buffer[self.counter][i][1])
+            self.ts.record("PUSH_END topic=dist_sirt")
             #f.wait(timeout_ms=-1)
             # if self.counter % self.batch == 0:
             #     self.futures.append(f)
-            diaspora_t.append(["push", projection_id, ts, time.perf_counter(), time.perf_counter() - ts, len(str(self.buffer[self.counter][i][0])) ,len(self.buffer[self.counter][i][1])])
+            diaspora_t.append(["push", projection_id, ts_t, time.perf_counter(), time.perf_counter() - ts_t, len(str(self.buffer[self.counter][i][0])) ,len(self.buffer[self.counter][i][1])])
 
         self.seq += 1
         self.counter += 1
@@ -188,21 +202,27 @@ class DiasporaDist:
 
     def last_flush(self, producer):
         if len(self.buffer)> 0:
-            ts = time.perf_counter()
+            ts_t = time.perf_counter()
+            self.ts.record("FLUSH_START topic=dist_sirt")
             producer.flush()
+            self.ts.record("FLUSH_END topic=dist_sirt")
             # while not self.futures:
             #     self.futures[0].wait(timeout_ms=-1)
             #     self.futures.popleft()
             self.seq += 1
-            return ["last_flush","" , ts, time.perf_counter(), time.perf_counter() - ts, self.nranks*len(self.buffer)* len(str(self.buffer[self.counter-1][0][0])), self.nranks*len(self.buffer)*len(self.buffer[self.counter-1][0][1])]
+            return ["last_flush","" , ts_t, time.perf_counter(), time.perf_counter() - ts_t, self.nranks*len(self.buffer)* len(str(self.buffer[self.counter-1][0][0])), self.nranks*len(self.buffer)*len(self.buffer[self.counter-1][0][1])]
         return None
 
     def done_image(self, producer) -> int:
         msg_metadata = {"Type": "FIN" }
         # Send Fin message to workers
         for _ in range(self.nranks):
+            self.ts.record("PUSH_START topic=dist_sirt,data_size=1")
             producer.push(msg_metadata, bytearray(1))
+            self.ts.record("PUSH_END topic=dist_sirt")
+        self.ts.record("FLUSH_START topic=dist_sirt")
         producer.flush()
+        self.ts.record("FLUSH_END topic=dist_sirt")
         self.seq += 1
         return 0
 

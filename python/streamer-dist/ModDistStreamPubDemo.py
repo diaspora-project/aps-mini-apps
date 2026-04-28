@@ -203,6 +203,7 @@ def main():
             tot_MiBs/elapsed_time, total_received/elapsed_time))
 
   diaspora_dist.done_image(producer)
+  diaspora_dist.ts.write("dist.0.ts.txt")
   diaspora_producing_time.append(["total", 0, time0, time1, elapsed_time, tot_MiBs])
   fields = ["type", "projection_id", "start", "stop", "duration", "metadata_size" ,"data_size"]
   with open('Dist_push.csv', 'w') as f:
@@ -215,6 +216,7 @@ def main():
     write.writerow(fields)
     write.writerows(diaspora_consuming_time)
   del producer
+  consumer.unsubscribe()
   del consumer
   print("Exiting ...")
 

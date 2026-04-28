@@ -68,11 +68,15 @@ DRIVER_ARGS="--driver_type mofka --driver_config_file diaspora-mofka-driver-conf
 echo "Completed topic creations"
 
 echo "Launching DAQ"
-# Launch DAQ
-python ./build/python/streamer-daq/DAQStream.py --mode 1 --simulation_file \
-./data/tomo_00058_all_subsampled1p_s1079s1081.h5 --d_iteration 1  --batchsize 4 \
---publisher_addr tcp://0.0.0.0:50000 --iteration_sleep 1 --synch_addr tcp://0.0.0.0:50001 \
---synch_count 1 $DRIVER_ARGS 1>daq.out 2>daq.err &
+# Launch DAQ in "mode 1" (data coming from an HDF5 file)
+#python ./build/python/streamer-daq/DAQStream.py --mode 1 --simulation_file \
+#    ./data/tomo_00058_all_subsampled1p_s1079s1081.h5 --d_iteration 1  --batchsize 4 \
+#    --publisher_addr tcp://0.0.0.0:50000 --iteration_sleep 1 --synch_addr tcp://0.0.0.0:50001 \
+#    --synch_count 1 $DRIVER_ARGS 1>daq.out 2>daq.err &
+# Launchd DAQ in "mode 2" (syntetic data generation)
+python ./build/python/streamer-daq/DAQStream.py --mode 2 \
+    --num_sinograms 2 --num_sinogram_columns 2560 --num_sinogram_projections 16 \
+    --batchsize 4 $DRIVER_ARGS 1>daq.out 2>daq.err &
 DAQ_PID=$!
 echo "DAQ launched with PID $DAQ_PID"
 
@@ -108,13 +112,11 @@ NAME[$DAQ_PID]="DAQ"
 NAME[$DIST_PID]="DIST"
 NAME[$SIRT_PID]="SIRT"
 NAME[$DEN_PID]="DEN"
-NAME[$MOFKA_PID]="MOFKA"
 
 ERR[$DAQ_PID]="daq.err"
 ERR[$DIST_PID]="dist.err"
 ERR[$SIRT_PID]="sirt.err"
 ERR[$DEN_PID]="den.err"
-ERR[$MOFKA_PID]="mofka.err"
 
 PIDS=("$DAQ_PID" "$DIST_PID" "$SIRT_PID" "$DEN_PID" "$MOFKA_PID")
 
@@ -123,7 +125,7 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-running=("${PIDS[@]}")
+running=("$DAQ_PID" "$DIST_PID" "$SIRT_PID" "$DEN_PID")
 
 while ((${#running[@]})); do
     # Wait for any process to exit
@@ -151,4 +153,7 @@ while ((${#running[@]})); do
     fi
 done
 
-echo "Run completed successfuly"
+echo "All components finished, shutting down Mofka"
+bedrock-shutdown $PROTOCOL -f mofka.flock
+wait $MOFKA_PID || true
+echo "Run completed successfully"

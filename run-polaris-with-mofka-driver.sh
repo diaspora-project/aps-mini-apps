@@ -174,13 +174,11 @@ NAME[$DAQ_PID]="DAQ"
 NAME[$DIST_PID]="DIST"
 NAME[$SIRT_PID]="SIRT"
 NAME[$DEN_PID]="DEN"
-NAME[$MOFKA_PID]="MOFKA"
 
 ERR[$DAQ_PID]="daq.err"
 ERR[$DIST_PID]="dist.err"
 ERR[$SIRT_PID]="sirt.err"
 ERR[$DEN_PID]="den.err"
-ERR[$MOFKA_PID]="mofka.err"
 
 PIDS=("$DAQ_PID" "$DIST_PID" "$SIRT_PID" "$DEN_PID" "$MOFKA_PID")
 
@@ -189,7 +187,7 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-running=("${PIDS[@]}")
+running=("$DAQ_PID" "$DIST_PID" "$SIRT_PID" "$DEN_PID")
 
 while ((${#running[@]})); do
     # Wait for any process to exit
@@ -217,4 +215,7 @@ while ((${#running[@]})); do
     fi
 done
 
-echo "Run completed successfuly"
+echo "All components finished, shutting down Mofka"
+simple_mpiexec bedrock-shutdown cxi -f mofka.flock
+wait $MOFKA_PID || true
+echo "Run completed successfully"

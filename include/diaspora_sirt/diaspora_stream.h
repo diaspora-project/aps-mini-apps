@@ -8,6 +8,7 @@
 #include <spdlog/spdlog.h>
 #include <fmt/format.h>
 #include <time.h>
+#include <chrono>
 #include <string>
 #include <iostream>
 #include <fstream>
@@ -39,6 +40,9 @@ class DiasporaStream
     diaspora::Driver driver;
     std::vector<std::tuple<std::string, uint64_t, float>> producer_times; // type, size, duration
     std::vector<std::tuple<std::string, uint64_t, float>> consumer_times; // type, size, duration
+    std::vector<std::string> m_ts_entries;
+
+    static int64_t ts_now();
 
     diaspora::BatchSize   batchSize   = diaspora::BatchSize{batchsize};
     diaspora::ThreadCount threadCount = diaspora::ThreadCount{1};
@@ -161,6 +165,9 @@ class DiasporaStream
     void setProducerTimes(std::string op, uint64_t size, float time);
 
     int writeTimes(std::string type);
+
+    void recordTs(const std::string& entry);
+    void writeTs(int rank);
 
 };
 #endif // MOFKA_STREAM_H

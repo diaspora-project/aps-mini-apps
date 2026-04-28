@@ -1,4 +1,19 @@
 #include <diaspora_stream.h>
+#include <chrono>
+
+int64_t DiasporaStream::ts_now() {
+    return std::chrono::duration_cast<std::chrono::microseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+}
+
+void DiasporaStream::recordTs(const std::string& entry) {
+    m_ts_entries.push_back(fmt::format("{} {}", ts_now(), entry));
+}
+
+void DiasporaStream::writeTs(int rank) {
+    std::ofstream f("sirt." + std::to_string(rank) + ".ts.txt");
+    for(auto& e : m_ts_entries) f << e << "\n";
+}
 
 void DiasporaStream::addTomoMsg(diaspora::Event event){
   auto start_t = std::chrono::high_resolution_clock::now();
@@ -150,10 +165,12 @@ void DiasporaStream::publishImage(
   auto free_cb = [](diaspora::DataView::UserContext ctx) {
       delete[] static_cast<float*>(ctx);
   };
-  auto start = std::chrono::high_resolution_clock::now();
   auto data_m = diaspora::DataView(static_cast<void*>(copy), size * sizeof(float), copy, free_cb);
+  recordTs(fmt::format("PUSH_START topic=sirt_den,data_size={}", size * sizeof(float)));
+  auto start = std::chrono::high_resolution_clock::now();
   producer.push(metadata, data_m);
   auto end = std::chrono::high_resolution_clock::now();
+  recordTs("PUSH_END topic=sirt_den");
   std::chrono::duration<double> elapsed_push = end - start;
   producer_times.emplace_back("Push", size*sizeof(float), elapsed_push.count());
 }
@@ -219,6 +236,7 @@ DataRegionBase<float, TraceMetadata>* DiasporaStream::readSlidingWindow(
   for(int i=0; i<step; ++i) {
     // diaspora messages
     auto start = std::chrono::high_resolution_clock::now();
+    recordTs("PULL_WAIT_START topic=dist_sirt");
     std::optional<diaspora::Event> event;
     while(!event) {
         event = consumer.pull().wait(-1);
@@ -226,6 +244,10 @@ DataRegionBase<float, TraceMetadata>* DiasporaStream::readSlidingWindow(
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = end - start;
     setConsumerTimes("wait_t", 1, elapsed.count());
+    size_t ev_data_size = 0;
+    for(auto& seg : event->data().segments()) ev_data_size += seg.size;
+    recordTs(fmt::format("PULL_WAIT_END topic=dist_sirt,event_id={},data_size={}",
+        event->id(), ev_data_size));
     diaspora_events.push_back(event.value());
     //if endMsg break
     if (event->metadata().json()["Type"].get<std::string>() == "FIN") return nullptr;
