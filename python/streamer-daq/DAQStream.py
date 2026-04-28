@@ -11,7 +11,6 @@ import dxchange
 import tomopy as tp
 import signal
 import diaspora_stream.api as diaspora
-import csv
 import json
 from collections import deque
 from ts_collector import TimestampCollector
@@ -193,7 +192,6 @@ def simulate_daq(producer,
   nelems_per_subset = 16
   indices = ordered_subset(serialized_data.shape[0],
                               nelems_per_subset)
-  diaspora_t = []
   buffer = []
   i = 0
   futures = deque()
@@ -216,7 +214,6 @@ def simulate_daq(producer,
       print("Sending projection {}".format(index))
       time.sleep(prj_slp)
       # diaspora send
-      ts_push = time.perf_counter()
       buffer.append(serialized_data[index])
       md = {"index": int(index), "Type" : "DATA"}
       if ts is not None: ts.record(f"PUSH_START topic=daq_dist,data_size={len(buffer[i])}")
@@ -225,7 +222,6 @@ def simulate_daq(producer,
       #f.wait(timeout_ms=-1)
       # if seq % batchsize == 0:
       #   futures.append(f)
-      diaspora_t.append(["push", index, ts_push, time.perf_counter(), time.perf_counter() - ts_push, len(str(md)) , len(buffer[i])])
       tot_transfer_size+=len(buffer[i])
       seq+=1
       i+=1
@@ -244,27 +240,16 @@ def simulate_daq(producer,
     time.sleep(slp)
   #Last flush if buffer was not full
   if len(buffer)>0:
-    ts_flush = time.perf_counter()
     if ts is not None: ts.record("FLUSH_START topic=daq_dist")
     producer.flush()
     if ts is not None: ts.record("FLUSH_END topic=daq_dist")
-    # while not futures:
-    #   futures[0].wait(timeout_ms=-1)
-    #   futures.popleft()
-    diaspora_t.append(["flush_after", index, ts_flush, time.perf_counter(), time.perf_counter() - ts_flush,len(buffer)*len(str(md)), len(buffer[i-1])])
   time1 = time.time()
 
   elapsed_time = time1-time0
   tot_MiBs = (tot_transfer_size*1.)/2**20
   nproj = iteration*len(serialized_data)
-  diaspora_t.append(["total", 0, time0, time1, elapsed_time, tot_MiBs])
   print("Sent number of projections: {}; Total size (MiB): {:.2f}; Elapsed time (s): {:.2f}".format(nproj, tot_MiBs, elapsed_time))
   print("Rate (MiB/s): {:.2f}; (msg/s): {:.2f}".format(tot_MiBs/elapsed_time, nproj/elapsed_time))
-  fields = ["type", "index", "start", "stop", "duration", "metadata_size", "data_size"]
-  with open('Daq_push.csv', 'w') as f:
-    write = csv.writer(f)
-    write.writerow(fields)
-    write.writerows(diaspora_t)
   return seq
 
 bsignal=False

@@ -38,8 +38,6 @@ class DiasporaStream
     json info;
 
     diaspora::Driver driver;
-    std::vector<std::tuple<std::string, uint64_t, float>> producer_times; // type, size, duration
-    std::vector<std::tuple<std::string, uint64_t, float>> consumer_times; // type, size, duration
     std::vector<std::string> m_ts_entries;
 
     static int64_t ts_now();
@@ -155,16 +153,6 @@ class DiasporaStream
     void setInfo(json &j);
 
     void windowLength(uint32_t wlen);
-
-    const std::vector<std::tuple<std::string, uint64_t, float>>& getConsumerTimes();
-
-    void setConsumerTimes(std::string op, uint64_t size, float time);
-
-    std::vector<std::tuple<std::string, uint64_t, float>> getProducerTimes();
-
-    void setProducerTimes(std::string op, uint64_t size, float time);
-
-    int writeTimes(std::string type);
 
     void recordTs(const std::string& entry);
     void writeTs(int rank);

@@ -16,16 +16,8 @@ void DiasporaStream::writeTs(int rank) {
 }
 
 void DiasporaStream::addTomoMsg(diaspora::Event event){
-  auto start_t = std::chrono::high_resolution_clock::now();
   diaspora::Metadata metadata = event.metadata();
-  auto end_t = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double> elapsed = end_t - start_t;
-  setConsumerTimes("meta_t", /* metadata.string().size() */ 0, elapsed.count());
-  start_t = std::chrono::high_resolution_clock::now();
   diaspora::DataView data = event.data();
-  end_t = std::chrono::high_resolution_clock::now();
-  elapsed = end_t - start_t;
-  setConsumerTimes("data_t", data.segments()[0].size, elapsed.count());
   // event.acknowledge(); // acknowledge event
   vmeta.push_back(metadata.json()); /// Setup metadata
   vtheta.push_back(metadata.json()["theta"].get<float_t>());
@@ -167,12 +159,8 @@ void DiasporaStream::publishImage(
   };
   auto data_m = diaspora::DataView(static_cast<void*>(copy), size * sizeof(float), copy, free_cb);
   recordTs(fmt::format("PUSH_START topic=sirt_den,data_size={}", size * sizeof(float)));
-  auto start = std::chrono::high_resolution_clock::now();
   producer.push(metadata, data_m);
-  auto end = std::chrono::high_resolution_clock::now();
   recordTs("PUSH_END topic=sirt_den");
-  std::chrono::duration<double> elapsed_push = end - start;
-  producer_times.emplace_back("Push", size*sizeof(float), elapsed_push.count());
 }
 
 
@@ -235,15 +223,11 @@ DataRegionBase<float, TraceMetadata>* DiasporaStream::readSlidingWindow(
 
   for(int i=0; i<step; ++i) {
     // diaspora messages
-    auto start = std::chrono::high_resolution_clock::now();
     recordTs("PULL_WAIT_START topic=dist_sirt");
     std::optional<diaspora::Event> event;
     while(!event) {
         event = consumer.pull().wait(-1);
     }
-    auto end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> elapsed = end - start;
-    setConsumerTimes("wait_t", 1, elapsed.count());
     size_t ev_data_size = 0;
     for(auto& seg : event->data().segments()) ev_data_size += seg.size;
     recordTs(fmt::format("PULL_WAIT_END topic=dist_sirt,event_id={},data_size={}",
@@ -311,41 +295,3 @@ void DiasporaStream::setInfo(json &j) {info = j;}
 
 void DiasporaStream::windowLength(uint32_t wlen){ window_len = wlen;}
 
-const std::vector<std::tuple<std::string, uint64_t, float>>& DiasporaStream::getConsumerTimes(){return consumer_times;}
-
-void DiasporaStream::setConsumerTimes(std::string op, uint64_t size, float time){
-  consumer_times.emplace_back(op, size, time);
-}
-
-std::vector<std::tuple<std::string, uint64_t, float>> DiasporaStream::getProducerTimes(){return producer_times;}
-
-void DiasporaStream::setProducerTimes(std::string op, uint64_t size, float time){
-  producer_times.emplace_back(op, size, time);
-}
-
-int DiasporaStream::writeTimes(std::string type){
-  std::string filename = "Sirt_"+ type + "_rank_" + std::to_string(getRank()) + ".csv";
-  std::ofstream file(filename);
-  if (!file.is_open()) {
-      std::cerr << "Failed to open file for writing." << std::endl;
-      return -1;
-  }
-  std::vector<std::tuple<std::string, uint64_t, float>> data;
-  if (type == "producer"){
-    data = getProducerTimes() ;
-  } else if (type == "consumer") {
-    data = getConsumerTimes() ;
-  } else{
-    std::cerr << type <<" data does not exist, 'producer' and 'consumer' are the only supported types" << std::endl;
-    return -1;
-  }    std::cout << "Consumer size data " << data.size() << std::endl ;
-  file << "type,size,duration\n";
-  for (const auto& entry : data) {
-      file << std::get<0>(entry) << ","
-            << std::get<1>(entry) << ","
-            << std::get<2>(entry) << "\n";
-  }
-  file.close();
-  std::cout << "Producer stats successfully written to " << filename << std::endl ;
-  return 0;
-}

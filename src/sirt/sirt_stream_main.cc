@@ -290,18 +290,9 @@ int main(int argc, char **argv)
       //delete curr_slices->metadata(); //TODO Check for memory leak
       delete curr_slices;
   }
-  auto start = std::chrono::high_resolution_clock::now();
   ms.recordTs("FLUSH_START topic=sirt_den");
   producer.flush();
   ms.recordTs("FLUSH_END topic=sirt_den");
-  // auto futures = ms.getFutures();
-  // while(!futures.empty()) {
-  //   futures.front().wait();
-  //   futures.pop();
-  // }
-  auto end = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double> elapsed_t = end - start;
-  ms.setProducerTimes("Flush", 0, elapsed_t.count());
 
 
   // try {
@@ -316,8 +307,6 @@ int main(int argc, char **argv)
   //     std::cerr << "MOFKA EXCEPTION: " << ex.what() << std::endl;
   // }
 
-  ms.writeTimes("producer");
-  ms.writeTimes("consumer");
   MPI_Barrier(MPI_COMM_WORLD);
   json md = {{"Type", "FIN"}};
   // data part

@@ -10,7 +10,6 @@ import TraceSerializer
 import tomopy as tp
 import json
 from diaspora_dist import DiasporaDist
-import csv
 #from memory_profiler import profile
 
 def parse_arguments():
@@ -73,8 +72,6 @@ def main():
 
   consumer = diaspora_dist.consumer(topic_name="daq_dist", consumer_name="dist")
   producer = diaspora_dist.producer(topic_name="dist_sirt", producer_name="producer_dist")
-  diaspora_producing_time = []
-  diaspora_consuming_time = []
   # Setup serializer
   serializer = TraceSerializer.ImageSerializer()
 
@@ -91,11 +88,10 @@ def main():
   time0 = time.time()
   while True:
 
-    metadata, data, pull_times = diaspora_dist.pull_image(consumer)
+    metadata, data = diaspora_dist.pull_image(consumer)
     if metadata["Type"] == "FIN": break
     total_received += 1
     total_size += len(data)
-    diaspora_consuming_time.append(pull_times)
     # This is mostly for data rate tests
     if args.skip_serialize:
       print("Skipping rest. Received msg: {}".format(total_received))
@@ -155,13 +151,8 @@ def main():
       if args.nproc_sirt>2:
         diaspora_sub = np.tile(diaspora_sub, args.nproc_sirt//2) # I suppose that the args.nproc_sirt is always a multiple of 2
       ncols = sub.shape[2]
-      tt = diaspora_dist.push_image(diaspora_sub, args.num_sinograms, ncols, rotation,
-                                    read_image.UniqueId(), read_image.Center(), producer=producer)
-
-      if all(isinstance(item, list) for item in tt):
-        diaspora_producing_time.extend(tt)
-      else:
-        diaspora_producing_time.append(tt)
+      diaspora_dist.push_image(diaspora_sub, args.num_sinograms, ncols, rotation,
+                               read_image.UniqueId(), read_image.Center(), producer=producer)
 
     # If incoming data is white field
     if read_image.Itype() is serializer.ITypes.White:
@@ -190,9 +181,7 @@ def main():
       tot_dark_imgs += 1
     seq+=1
 
-  t = diaspora_dist.last_flush(producer)
-  if t is not None:
-    diaspora_producing_time.append(t)
+  diaspora_dist.last_flush(producer)
   time1 = time.time()
 
   # Profile information
@@ -204,17 +193,6 @@ def main():
 
   diaspora_dist.done_image(producer)
   diaspora_dist.ts.write("dist.0.ts.txt")
-  diaspora_producing_time.append(["total", 0, time0, time1, elapsed_time, tot_MiBs])
-  fields = ["type", "projection_id", "start", "stop", "duration", "metadata_size" ,"data_size"]
-  with open('Dist_push.csv', 'w') as f:
-    write = csv.writer(f)
-    write.writerow(fields)
-    write.writerows(diaspora_producing_time)
-  fields = ["t_wait", "t_metadata", "metadata_size" ,"t_data", "data_size"]
-  with open('Dist_pull.csv', 'w') as f:
-    write = csv.writer(f)
-    write.writerow(fields)
-    write.writerows(diaspora_consuming_time)
   del producer
   consumer.unsubscribe()
   del consumer
