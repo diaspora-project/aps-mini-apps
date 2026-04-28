@@ -83,24 +83,24 @@ echo "DAQ launched with PID $DAQ_PID"
 echo "Launching DIST"
 # Launch Dist
 python ./build/python/streamer-dist/ModDistStreamPubDemo.py  --cast_to_float32 \
---normalize --beg_sinogram 1000 --num_sinograms 2 --num_columns 2560  --batchsize 4 \
-$DRIVER_ARGS 1>dist.out 2>dist.err &
+    --normalize --beg_sinogram 1000 --num_sinograms 2 --num_columns 2560  --batchsize 4 \
+    $DRIVER_ARGS 1>dist.out 2>dist.err &
 DIST_PID=$!
 echo "DIST launched with PID $DIST_PID"
 
 echo "Launching SIRT"
 # Launch SIRT
 mpiexec -n $SIRT_RANKS ./build/bin/sirt_stream --write-freq 4  \
---window-iter 1 --window-step 4 --window-length 4 -t 4 -c 1427 \
-$DRIVER_ARGS --batchsize 4 1>sirt.out 2>sirt.err &
+    --window-iter 1 --window-step 4 --window-length 4 -t 4 -c 1427 \
+    $DRIVER_ARGS --batchsize 4 1>sirt.out 2>sirt.err &
 SIRT_PID=$!
 echo "SIRT launched with PID $SIRT_PID"
 
 echo "Launching DEN"
 # Launch DEN
 python ./build/python/streamer-denoiser/denoiser.py \
---model ./build/python/streamer-denoiser/testA40GPU-it07500.h5 \
-$DRIVER_ARGS --batchsize 4 --nproc_sirt 2 1>den.out 2>den.err &
+    --model ./build/python/streamer-denoiser/testA40GPU-it07500.h5 \
+    $DRIVER_ARGS --batchsize 4 --nproc_sirt 2 1>den.out 2>den.err &
 DEN_PID=$!
 echo "DEN launched with PID $DEN_PID"
 
