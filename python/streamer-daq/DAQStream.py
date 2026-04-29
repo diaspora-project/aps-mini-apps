@@ -415,9 +415,14 @@ def main():
   topic = driver.open_topic(topic_name)
   producer_name = "daq_producer"
   batchsize = args.batchsize #diaspora.AdaptiveBatchSize
-  thread_pool = driver.make_thread_pool(1)
   ordering = diaspora.Ordering.Strict
-  producer = topic.producer(producer_name, batch_size=batchsize, thread_pool=thread_pool, ordering=ordering)
+  thread_pool = None
+  if args.driver_type != 'files':
+      thread_pool = driver.make_thread_pool(1)
+  producer_kwargs = dict(batch_size=batchsize, ordering=ordering)
+  if thread_pool is not None:
+      producer_kwargs['thread_pool'] = thread_pool
+  producer = topic.producer(producer_name, **producer_kwargs)
 
   ts = TimestampCollector()
   time0 = time.time()

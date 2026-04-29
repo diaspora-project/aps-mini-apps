@@ -78,6 +78,7 @@ class DiasporaDist:
                 "root_path": "./diaspora-data"
             }
         self.driver = diaspora.Driver(backend=driver_type, options=driver_options)
+        self.driver_type = driver_type
         self.seq = 0
         self.nranks = 1
         self.buffer = []
@@ -88,23 +89,20 @@ class DiasporaDist:
 
     def producer(self, topic_name: str, producer_name: str) -> diaspora.Producer:
         topic = self.driver.open_topic(topic_name)
-        batchsize = self.batch #self.batch #diaspora.AdaptiveBatchSize
-        thread_pool = self.driver.make_thread_pool(1)
+        batchsize = self.batch
         ordering = diaspora.Ordering.Strict
-        producer = topic.producer(producer_name,
-                                  batch_size=batchsize,
-                                  thread_pool=thread_pool,
-                                  ordering=ordering)
-        return producer
+        kwargs = dict(batch_size=batchsize, ordering=ordering)
+        if self.driver_type != 'files':
+            kwargs['thread_pool'] = self.driver.make_thread_pool(1)
+        return topic.producer(producer_name, **kwargs)
 
     def consumer(self, topic_name: str, consumer_name: str) -> diaspora.Consumer:
-        batch_size = self.batch #diaspora.AdaptiveBatchSize
-        thread_pool = self.driver.make_thread_pool(0)
+        batch_size = self.batch
         topic = self.driver.open_topic(topic_name)
-        consumer = topic.consumer(name=consumer_name,
-                                  thread_pool=thread_pool,
-                                  batch_size=batch_size)
-        return consumer
+        kwargs = dict(name=consumer_name, batch_size=batch_size)
+        if self.driver_type != 'files':
+            kwargs['thread_pool'] = self.driver.make_thread_pool(0)
+        return topic.consumer(**kwargs)
 
 
     def handshake(self, nproc_sirt: int,  row: int, col: int) -> str :
@@ -112,9 +110,10 @@ class DiasporaDist:
         if nproc_sirt == 0:
             topic_name = "handshake_s_d"
             topic = self.driver.open_topic(topic_name)
-            consumer = topic.consumer(name="handshaker",
-                                      thread_pool=self.driver.make_thread_pool(0),
-                                      batch_size=self.batch)
+            hs_kwargs = dict(name="handshaker", batch_size=self.batch)
+            if self.driver_type != 'files':
+                hs_kwargs['thread_pool'] = self.driver.make_thread_pool(0)
+            consumer = topic.consumer(**hs_kwargs)
             event = None
             while event is None:
                 event = consumer.pull().wait(timeout_ms=-1)

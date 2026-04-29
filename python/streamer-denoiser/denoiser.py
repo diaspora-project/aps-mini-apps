@@ -90,14 +90,15 @@ def main(input_path, model_path, driver_type, driver_config_file, batchsize, npr
         }
     driver = diaspora.Driver(backend=driver_type, options=driver_options)
     batch_size = batchsize # AdaptiveBatchSize
-    thread_pool = driver.make_thread_pool(0)
+    thread_pool = driver.make_thread_pool(0) if driver_type != 'files' else None
     # create a topic
     topic_name = "sirt_den"
     topic = driver.open_topic(topic_name)
     consumer_name = "denoiser"
-    consumer = topic.consumer(name=consumer_name,
-                              thread_pool=thread_pool,
-                              batch_size=batch_size)
+    consumer_kwargs = dict(name=consumer_name, batch_size=batch_size)
+    if thread_pool is not None:
+        consumer_kwargs['thread_pool'] = thread_pool
+    consumer = topic.consumer(**consumer_kwargs)
     more_data = True
     ts_collector = TimestampCollector()
     time0 = time.perf_counter()

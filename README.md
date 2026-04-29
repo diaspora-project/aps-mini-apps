@@ -19,51 +19,47 @@ Here are the steps to use spack to install the environment:
 7. Add diaspora spack packages to the env `spack repo add diaspora-spack-packages/spack_repo/diaspora`
 8. Concretize and install `spack concretize -f && spack install`
 
-There are 4 main componenets:
-1. streamer-daq: In order to setup the python script, follow the below steps (again from project root directory):
-```
-mkdir build/python/streamer-daq
-cd build/python/streamer-daq
-cp ../../../python/streamer-daq/DAQStream.py ./
-```
-This will let you execute the DAQStream.py script, which is the main streamer-daq process. You can check a sample usage of this script in the file ``` [Trace]$ cat tests/daq.cmd.log ```.
+### Build
 
-2. streamer-dist: In order to setup the python script, follow the below steps (again from project root directory):
-```
-mkdir -p build/python/streamer-dist
-cd build/python/streamer-dist
-cp ../../../python/streamer-dist/ModDistStreamPubDemo.py .
-cp ../../../python/streamer-dist/diaspora_dist.py .
-cp -r ../../../python/common ../
-```
-This will let you execute the ModDistStreamPubDemo.py script, which is the main streamer-dist process. You can check a sample usage of this script in the file ``` [Trace]$ cat tests/dist.cmd.log ```.
+Generate the C++ FlatBuffers header, then build all components (C++ binary + Python scripts):
 
-3. sirt_stream: In order to generate this executable,:
-Setup flatbuffers data structures
-```
+```bash
 cd include/tracelib
 flatc -c trace_prot.fbs
-```
-Run the following commands in project root directory
-```
-mkdir build
-cd build
+cd ../..
+
+mkdir build && cd build
 cmake ..
 make
 ```
 
-4. streamer-den: In order to setup the python script, follow the below steps (again from project root directory):
-```
-mkdir build/python/streamer-denoiser
-cd build/python/streamer-denoiser
-cp ../../../python/streamer-denoiser/* ./
-```
+`cmake ..` copies all Python scripts into the build tree automatically:
+
+| Destination | Source |
+|---|---|
+| `build/python/streamer-daq/DAQStream.py` | `python/streamer-daq/DAQStream.py` |
+| `build/python/streamer-dist/ModDistStreamPubDemo.py` | `python/streamer-dist/ModDistStreamPubDemo.py` |
+| `build/python/streamer-dist/diaspora_dist.py` | `python/streamer-dist/diaspora_dist.py` |
+| `build/python/streamer-denoiser/denoiser.py` | `python/streamer-denoiser/denoiser.py` |
+| `build/python/common/` | `python/common/` |
+
+`make` produces the `build/bin/sirt_stream` executable.
 
 ### Run the workflow
 
 Locally, you can run the workflow using `run-local-with-mofka-driver.sh`.
 This will deploy Mofka locally, using in-memory partitions, then deploy and run all the components.
 If all runs well, you should start seeing HDF5 files being generated.
+
+### Run with Docker
+
+All four components can be run in Docker containers using the provided `docker-compose.yaml`:
+
+```bash
+docker compose build
+docker compose up --abort-on-container-exit
+docker compose down -v   # clean up the shared data volume
+```
 
 ### Instructions to Run the miniapp in Polaris:
 

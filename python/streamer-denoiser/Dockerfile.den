@@ -1,5 +1,5 @@
-# Standalone Dockerfile for the DIST component.
-# Build from the project root: docker build --target dist -f python/streamer-dist/Dockerfile.dist .
+# Standalone Dockerfile for the DEN (denoiser) component.
+# Build from the project root: docker build --target den -f python/streamer-denoiser/Dockerfile.den .
 #
 # For docker-compose use, prefer the root Dockerfile (which shares cached layers
 # across all components via multi-stage builds).
@@ -11,8 +11,6 @@ RUN apt-get update --fix-missing && apt-get install -y \
     cmake \
     git \
     wget \
-    libzmq3-dev \
-    swig \
     apt-utils \
     net-tools \
     iproute2 \
@@ -22,7 +20,7 @@ RUN apt-get update --fix-missing && apt-get install -y \
 # flatbuffers is installed via pip, not conda.  The defaults-channel conda
 # package only installs the C++ library; the Python bindings (needed by
 # TraceSerializer.py) are only available on PyPI.
-RUN conda install -y python=3.12 numpy scipy matplotlib pip \
+RUN conda install -y python=3.12 numpy scipy matplotlib pip h5py \
  && pip install flatbuffers \
  && conda clean -afy
 
@@ -55,16 +53,19 @@ COPY . /aps-mini-apps
 WORKDIR /aps-mini-apps
 RUN flatc -c include/tracelib/trace_prot.fbs
 
+# Run cmake configure only (no make): this triggers the file(COPY) calls in
+# CMakeLists.txt that place all Python scripts into build/python/.
 FROM base AS builder
 RUN mkdir -p /aps-mini-apps/build
 WORKDIR /aps-mini-apps/build
 RUN cmake -DCMAKE_PREFIX_PATH=/opt/conda \
           -DCMAKE_CXX_FLAGS="-DSPDLOG_FMT_EXTERNAL" \
-          .. \
- && make -j$(nproc)
+          ..
 
-FROM builder AS dist
-RUN conda install -y -c conda-forge tomopy dxchange \
- && conda clean -afy
+# DEN needs only the Python tree produced by cmake, not the compiled binary.
+# denoiser.py appends '../common' relative to __file__, so common/ must be at
+# build/python/common/ (one level above streamer-denoiser/).
+FROM base AS den
+COPY --from=builder /aps-mini-apps/build/python /aps-mini-apps/build/python
 
-WORKDIR /aps-mini-apps/build/python/streamer-dist
+WORKDIR /aps-mini-apps/build/python/streamer-denoiser

@@ -1,42 +1,116 @@
-version: '3'
+version: '3.8'
+
+# All containers share this volume as the files-driver message bus.
+volumes:
+  diaspora-data:
+
 services:
-    streamer-daq:
-        build:
-            context: ./python/streamer-daq
-            dockerfile: Dockerfile.daq
-            target: daq
-        ports:
-            - "50000-50001:50000-50001"
-        command: python /aps-mini-apps/build/python/streamer-daq/DAQStream.py --mode 1 --simulation_file /aps-mini-apps/data/tomo_00058_all_subsampled1p_s1079s1081.h5 --d_iteration 1 --publisher_addr tcp://*:50000 --iteration_sleep 1 --synch_addr tcp://*:50001 --synch_count 1
-    
-    streamer-dist:
-        depends_on:
-            - streamer-daq
-        build:
-            context: ./python/streamer-dist
-            dockerfile: Dockerfile.dist
-            target: dist
-        ports:
-            - 50010:50010
-        command: python /aps-mini-apps/build/python/streamer-dist/ModDistStreamPubDemo.py --data_source_addr tcp://host.docker.internal:50000 --data_source_synch_addr tcp://host.docker.internal:50001 --cast_to_float32 --normalize --my_distributor_addr tcp://*:50010 --beg_sinogram 1000 --num_sinograms 2 --num_columns 2560
 
-    streamer-quality:
-        build:
-            context: ./python/quality
-            dockerfile: Dockerfile.quality
-        #volumes:
-        #    - /Users/tbicer/Projects/data/output:/mnt/output
-        #command: python /aps-mini-apps/build/python/quality/iqcheck.py ${INPUT0} ${INPUT1}
+  # Creates all Diaspora topics before any component starts.
+  # Uses the sirt image because it already has diaspora-ctl installed.
+  setup:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: sirt
+    volumes:
+      - diaspora-data:/diaspora-data
+    # Use the YAML list form so the entire script is a single string argument
+    # passed to /bin/bash -c.  The string form (command: |...) causes compose
+    # to split on whitespace, making bash receive only "set" as its script.
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -e
+        echo '{"root_path":"/diaspora-data"}' > /diaspora-data/config.json
+        ARGS="--driver files --driver.root_path /diaspora-data"
+        diaspora-ctl topic create --name daq_dist      $$ARGS --topic.num_partitions 1
+        diaspora-ctl topic create --name dist_sirt     $$ARGS --topic.num_partitions 2
+        diaspora-ctl topic create --name handshake_s_d $$ARGS --topic.num_partitions 1
+        diaspora-ctl topic create --name handshake_d_s $$ARGS --topic.num_partitions 2
+        diaspora-ctl topic create --name sirt_den      $$ARGS --topic.num_partitions 2
+    restart: "no"
 
-    streamer-sirt:
-        depends_on:
-            - streamer-dist
-        build:
-            context: ./src/sirt
-            dockerfile: Dockerfile.sirt
-            target: sirt
-        #volumes:
-        #    - /Users/tbicer/Projects/data/output:/mnt/output
-        ports:
-            - 52000:52000
-        command: /aps-mini-apps/build/bin/sirt_stream --write-freq 4 --dest-host host.docker.internal --dest-port 50010 --window-iter 1 --window-step 4 --window-length 4 -t 2 -c 1427 --pub-addr tcp://*:52000 #--recon-output-dir /mnt/output
+  daq:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: daq
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+    volumes:
+      - diaspora-data:/diaspora-data
+    command: >
+      python DAQStream.py --mode 2
+        --num_sinograms 2
+        --num_sinogram_columns 2560
+        --num_sinogram_projections 16
+        --batchsize 4
+        --driver_type files
+        --driver_config_file /diaspora-data/config.json
+
+  dist:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: dist
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+    volumes:
+      - diaspora-data:/diaspora-data
+    command: >
+      python ModDistStreamPubDemo.py
+        --cast_to_float32
+        --normalize
+        --beg_sinogram 1000
+        --num_sinograms 2
+        --num_columns 2560
+        --batchsize 4
+        --driver_type files
+        --driver_config_file /diaspora-data/config.json
+
+  sirt:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: sirt
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+    volumes:
+      - diaspora-data:/diaspora-data
+    # All MPI ranks run as local processes inside this single container.
+    # SIRT_RANKS=2 must match the partition counts for dist_sirt, handshake_d_s, sirt_den.
+    command: >
+      mpiexec -n 2 /aps-mini-apps/build/bin/sirt_stream
+        --write-freq 4
+        --window-iter 1
+        --window-step 4
+        --window-length 4
+        -t 4
+        -c 1427
+        --batchsize 4
+        --driver_type files
+        --driver_config_file /diaspora-data/config.json
+
+  den:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: den
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+    volumes:
+      - diaspora-data:/diaspora-data
+    # --model is required by argparse but model loading is commented out in denoiser.py.
+    # --nproc_sirt must match the number of MPI ranks used by the sirt service above.
+    command: >
+      python denoiser.py
+        --model /dev/null
+        --batchsize 4
+        --nproc_sirt 2
+        --driver_type files
+        --driver_config_file /diaspora-data/config.json
