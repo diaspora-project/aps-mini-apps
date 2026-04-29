@@ -120,8 +120,8 @@ void DiasporaStream::handshake(int rank, int size){
 
   json md = {{"comm_size", size}};
   diaspora::Metadata metadata{md};
-  auto future = hs_producer.push(metadata);
-  future.wait(-1);
+  hs_producer.push(metadata);
+  hs_producer.flush().wait(-1);  // ensure comm_size is on disk before waiting for DIST's reply
 
   // Receive metadata info
   topic_name = "handshake_d_s";
@@ -149,7 +149,8 @@ void DiasporaStream::publishImage(
   json &meta,
   float *data,
   size_t size,
-  diaspora::Producer producer){
+  diaspora::Producer producer,
+  std::optional<size_t> partition){
 
   diaspora::Metadata metadata{meta};
   float* copy = new float[size];
@@ -159,7 +160,7 @@ void DiasporaStream::publishImage(
   };
   auto data_m = diaspora::DataView(static_cast<void*>(copy), size * sizeof(float), copy, free_cb);
   recordTs(fmt::format("PUSH_START topic=sirt_den,data_size={}", size * sizeof(float)));
-  producer.push(metadata, data_m);
+  producer.push(metadata, data_m, partition);
   recordTs("PUSH_END topic=sirt_den");
 }
 

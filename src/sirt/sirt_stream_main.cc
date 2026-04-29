@@ -276,7 +276,8 @@ int main(int argc, char **argv)
                       {"app_dims", app_dims},
                       {"recon_slice_data_index", recon_slice_data_index}};
 
-          ms.publishImage(md, &recon[recon_slice_data_index], data_size, producer);
+          ms.publishImage(md, &recon[recon_slice_data_index], data_size, producer,
+                          static_cast<size_t>(comm->rank()));
 
         } catch(const diaspora::Exception& ex) {
           spdlog::critical("{}", ex.what());
@@ -291,7 +292,7 @@ int main(int argc, char **argv)
       delete curr_slices;
   }
   ms.recordTs("FLUSH_START topic=sirt_den");
-  producer.flush();
+  producer.flush().wait(-1);
   ms.recordTs("FLUSH_END topic=sirt_den");
 
 
@@ -312,12 +313,12 @@ int main(int argc, char **argv)
   // data part
   float d = 1;
   ms.recordTs(fmt::format("PUSH_START topic=sirt_den,data_size={}", sizeof(float)));
-  auto future = producer.push(diaspora::Metadata{md}, diaspora::DataView{&d,sizeof(float)});
+  producer.push(diaspora::Metadata{md}, diaspora::DataView{&d,sizeof(float)},
+                static_cast<size_t>(comm->rank()));
   ms.recordTs("PUSH_END topic=sirt_den");
-  ms.recordTs("PUSH_WAIT_START topic=sirt_den");
-  auto eid = future.wait(-1);
-  ms.recordTs(fmt::format("PUSH_WAIT_END topic=sirt_den,event_id={}",
-      eid.has_value() ? std::to_string(static_cast<uint64_t>(*eid)) : std::string("N/A")));
+  ms.recordTs("FLUSH_WAIT_START topic=sirt_den");
+  producer.flush().wait(-1);
+  ms.recordTs("FLUSH_WAIT_END topic=sirt_den");
 
   /**************************/
   #ifdef TIMERON

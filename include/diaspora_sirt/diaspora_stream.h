@@ -14,6 +14,7 @@
 #include <fstream>
 #include <vector>
 #include <utility>
+#include <optional>
 #include <nlohmann/json.hpp>
 #include "trace_data.h"
 #include <diaspora_stream.h>
@@ -106,7 +107,8 @@ class DiasporaStream
       json &metadata,
       float *data,
       size_t size,
-      diaspora::Producer producer);
+      diaspora::Producer producer,
+      std::optional<size_t> partition = std::nullopt);
 
 
     /* Create and return a diaspora producer

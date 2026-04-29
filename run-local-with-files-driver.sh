@@ -15,8 +15,8 @@ diaspora-ctl topic create --name daq_dist $DIASPORA_CTL_DRIVER_ARGS --topic.num_
 diaspora-ctl topic create --name dist_sirt $DIASPORA_CTL_DRIVER_ARGS --topic.num_partitions $SIRT_RANKS
 diaspora-ctl topic create --name handshake_s_d $DIASPORA_CTL_DRIVER_ARGS --topic.num_partitions 1
 diaspora-ctl topic create --name handshake_d_s $DIASPORA_CTL_DRIVER_ARGS --topic.num_partitions $SIRT_RANKS
-# SIRT -> DEN topic
-diaspora-ctl topic create --name sirt_den $DIASPORA_CTL_DRIVER_ARGS --topic.num_partitions 1
+# SIRT -> DEN topic (one partition per SIRT rank to avoid concurrent write conflicts)
+diaspora-ctl topic create --name sirt_den $DIASPORA_CTL_DRIVER_ARGS --topic.num_partitions $SIRT_RANKS
 
 echo '{"root_path":"./aps-miniapp-data"}' > diaspora-files-driver-config.json
 DRIVER_ARGS="--driver_type files --driver_config_file diaspora-files-driver-config.json"

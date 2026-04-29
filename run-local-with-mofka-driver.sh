@@ -59,8 +59,8 @@ diaspora-ctl topic create --name daq_dist $DIASPORA_CTL_DRIVER_ARGS --topic.part
 diaspora-ctl topic create --name dist_sirt $DIASPORA_CTL_DRIVER_ARGS --topic.partitions $SIRT_RANKS
 diaspora-ctl topic create --name handshake_s_d $DIASPORA_CTL_DRIVER_ARGS --topic.partitions 1
 diaspora-ctl topic create --name handshake_d_s $DIASPORA_CTL_DRIVER_ARGS --topic.partitions $SIRT_RANKS
-# SIRT -> DEN topic
-diaspora-ctl topic create --name sirt_den $DIASPORA_CTL_DRIVER_ARGS --topic.partitions 1
+# SIRT -> DEN topic (one partition per SIRT rank to avoid concurrent write conflicts)
+diaspora-ctl topic create --name sirt_den $DIASPORA_CTL_DRIVER_ARGS --topic.partitions $SIRT_RANKS
 
 echo '{"group_file":"./mofka.flock"}' > diaspora-mofka-driver-config.json
 DRIVER_ARGS="--driver_type mofka --driver_config_file diaspora-mofka-driver-config.json"
