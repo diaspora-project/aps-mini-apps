@@ -6,7 +6,8 @@
 spack:
   # add package specs to the `specs` list
   specs:
-  - mofka@0.8.2+python
+  - mofka@0.8.3+python
+  - diaspora-stream-api@0.5.4
   - py-mochi-margo
   - mercury@master # TODO replace witgh 2.4.2 or greater once released
   - py-numpy
@@ -31,6 +32,13 @@ spack:
       lib: [LD_LIBRARY_PATH]
       lib64: [LD_LIBRARY_PATH]
   packages:
+    mofka:
+      require:
+      - "@0.8.3:"
+      - "+python"
+    diaspora-stream-api:
+      require:
+      - "@0.5.4:"
     gcc:
       externals:
       - spec: gcc@14.2.0 languages:='c,c++,fortran'
