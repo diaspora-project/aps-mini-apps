@@ -21,17 +21,16 @@ Here are the steps to use spack to install the environment:
 
 ### Build
 
-Generate the C++ FlatBuffers header, then build all components (C++ binary + Python scripts):
+Build all components (C++ binary + Python scripts):
 
 ```bash
-cd include/tracelib
-flatc -c trace_prot.fbs
-cd ../..
-
 mkdir build && cd build
 cmake ..
 make
 ```
+
+CMake invokes `flatc` automatically to regenerate `include/tracelib/trace_prot_generated.h`
+from `trace_prot.fbs` when needed.
 
 `cmake ..` copies all Python scripts into the build tree automatically:
 

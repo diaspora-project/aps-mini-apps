@@ -194,3 +194,6 @@ python/streamer-dist/.devcontainer/devcontainer.json
 python/streamer-dist/.github/dependabot.yml
 src/sirt/.devcontainer/devcontainer.json
 src/sirt/.github/dependabot.yml
+
+# Generated FlatBuffers header (built by CMake from trace_prot.fbs)
+include/tracelib/trace_prot_generated.h

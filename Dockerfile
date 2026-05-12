@@ -62,9 +62,6 @@ RUN git clone --depth 1 https://github.com/google/flatbuffers.git /tmp/flatbuffe
 COPY . /aps-mini-apps
 WORKDIR /aps-mini-apps
 
-# Generate the C++ FlatBuffers header from the schema.
-RUN flatc -c include/tracelib/trace_prot.fbs
-
 # ─── Builder ─────────────────────────────────────────────────────────────────
 # Compiles the SIRT C++ binary.  CMAKE_PREFIX_PATH points cmake at the conda
 # prefix so it finds diaspora-stream-api and fmt installed by the mochi channel.

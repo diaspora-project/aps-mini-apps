@@ -24,6 +24,27 @@ add_definitions(-DTIMERON)
 find_package(Flatbuffers REQUIRED)
 include_directories(${FLATBUFFERS_INCLUDE_DIR})
 
+# Generate the C++ FlatBuffers header from the schema at build time.
+if(TARGET flatbuffers::flatc)
+    set(FLATC_COMMAND $<TARGET_FILE:flatbuffers::flatc>)
+    set(FLATC_DEP flatbuffers::flatc)
+else()
+    find_program(FLATC_EXECUTABLE flatc REQUIRED)
+    set(FLATC_COMMAND ${FLATC_EXECUTABLE})
+    set(FLATC_DEP ${FLATC_EXECUTABLE})
+endif()
+set(FBS_SCHEMA  ${Trace_SOURCE_DIR}/include/tracelib/trace_prot.fbs)
+set(FBS_HEADER  ${Trace_SOURCE_DIR}/include/tracelib/trace_prot_generated.h)
+set(FBS_OUT_DIR ${Trace_SOURCE_DIR}/include/tracelib)
+add_custom_command(
+    OUTPUT  ${FBS_HEADER}
+    COMMAND ${FLATC_COMMAND} -c -o ${FBS_OUT_DIR} ${FBS_SCHEMA}
+    DEPENDS ${FBS_SCHEMA} ${FLATC_DEP}
+    COMMENT "Generating FlatBuffers header trace_prot_generated.h"
+    VERBATIM
+)
+add_custom_target(trace_prot_header DEPENDS ${FBS_HEADER})
+
 find_package(MPI REQUIRED)
 include_directories(${MPI_INCLUDE_PATH})
 
@@ -58,4 +79,9 @@ add_library(sirt ${CMAKE_CURRENT_LIST_DIR}/sirt.cc)
 
 add_executable(sirt_stream sirt_stream_main.cc)
 target_link_libraries(sirt_stream diaspora_stream sirt trace_utils trace_h5io MPI::MPI_CXX hdf5::hdf5 Threads::Threads diaspora-stream-api fmt::fmt-header-only)
+
+add_dependencies(trace_h5io      trace_prot_header)
+add_dependencies(diaspora_stream trace_prot_header)
+add_dependencies(sirt            trace_prot_header)
+add_dependencies(sirt_stream     trace_prot_header)
 #target_include_directories(sirt_stream PRIVATE ${HDF5_INCLUDE_DIRS})
