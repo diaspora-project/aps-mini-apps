@@ -1,18 +1,44 @@
 version: '3.8'
 
-# All containers share this volume as the files-driver message bus.
+# Shared build config snippets (referenced via YAML anchors below).
+x-build-sirt: &build-sirt
+  build:
+    context: .
+    dockerfile: Dockerfile
+    target: sirt
+
+x-build-daq: &build-daq
+  build:
+    context: .
+    dockerfile: Dockerfile
+    target: daq
+
+x-build-dist: &build-dist
+  build:
+    context: .
+    dockerfile: Dockerfile
+    target: dist
+
+x-build-den: &build-den
+  build:
+    context: .
+    dockerfile: Dockerfile
+    target: den
+
 volumes:
+  # Shared message bus for the files driver.
   diaspora-data:
+  # Shared storage for the Mofka flock file and driver config.
+  mofka-data:
 
 services:
 
+  # ─── files driver (--profile files) ────────────────────────────────────────
+
   # Creates all Diaspora topics before any component starts.
-  # Uses the sirt image because it already has diaspora-ctl installed.
   setup:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: sirt
+    profiles: [files]
+    <<: *build-sirt
     volumes:
       - diaspora-data:/diaspora-data
     # Use the YAML list form so the entire script is a single string argument
@@ -32,10 +58,8 @@ services:
     restart: "no"
 
   daq:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: daq
+    profiles: [files]
+    <<: *build-daq
     depends_on:
       setup:
         condition: service_completed_successfully
@@ -51,10 +75,8 @@ services:
         --driver_config_file /diaspora-data/config.json
 
   dist:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: dist
+    profiles: [files]
+    <<: *build-dist
     depends_on:
       setup:
         condition: service_completed_successfully
@@ -72,10 +94,8 @@ services:
         --driver_config_file /diaspora-data/config.json
 
   sirt:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: sirt
+    profiles: [files]
+    <<: *build-sirt
     depends_on:
       setup:
         condition: service_completed_successfully
@@ -96,10 +116,8 @@ services:
         --driver_config_file /diaspora-data/config.json
 
   den:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: den
+    profiles: [files]
+    <<: *build-den
     depends_on:
       setup:
         condition: service_completed_successfully
@@ -114,3 +132,156 @@ services:
         --nproc_sirt 2
         --driver_type files
         --driver_config_file /diaspora-data/config.json
+
+  # ─── Mofka driver (--profile mofka) ────────────────────────────────────────
+
+  # Runs the Bedrock server, creates all Diaspora topics, then stays alive as the
+  # Mofka server for the duration of the pipeline run.  Merging setup into this
+  # service avoids the early-exit problem: a separate setup service exiting 0
+  # triggers --abort-on-container-exit before pipeline services can connect.
+  #
+  # Readiness signal: writes /mofka-data/.topics-ready after all topics are
+  # created.  The healthcheck tests for this file so pipeline services don't
+  # start until both Bedrock and topics are fully initialised.
+  #
+  # Shutdown: when the pipeline completes, --abort-on-container-exit sends
+  # SIGTERM to this container.  The trap forwards SIGTERM to the bedrock
+  # process so it shuts down gracefully.
+  mofka:
+    profiles: [mofka]
+    <<: *build-sirt
+    volumes:
+      - mofka-data:/mofka-data
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -e
+        rm -f /mofka-data/mofka.flock /mofka-data/.topics-ready
+        # libyokan-server.so.0 has hard undefined references to lmdb and leveldb
+        # symbols that it expects from the global symbol table.  Bedrock's dlopen
+        # for the yokan module uses RTLD_LOCAL, so those symbols are invisible
+        # unless the libraries are pre-loaded globally first.
+        export LD_PRELOAD="/opt/conda/lib/liblmdb.so /opt/conda/lib/libleveldb.so"
+        cat > /mofka-data/mofka.json <<'MOFKA_EOF'
+        {
+          "libraries": [
+            "libflock-bedrock-module.so",
+            "libyokan-bedrock-module.so",
+            "libwarabi-bedrock-module.so",
+            "libmofka-bedrock-module.so"
+          ],
+          "providers": [
+            {
+              "name": "group_manager",
+              "type": "flock",
+              "provider_id": 1,
+              "config": {
+                "bootstrap": "self",
+                "file": "/mofka-data/mofka.flock",
+                "group": { "type": "static" }
+              }
+            },
+            {
+              "name": "master",
+              "provider_id": 2,
+              "type": "yokan",
+              "tags": ["mofka:master"],
+              "config": { "database": { "type": "map" } }
+            }
+          ]
+        }
+        MOFKA_EOF
+        bedrock tcp -c /mofka-data/mofka.json &
+        BEDROCK_PID=$!
+        cleanup() { kill $$BEDROCK_PID 2>/dev/null; wait $$BEDROCK_PID 2>/dev/null; }
+        trap cleanup SIGTERM SIGINT
+        until [ -f /mofka-data/mofka.flock ]; do sleep 0.5; done
+        echo '{"group_file":"/mofka-data/mofka.flock"}' > /mofka-data/driver-config.json
+        ARGS="--driver mofka --driver.group_file /mofka-data/mofka.flock"
+        diaspora-ctl topic create --name daq_dist      $$ARGS --topic.partitions 1
+        diaspora-ctl topic create --name dist_sirt     $$ARGS --topic.partitions 2
+        diaspora-ctl topic create --name handshake_s_d $$ARGS --topic.partitions 1
+        diaspora-ctl topic create --name handshake_d_s $$ARGS --topic.partitions 2
+        diaspora-ctl topic create --name sirt_den      $$ARGS --topic.partitions 2
+        touch /mofka-data/.topics-ready
+        wait $$BEDROCK_PID
+    healthcheck:
+      test: ["CMD", "test", "-f", "/mofka-data/.topics-ready"]
+      interval: 1s
+      timeout: 5s
+      retries: 60
+      start_period: 2s
+
+  daq-mofka:
+    profiles: [mofka]
+    <<: *build-daq
+    depends_on:
+      mofka:
+        condition: service_healthy
+    volumes:
+      - mofka-data:/mofka-data
+    command: >
+      python DAQStream.py --mode 2
+        --num_sinograms 2
+        --num_sinogram_columns 2560
+        --num_sinogram_projections 16
+        --batchsize 4
+        --driver_type mofka
+        --driver_config_file /mofka-data/driver-config.json
+
+  dist-mofka:
+    profiles: [mofka]
+    <<: *build-dist
+    depends_on:
+      mofka:
+        condition: service_healthy
+    volumes:
+      - mofka-data:/mofka-data
+    command: >
+      python ModDistStreamPubDemo.py
+        --cast_to_float32
+        --normalize
+        --beg_sinogram 1000
+        --num_sinograms 2
+        --num_columns 2560
+        --batchsize 4
+        --driver_type mofka
+        --driver_config_file /mofka-data/driver-config.json
+
+  sirt-mofka:
+    profiles: [mofka]
+    <<: *build-sirt
+    depends_on:
+      mofka:
+        condition: service_healthy
+    volumes:
+      - mofka-data:/mofka-data
+    # SIRT_RANKS=2 must match the partition counts for dist_sirt, handshake_d_s, sirt_den.
+    command: >
+      mpiexec -n 2 /aps-mini-apps/build/bin/sirt_stream
+        --write-freq 4
+        --window-iter 1
+        --window-step 4
+        --window-length 4
+        -t 4
+        -c 1427
+        --batchsize 4
+        --driver_type mofka
+        --driver_config_file /mofka-data/driver-config.json
+
+  den-mofka:
+    profiles: [mofka]
+    <<: *build-den
+    depends_on:
+      mofka:
+        condition: service_healthy
+    volumes:
+      - mofka-data:/mofka-data
+    # --nproc_sirt must match the number of MPI ranks used by sirt-mofka above.
+    command: >
+      python denoiser.py
+        --model /dev/null
+        --batchsize 4
+        --nproc_sirt 2
+        --driver_type mofka
+        --driver_config_file /mofka-data/driver-config.json

@@ -92,16 +92,12 @@ class DiasporaDist:
         batchsize = self.batch
         ordering = diaspora.Ordering.Strict
         kwargs = dict(batch_size=batchsize, ordering=ordering)
-        if self.driver_type != 'files':
-            kwargs['thread_pool'] = self.driver.make_thread_pool(1)
         return topic.producer(producer_name, **kwargs)
 
     def consumer(self, topic_name: str, consumer_name: str) -> diaspora.Consumer:
         batch_size = self.batch
         topic = self.driver.open_topic(topic_name)
         kwargs = dict(name=consumer_name, batch_size=batch_size)
-        if self.driver_type != 'files':
-            kwargs['thread_pool'] = self.driver.make_thread_pool(0)
         return topic.consumer(**kwargs)
 
 
@@ -111,12 +107,10 @@ class DiasporaDist:
             topic_name = "handshake_s_d"
             topic = self.driver.open_topic(topic_name)
             hs_kwargs = dict(name="handshaker", batch_size=self.batch)
-            if self.driver_type != 'files':
-                hs_kwargs['thread_pool'] = self.driver.make_thread_pool(0)
             consumer = topic.consumer(**hs_kwargs)
             event = None
             while event is None:
-                event = consumer.pull().wait(timeout_ms=-1)
+                event = consumer.pull().wait(timeout_ms=300000)
             self.nranks = event.metadata["comm_size"]
             self.seq += 1
             del event
@@ -133,7 +127,7 @@ class DiasporaDist:
         for p in range(self.nranks):
             info = assign_data(p, self.nranks, row, col)
             f = producer.push(info)
-        producer.flush().wait(timeout_ms=-1)
+        producer.flush().wait(timeout_ms=300000)
         self.seq += 1
         del producer
         return "Done"
@@ -143,7 +137,7 @@ class DiasporaDist:
         f = consumer.pull()
         self.ts.record("PULL_END topic=daq_dist")
         self.ts.record("PULL_WAIT_START topic=daq_dist")
-        event = f.wait(timeout_ms=-1)
+        event = f.wait(timeout_ms=300000)
         data_size = len(event.data[0]) if event.data else 0
         self.ts.record(f"PULL_WAIT_END topic=daq_dist,event_id={event.event_id},data_size={data_size}")
         metadata = event.metadata
@@ -182,7 +176,7 @@ class DiasporaDist:
             # ts = time.perf_counter()
             # #producer.flush()
             # for i in range(self.nranks):
-            #     self.futures[0].wait(timeout_ms=-1)
+            #     self.futures[0].wait(timeout_ms=300000)
             #     self.futures.popleft()
             #     diaspora_t.append(["wait", projection_id, ts, time.perf_counter(), time.perf_counter() - ts, self.nranks*len(self.buffer)* len(str(self.buffer[self.counter-1][0][0])), self.nranks*len(self.buffer)*len(self.buffer[self.counter-1][0][1])])
             self.buffer = self.buffer[self.batch:]

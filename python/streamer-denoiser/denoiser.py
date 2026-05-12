@@ -90,14 +90,12 @@ def main(input_path, model_path, driver_type, driver_config_file, batchsize, npr
         }
     driver = diaspora.Driver(backend=driver_type, options=driver_options)
     batch_size = batchsize # AdaptiveBatchSize
-    thread_pool = driver.make_thread_pool(0) if driver_type != 'files' else None
+    thread_pool = None
     # create a topic
     topic_name = "sirt_den"
     topic = driver.open_topic(topic_name)
     consumer_name = "denoiser"
     consumer_kwargs = dict(name=consumer_name, batch_size=batch_size)
-    if thread_pool is not None:
-        consumer_kwargs['thread_pool'] = thread_pool
     consumer = topic.consumer(**consumer_kwargs)
     more_data = True
     ts_collector = TimestampCollector()
@@ -113,7 +111,7 @@ def main(input_path, model_path, driver_type, driver_config_file, batchsize, npr
             ts_collector.record("PULL_WAIT_START topic=sirt_den")
             event = None
             while event is None:
-                event = f.wait(timeout_ms=-1)
+                event = f.wait(timeout_ms=300000)
             m = event.metadata
             m["diaspora_e_id"] = event.event_id
             m["diaspora_e_partition"] = event.partition

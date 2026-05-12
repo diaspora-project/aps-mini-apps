@@ -417,12 +417,7 @@ def main():
   batchsize = args.batchsize #diaspora.AdaptiveBatchSize
   ordering = diaspora.Ordering.Strict
   thread_pool = None
-  if args.driver_type != 'files':
-      thread_pool = driver.make_thread_pool(1)
-  producer_kwargs = dict(batch_size=batchsize, ordering=ordering)
-  if thread_pool is not None:
-      producer_kwargs['thread_pool'] = thread_pool
-  producer = topic.producer(producer_name, **producer_kwargs)
+  producer = topic.producer(producer_name, batch_size=batchsize, ordering=ordering)
 
   ts = TimestampCollector()
   time0 = time.time()
@@ -470,7 +465,7 @@ def main():
   producer.push({"Type": "FIN"}, bytearray(1))
   ts.record("PUSH_END topic=daq_dist")
   ts.record("FLUSH_START topic=daq_dist")
-  producer.flush().wait(timeout_ms=-1)
+  producer.flush().wait(timeout_ms=300000)
   ts.record("FLUSH_END topic=daq_dist")
   ts.write("daq.0.ts.txt")
   time1 = time.time()

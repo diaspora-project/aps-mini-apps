@@ -37,12 +37,10 @@ RUN set -e; \
     wget -q "$_URL" -O /tmp/mochi-channel.tar.gz; \
     mkdir -p /mochi-channel; \
     tar -xzf /tmp/mochi-channel.tar.gz -C /mochi-channel; \
-    conda install -y -c file:///mochi-channel diaspora-stream-api; \
+    conda install -y -c file:///mochi-channel -c conda-forge \
+        diaspora-stream-api mofka mochi-bedrock "hdf5=1.*=mpi_mpich*"; \
     conda clean -afy; \
     rm /tmp/mochi-channel.tar.gz
-
-RUN conda install -y -c conda-forge "hdf5=*=mpi_mpich*" \
- && conda clean -afy
 
 RUN git clone --depth 1 https://github.com/google/flatbuffers.git /tmp/flatbuffers \
  && cd /tmp/flatbuffers \

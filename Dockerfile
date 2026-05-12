@@ -28,9 +28,12 @@ RUN conda install -y python=3.12 numpy scipy matplotlib pip \
  && pip install flatbuffers \
  && conda clean -afy
 
-# Download the architecture-appropriate mochi conda channel and install
-# diaspora-stream-api (provides C++ libs+headers, Python bindings, diaspora-ctl).
-# The mochi channel also pulls in mpich from conda-forge as a dependency.
+# Download the architecture-appropriate mochi conda channel and install all
+# mochi packages together with parallel HDF5 in a single solver pass.
+# Installing them together is required: mofka and mochi-bedrock need mpich 5.x
+# (via conda-forge), and the HDF5 parallel build must match that same mpich
+# version.  Separating the installs causes conda to pick an incompatible
+# (non-parallel) HDF5.
 ARG TARGETARCH
 RUN set -e; \
     case "$TARGETARCH" in \
@@ -42,16 +45,10 @@ RUN set -e; \
     wget -q "$_URL" -O /tmp/mochi-channel.tar.gz; \
     mkdir -p /mochi-channel; \
     tar -xzf /tmp/mochi-channel.tar.gz -C /mochi-channel; \
-    conda install -y -c file:///mochi-channel diaspora-stream-api; \
+    conda install -y -c file:///mochi-channel -c conda-forge \
+        diaspora-stream-api mofka mochi-bedrock "hdf5=1.*=mpi_mpich*"; \
     conda clean -afy; \
     rm /tmp/mochi-channel.tar.gz
-
-# Install parallel HDF5 (mpich variant) from conda-forge.  Using conda-forge
-# for both HDF5 and MPI avoids ABI mismatches that arise when the apt HDF5
-# (linked against system libcurl) is mixed with the conda libcurl from the
-# mochi channel.
-RUN conda install -y -c conda-forge "hdf5=*=mpi_mpich*" \
- && conda clean -afy
 
 # Build flatbuffers from source (provides flatc compiler + cmake find_package support).
 RUN git clone --depth 1 https://github.com/google/flatbuffers.git /tmp/flatbuffers \
