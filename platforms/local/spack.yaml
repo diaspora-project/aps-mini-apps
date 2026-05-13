@@ -1,0 +1,23 @@
+# This is a Spack Environment file.
+#
+# It describes a set of packages to be installed, along with
+# configuration settings.
+spack:
+  # add package specs to the `specs` list
+  specs:
+  - tekapp
+  - mofka+python
+  view: true
+  concretizer:
+    unify: true
+  repos:
+    diaspora:
+      git: https://github.com/diaspora-project/diaspora-spack-packages.git
+      destination: $env/repos
+      # if you want to use a specific commit, uncomment and change the following line
+      # commit: <commit-hash>
+    mochi:
+      git: https://github.com/mochi-hpc/mochi-spack-packages.git
+      destination: $env/repos
+      # if you want to use a specific commit, uncomment and change the following line
+      # commit: <commit-hash>

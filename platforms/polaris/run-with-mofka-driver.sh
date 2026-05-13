@@ -36,9 +36,10 @@ export SPACK_DISABLE_LOCAL_CONFIG=true
 eval `spack/bin/spack env activate --sh APS`
 
 # Use the build tree if present; otherwise rely on the installed tekapp-* on PATH.
-if [ -d ./build/bin ]; then
-    export PATH="$(pwd)/build/bin:$PATH"
-    export PYTHONPATH="$(pwd)/build/python:${PYTHONPATH:-}"
+SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &>/dev/null && pwd )"
+if [ -d "$SCRIPT_DIR/../../build/bin" ]; then
+    export PATH="$SCRIPT_DIR/../../build/bin:$PATH"
+    export PYTHONPATH="$SCRIPT_DIR/../../build/python:${PYTHONPATH:-}"
 fi
 
 echo "Defining workflow topology/mapping"

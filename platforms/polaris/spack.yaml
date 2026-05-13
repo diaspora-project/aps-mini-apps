@@ -6,24 +6,8 @@
 spack:
   # add package specs to the `specs` list
   specs:
-  - mofka@0.8.3+python
-  - diaspora-stream-api@0.5.4
-  - py-mochi-margo
-  - mercury@master # TODO replace witgh 2.4.2 or greater once released
-  - py-numpy
-  - py-scipy
-  - swig # rm
-  - py-tomopy@1.11.0
-  - libzmq # rm
-  - py-pyzmq # rm
-  - py-matplotlib
-  - py-dxchange
-  - py-pip
-#  - hdf5+mpi
-#  - py-h5py
-  - flatbuffers
-  - py-flatbuffers
-  #- py-tensorflow
+  - tekapp
+  - mofka+python
   view: true
   concretizer:
     unify: true
@@ -31,14 +15,18 @@ spack:
     prefix_inspections:
       lib: [LD_LIBRARY_PATH]
       lib64: [LD_LIBRARY_PATH]
+  repos:
+    diaspora:
+      git: https://github.com/diaspora-project/diaspora-spack-packages.git
+      destination: $env/repos
+      # if you want to use a specific commit, uncomment and change the following line
+      # commit: <commit-hash>
+    mochi:
+      git: https://github.com/mochi-hpc/mochi-spack-packages.git
+      destination: $env/repos
+      # if you want to use a specific commit, uncomment and change the following line
+      # commit: <commit-hash>
   packages:
-    mofka:
-      require:
-      - "@0.8.3:"
-      - "+python"
-    diaspora-stream-api:
-      require:
-      - "@0.5.4:"
     gcc:
       externals:
       - spec: gcc@14.2.0 languages:='c,c++,fortran'
@@ -80,6 +68,8 @@ spack:
 #        modules:
 #        - cray-hdf5-parallel/1.14.3.7
     mercury:
+      require:
+        - "@master" # TODO replace witgh 2.4.2 or greater once released
       buildable: true
       variants: ~boostsys ~checksum
     libfabric:

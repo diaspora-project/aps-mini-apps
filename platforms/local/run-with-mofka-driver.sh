@@ -1,31 +1,76 @@
 #!/bin/bash
 
+PROTOCOL=${PROTOCOL:-"na+sm"}
+
 eval `spack env activate --sh tekapp-env`
 
 # Use the build tree if present; otherwise rely on the installed tekapp-* on PATH.
-if [ -d ./build/bin ]; then
-    export PATH="$(pwd)/build/bin:$PATH"
-    export PYTHONPATH="$(pwd)/build/python:${PYTHONPATH:-}"
+SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &>/dev/null && pwd )"
+if [ -d "$SCRIPT_DIR/../../build/bin" ]; then
+    export PATH="$SCRIPT_DIR/../../build/bin:$PATH"
+    export PYTHONPATH="$SCRIPT_DIR/../../build/python:${PYTHONPATH:-}"
 fi
 
 SIRT_RANKS=2
 
-DIASPORA_CTL_DRIVER_ARGS="--driver files --driver.root_path ./aps-miniapp-data"
-rm -rf aps-miniapp-data
+echo "Creating Mofka configuration file (mofka.json)"
+cat >mofka.json <<EOL
+{
+    "libraries": [
+        "libflock-bedrock-module.so",
+        "libyokan-bedrock-module.so",
+        "libwarabi-bedrock-module.so",
+        "libmofka-bedrock-module.so"
+    ],
+    "providers": [
+        {
+            "name" : "group_manager",
+            "type" : "flock",
+            "provider_id" : 1,
+            "config": {
+                "bootstrap": "self",
+                "file": "mofka.flock",
+                "group": {
+                    "type": "static"
+                }
+            }
+        },
+        {
+            "name": "master",
+            "provider_id": 2,
+            "type": "yokan",
+            "tags" : [ "mofka:master" ],
+            "config" : {
+                "database" : {
+                    "type": "map"
+                }
+            }
+        }
+    ]
+}
+EOL
+
+echo "Deploying Mofka"
+bedrock $PROTOCOL -c mofka.json -v trace 1> mofka.out 2> mofka.err &
+MOFKA_PID=$!
+
+sleep 2
+
+DIASPORA_CTL_DRIVER_ARGS="--driver mofka --driver.group_file mofka.flock"
 
 echo "Starting topic creations"
 # setup topics and partitions
 # DAQ -> DIST topic
-diaspora-ctl topic create --name daq_dist $DIASPORA_CTL_DRIVER_ARGS --topic.num_partitions 1
+diaspora-ctl topic create --name daq_dist $DIASPORA_CTL_DRIVER_ARGS --topic.partitions 1
 # DIST topics
-diaspora-ctl topic create --name dist_sirt $DIASPORA_CTL_DRIVER_ARGS --topic.num_partitions $SIRT_RANKS
-diaspora-ctl topic create --name handshake_s_d $DIASPORA_CTL_DRIVER_ARGS --topic.num_partitions 1
-diaspora-ctl topic create --name handshake_d_s $DIASPORA_CTL_DRIVER_ARGS --topic.num_partitions $SIRT_RANKS
+diaspora-ctl topic create --name dist_sirt $DIASPORA_CTL_DRIVER_ARGS --topic.partitions $SIRT_RANKS
+diaspora-ctl topic create --name handshake_s_d $DIASPORA_CTL_DRIVER_ARGS --topic.partitions 1
+diaspora-ctl topic create --name handshake_d_s $DIASPORA_CTL_DRIVER_ARGS --topic.partitions $SIRT_RANKS
 # SIRT -> DEN topic (one partition per SIRT rank to avoid concurrent write conflicts)
-diaspora-ctl topic create --name sirt_den $DIASPORA_CTL_DRIVER_ARGS --topic.num_partitions $SIRT_RANKS
+diaspora-ctl topic create --name sirt_den $DIASPORA_CTL_DRIVER_ARGS --topic.partitions $SIRT_RANKS
 
-echo '{"root_path":"./aps-miniapp-data"}' > diaspora-files-driver-config.json
-DRIVER_ARGS="--driver_type files --driver_config_file diaspora-files-driver-config.json"
+echo '{"group_file":"./mofka.flock"}' > diaspora-mofka-driver-config.json
+DRIVER_ARGS="--driver_type mofka --driver_config_file diaspora-mofka-driver-config.json"
 
 echo "Completed topic creations"
 
@@ -115,4 +160,7 @@ while ((${#running[@]})); do
     fi
 done
 
+echo "All components finished, shutting down Mofka"
+bedrock-shutdown $PROTOCOL -f mofka.flock
+wait $MOFKA_PID || true
 echo "Run completed successfully"
