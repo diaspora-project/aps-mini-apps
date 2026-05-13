@@ -21,7 +21,7 @@ Here are the steps to use spack to install the environment:
 
 ### Build
 
-Build all components (C++ binary + Python scripts):
+Build all components (C++ binary + `tekapp` Python package):
 
 ```bash
 mkdir build && cd build
@@ -32,17 +32,39 @@ make
 CMake invokes `flatc` automatically to regenerate `include/tracelib/trace_prot_generated.h`
 from `trace_prot.fbs` when needed.
 
-`cmake ..` copies all Python scripts into the build tree automatically:
-
-| Destination | Source |
-|---|---|
-| `build/python/streamer-daq/DAQStream.py` | `python/streamer-daq/DAQStream.py` |
-| `build/python/streamer-dist/ModDistStreamPubDemo.py` | `python/streamer-dist/ModDistStreamPubDemo.py` |
-| `build/python/streamer-dist/diaspora_dist.py` | `python/streamer-dist/diaspora_dist.py` |
-| `build/python/streamer-denoiser/denoiser.py` | `python/streamer-denoiser/denoiser.py` |
-| `build/python/common/` | `python/common/` |
+`cmake ..` also copies the `tekapp` Python package into `build/python/tekapp/`,
+so build-tree runs work as long as `PYTHONPATH=$(pwd)/build/python`.
 
 `make` produces the `build/bin/sirt_stream` executable.
+
+### Install
+
+```bash
+make install                       # default prefix /usr/local
+# or pick your own prefix:
+cmake -DCMAKE_INSTALL_PREFIX=$HOME/.local ..
+make install
+```
+
+Layout under `CMAKE_INSTALL_PREFIX`:
+
+| Path | Contents |
+|---|---|
+| `bin/sirt_stream` | MPI reconstruction binary |
+| `lib/libdiaspora_stream.so`, `libsirt.so`, `libtrace_*.so` | shared libs (RPATH `$ORIGIN/../lib`) |
+| `lib/python<X.Y>/site-packages/tekapp/` | DAQ, DIST, DEN entry points + shared `tekapp.common` |
+
+Run installed components with:
+
+```bash
+python -m tekapp.streamer_daq …
+python -m tekapp.streamer_dist …
+python -m tekapp.streamer_denoiser …
+mpiexec -n <N> sirt_stream …
+```
+
+The Python version embedded in the install path is taken from the interpreter
+CMake found, so the package lands in the right `site-packages` automatically.
 
 ### Run the workflow
 

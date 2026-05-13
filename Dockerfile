@@ -72,47 +72,39 @@ FROM base AS builder
 RUN mkdir -p /aps-mini-apps/build
 WORKDIR /aps-mini-apps/build
 RUN cmake -DCMAKE_PREFIX_PATH=/opt/conda \
+          -DCMAKE_INSTALL_PREFIX=/usr/local \
           -DCMAKE_CXX_FLAGS="-DSPDLOG_FMT_EXTERNAL" \
           .. \
- && make -j$(nproc)
+ && make -j$(nproc) \
+ && make install
 
 # ─── DAQ ─────────────────────────────────────────────────────────────────────
-# cmake already copied DAQStream.py and common/ into build/python/ at configure time.
+# Run via `python -m tekapp.streamer_daq` (package installed in site-packages).
 FROM builder AS daq
 
 RUN conda install -y -c conda-forge tomopy dxchange \
  && conda clean -afy
 
-WORKDIR /aps-mini-apps/build/python/streamer-daq
 EXPOSE 50000 50001
 
 # ─── DIST ────────────────────────────────────────────────────────────────────
-# cmake already copied the DIST scripts and common/ into build/python/ at configure time.
 FROM builder AS dist
 
 RUN conda install -y -c conda-forge tomopy dxchange \
  && conda clean -afy
 
-WORKDIR /aps-mini-apps/build/python/streamer-dist
-
 # ─── SIRT ────────────────────────────────────────────────────────────────────
-# The binary is already compiled in the builder stage.  All MPI ranks run as
-# local processes inside this single container (mpiexec -n <N> sirt_stream ...).
+# sirt_stream is installed to /usr/local/bin and runs as `mpiexec -n N sirt_stream`.
 FROM builder AS sirt
 
-WORKDIR /aps-mini-apps/build/bin
 EXPOSE 52000
 
 # ─── DEN ─────────────────────────────────────────────────────────────────────
-# DEN is pure Python.  Pull only the cmake-installed build/python/ tree from the
-# builder stage so this image stays free of the compiled C++ binary.
-# denoiser.py appends '../common' relative to __file__, so common/ must be at
-# build/python/common/ (one level above streamer-denoiser/).
+# DEN is pure Python.  Pull the install tree from the builder so this image
+# stays free of the compiled C++ binary while still getting the tekapp package.
 FROM base AS den
 
 RUN conda install -y -c conda-forge h5py \
  && conda clean -afy
 
-COPY --from=builder /aps-mini-apps/build/python /aps-mini-apps/build/python
-
-WORKDIR /aps-mini-apps/build/python/streamer-denoiser
+COPY --from=builder /usr/local /usr/local

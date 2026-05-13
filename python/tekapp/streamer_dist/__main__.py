@@ -1,16 +1,11 @@
-import sys
-import os
-sys.path.append(os.path.join(os.path.dirname(__file__), '../common'))
-sys.path.append(os.path.join(os.path.dirname(__file__), '../common/local'))
 import argparse
 import numpy as np
 import time
 import math
-import TraceSerializer
 import tomopy as tp
 import json
-from diaspora_dist import DiasporaDist
-#from memory_profiler import profile
+from tekapp.common import serializer as TraceSerializer
+from tekapp.streamer_dist.diaspora_dist import DiasporaDist
 
 def parse_arguments():
   parser = argparse.ArgumentParser( description='Data Distributor Process')
@@ -60,7 +55,7 @@ def parse_arguments():
 
 
   return parser.parse_args()
-#@profile
+
 def main():
   args = parse_arguments()
   # Setup Diaspora
@@ -102,12 +97,6 @@ def main():
     read_image = serializer.deserialize(serialized_image=data)
     serializer.info(read_image) # print image information
 
-    # # Local checks
-    # if args.check_seq:
-    #   if seq != read_image.Seq():
-    #     print("Wrong sequence number: {} != {}".format(seq, read_image.Seq()))
-    #   seq += 1
-
     # Push image to workers (REQ/REP)
     my_image_np = read_image.TdataAsNumpy()
     if args.uint8_to_float32:
@@ -129,53 +118,38 @@ def main():
 
       # Tomopy operations expect 3D data, reshape incoming projections.
       if args.normalize:
-        # flat/dark fields' corresponding rows
         if tot_white_imgs>0 and tot_dark_imgs>0:
-          # print("normalizing: white_imgs.shape={}; dark_imgs.shape={}".format(
-                  #np.array(white_imgs).shape, np.array(dark_imgs).shape))
           sub = tp.normalize(sub, flat=white_imgs, dark=dark_imgs)
       if args.remove_stripes:
-        #print("removing stripes")
         sub = tp.remove_stripe_fw(sub, level=7, wname='sym16', sigma=1, pad=True)
       if args.mlog:
-        #print("applying -log")
         sub = -np.log(sub)
       if args.remove_invalids:
-        #print("removing invalids")
         sub = tp.remove_nan(sub, val=0.0)
         sub = tp.remove_neg(sub, val=0.00)
         sub[np.where(sub == np.inf)] = 0.00
 
-      #to send from diaspora:
       diaspora_sub = sub.flatten()
       if args.nproc_sirt>2:
-        diaspora_sub = np.tile(diaspora_sub, args.nproc_sirt//2) # I suppose that the args.nproc_sirt is always a multiple of 2
+        diaspora_sub = np.tile(diaspora_sub, args.nproc_sirt//2)
       ncols = sub.shape[2]
       diaspora_dist.push_image(diaspora_sub, args.num_sinograms, ncols, rotation,
                                read_image.UniqueId(), read_image.Center(), producer=producer)
 
-    # If incoming data is white field
     if read_image.Itype() is serializer.ITypes.White:
-      #print("White field data is received: {}".format(read_image.UniqueId()))
       white_imgs.extend(sub)
       tot_white_imgs += 1
 
-    # If incoming data is white-reset
     if read_image.Itype() is serializer.ITypes.WhiteReset:
-      #print("White-reset data is received: {}".format(read_image.UniqueId()))
       white_imgs=[]
       white_imgs.extend(sub)
       tot_white_imgs += 1
 
-    # If incoming data is dark field
     if read_image.Itype() is serializer.ITypes.Dark:
-      #print("Dark data is received: {}".format(read_image.UniqueId()))
       dark_imgs.extend(sub)
       tot_dark_imgs += 1
 
-    # If incoming data is dark-reset
     if read_image.Itype() is serializer.ITypes.DarkReset:
-      #print("Dark-reset data is received: {}".format(read_image.UniqueId()))
       dark_imgs=[]
       dark_imgs.extend(sub)
       tot_dark_imgs += 1
@@ -184,7 +158,6 @@ def main():
   diaspora_dist.last_flush(producer)
   time1 = time.time()
 
-  # Profile information
   elapsed_time = time1-time0
   tot_MiBs = (total_size*1.)/2**20
   print("Received number of projections: {}; Total size (MiB): {:.2f}; Elapsed time (s): {:.2f}".format(total_received, tot_MiBs, elapsed_time))

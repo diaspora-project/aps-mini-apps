@@ -67,14 +67,16 @@ DRIVER_ARGS="--driver_type mofka --driver_config_file diaspora-mofka-driver-conf
 
 echo "Completed topic creations"
 
+export PYTHONPATH=$(pwd)/build/python:${PYTHONPATH:-}
+
 echo "Launching DAQ"
 # Launch DAQ in "mode 1" (data coming from an HDF5 file)
-#python ./build/python/streamer-daq/DAQStream.py --mode 1 --simulation_file \
+#python -m tekapp.streamer_daq --mode 1 --simulation_file \
 #    ./data/tomo_00058_all_subsampled1p_s1079s1081.h5 --d_iteration 1  --batchsize 4 \
 #    --publisher_addr tcp://0.0.0.0:50000 --iteration_sleep 1 --synch_addr tcp://0.0.0.0:50001 \
 #    --synch_count 1 $DRIVER_ARGS 1>daq.out 2>daq.err &
 # Launchd DAQ in "mode 2" (syntetic data generation)
-python ./build/python/streamer-daq/DAQStream.py --mode 2 \
+python -m tekapp.streamer_daq --mode 2 \
     --num_sinograms 2 --num_sinogram_columns 2560 --num_sinogram_projections 16 \
     --batchsize 4 $DRIVER_ARGS 1>daq.out 2>daq.err &
 DAQ_PID=$!
@@ -82,7 +84,7 @@ echo "DAQ launched with PID $DAQ_PID"
 
 echo "Launching DIST"
 # Launch Dist
-python ./build/python/streamer-dist/ModDistStreamPubDemo.py  --cast_to_float32 \
+python -m tekapp.streamer_dist  --cast_to_float32 \
     --normalize --beg_sinogram 1000 --num_sinograms 2 --num_columns 2560  --batchsize 4 \
     $DRIVER_ARGS 1>dist.out 2>dist.err &
 DIST_PID=$!
@@ -98,7 +100,7 @@ echo "SIRT launched with PID $SIRT_PID"
 
 echo "Launching DEN"
 # Launch DEN
-python ./build/python/streamer-denoiser/denoiser.py \
+python -m tekapp.streamer_denoiser \
     --model ./build/python/streamer-denoiser/testA40GPU-it07500.h5 \
     $DRIVER_ARGS --batchsize 4 --nproc_sirt 2 1>den.out 2>den.err &
 DEN_PID=$!

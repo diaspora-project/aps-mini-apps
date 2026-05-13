@@ -1,13 +1,7 @@
-import sys
-import os
-sys.path.append(os.path.join(os.path.dirname(__file__), './local'))
-sys.path.append(os.path.join(os.path.dirname(__file__), './serialization'))
 import numpy as np
 import time
 import flatbuffers
-import MONA.TraceDS.Dim3 as Dim3
-import MONA.TraceDS.IType as IType
-import MONA.TraceDS.TImage as TImage
+from tekapp.common.mona.tracedm import Dim3, IType, TImage
 
 class ImageSerializer:
   """
@@ -84,32 +78,6 @@ class ImageSerializer:
     -------
     serialized_data : bytearray
       Serialized image data.
-
-    Notes
-    -----
-    This code treats image data as byte sequence, which can provide better
-    performance but it is not portable. We know that lyra machine is little endian,
-    thus there is no issues. However, if needed Flatbuffer documentation mentions
-    builder.Prepend*(val) function can be used to copy data in portable way.
-
-    Example for portable code is given below:
-    >>> for i in reversed(image): # Assuming image is uint16.
-    >>>  builder.PrependUint16(i)
-
-
-    Some serialization performance information:
-    We note the following serialization times (on lyra machine) when dimensions are
-    2048*2048.
-    Serialization time: 0.009891748428344727 - 0.014806032180786133 (mostly in 0.011* range)
-
-    Below is the rough ratios for some of the time consuming steps:
-    >>> bytesOfImage = image.tobytes() # Converting byte is expensive (3x/4)
-    >>> TImage.TImageStartTdataVector(builder, len(bytesOfImage)) # Memory allocation is expensive (2x-3x)
-    >>> builder.Bytes[builder.head : (builder.head + len(bytesOfImage))] = bytesOfImage # Copy operation is expeinsive (x)
-
-    >>> # Image serialization time after preparation: 9.560585021972656e-05
-
-    >>> serialized_data = builder.Output() # Timing range: 0.0007877349853515625 - 0.0009405612945556641
     """
 
     builder = self.builder
@@ -148,31 +116,7 @@ class ImageSerializer:
   def deserialize(self, serialized_image, root_offset=0):
     r"""
     Deserializes the provided byte sequence image data using TImage.
-
-    Parameters
-    ----------
-    serialized_image : bytearray
-      Serialized image using 'TraceImageSerializer.serialize()' function.
-
-    root_offset : np.int32
-      If deserialization is being done using builder.Bytes, then the
-      offset of `builder.Head()` needs to be passed since deserialization
-      is being done backward.
-
-
-    Returns
-    -------
-    image : flatbuf.MONA.TraceDS.TImage.TImage
-      Deserialized image data.
-
-
-    Notes
-    -----
-    Some deserialization performance information:
-    We note the following deserialization times (on lyra machine) when dimensions are
-    2048*2048: 1.1920928955078125e-05
     """
-
     image = TImage.TImage.GetRootAsTImage(serialized_image, root_offset)
     return image
 

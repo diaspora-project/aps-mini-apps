@@ -1,6 +1,10 @@
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+include(GNUInstallDirs)
+set(CMAKE_INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+
 # setup cache variables for ccmake
 if (NOT CMAKE_BUILD_TYPE)
     set (CMAKE_BUILD_TYPE Release
@@ -84,4 +88,9 @@ add_dependencies(trace_h5io      trace_prot_header)
 add_dependencies(diaspora_stream trace_prot_header)
 add_dependencies(sirt            trace_prot_header)
 add_dependencies(sirt_stream     trace_prot_header)
-#target_include_directories(sirt_stream PRIVATE ${HDF5_INCLUDE_DIRS})
+
+install(TARGETS sirt_stream
+                diaspora_stream sirt trace_utils trace_h5io
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})

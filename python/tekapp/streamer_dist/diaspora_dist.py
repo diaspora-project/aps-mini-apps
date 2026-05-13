@@ -1,12 +1,9 @@
-import sys
-import os
-sys.path.append(os.path.join(os.path.dirname(__file__), '../common'))
 import numpy as np
 import json
 import diaspora_stream.api as diaspora
 import time
 from collections import deque
-from ts_collector import TimestampCollector
+from tekapp.common.ts_collector import TimestampCollector
 
 def generate_worker_msgs(data: np.ndarray, dims: list, projection_id: int, theta: float,
                          n_ranks: int, center: float, seq: int) -> list:

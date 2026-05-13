@@ -1,12 +1,10 @@
 import os
-import sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '../common'))
 import time
 import json
 import numpy as np
 import h5py
 import diaspora_stream.api as diaspora
-from ts_collector import TimestampCollector
+from tekapp.common.ts_collector import TimestampCollector
 #import keras
 import argparse
 import matplotlib.pyplot as plt

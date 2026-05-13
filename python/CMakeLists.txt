@@ -1,14 +1,13 @@
-# Copy Python scripts and shared utilities to the build directory at configure
-# time so they are available alongside the compiled binaries without any manual
-# post-build steps.
+include(GNUInstallDirs)
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+set(APS_PY_SITE
+    ${CMAKE_INSTALL_LIBDIR}/python${Python3_VERSION_MAJOR}.${Python3_VERSION_MINOR}/site-packages)
 
-file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/common
+# Build-tree copy so run-local-*.sh and the build-tree dev workflow work
+# without `make install` (PYTHONPATH=build/python picks up tekapp from here).
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/tekapp
      DESTINATION ${CMAKE_BINARY_DIR}/python/)
 
-file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/streamer-daq/DAQStream.py
-     DESTINATION ${CMAKE_BINARY_DIR}/python/streamer-daq/)
-
-file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/streamer-denoiser/denoiser.py
-     DESTINATION ${CMAKE_BINARY_DIR}/python/streamer-denoiser/)
-
-add_subdirectory(streamer-dist)
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tekapp
+        DESTINATION ${APS_PY_SITE}
+        FILES_MATCHING PATTERN "*.py")

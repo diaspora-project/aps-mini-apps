@@ -1,11 +1,6 @@
-import sys
-import os
-sys.path.append(os.path.join(os.path.dirname(__file__), '../common'))
-sys.path.append(os.path.join(os.path.dirname(__file__), '../common/local'))
 import argparse
 import numpy as np
 import time
-import TraceSerializer
 import h5py as h5
 import dxchange
 import tomopy as tp
@@ -13,7 +8,8 @@ import signal
 import diaspora_stream.api as diaspora
 import json
 from collections import deque
-from ts_collector import TimestampCollector
+from tekapp.common import serializer as TraceSerializer
+from tekapp.common.ts_collector import TimestampCollector
 
 #from memory_profiler import profile
 
