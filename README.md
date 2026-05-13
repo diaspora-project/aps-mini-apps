@@ -87,11 +87,14 @@ spack install
 ```
 
 ```bash
-# Polaris (uses externals + module-aware config)
-spack env create APS platforms/polaris/spack.yaml
-spack env activate APS
-spack install
+# Polaris (uses externals + module-aware config and build in a PBS job)
+qsub -A <your-project> platforms/polaris/build.sh
 ```
+
+Note: on Polaris we use a job to build the code as Spack tends to spawn too
+many processes on login nodes and gets killed. If the build doesn't complete
+within the 1h job allocation, simply submit another job, it will pick up where
+the previous one stopped.
 
 The `repos:` section in each `spack.yaml` declares the diaspora and mochi
 package repositories, so Spack clones them automatically — no need to add
