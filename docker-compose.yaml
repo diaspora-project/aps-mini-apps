@@ -66,7 +66,7 @@ services:
     volumes:
       - diaspora-data:/diaspora-data
     command: >
-      python -m tekapp.streamer_daq --mode 2
+      tekapp-daq --mode 2
         --num_sinograms 2
         --num_sinogram_columns 2560
         --num_sinogram_projections 16
@@ -83,7 +83,7 @@ services:
     volumes:
       - diaspora-data:/diaspora-data
     command: >
-      python -m tekapp.streamer_dist
+      tekapp-dist
         --cast_to_float32
         --normalize
         --beg_sinogram 1000
@@ -104,7 +104,7 @@ services:
     # All MPI ranks run as local processes inside this single container.
     # SIRT_RANKS=2 must match the partition counts for dist_sirt, handshake_d_s, sirt_den.
     command: >
-      mpiexec -n 2 sirt_stream
+      mpiexec -n 2 tekapp-sirt
         --write-freq 4
         --window-iter 1
         --window-step 4
@@ -126,7 +126,7 @@ services:
     # --model is required by argparse but model loading is commented out in denoiser.py.
     # --nproc_sirt must match the number of MPI ranks used by the sirt service above.
     command: >
-      python -m tekapp.streamer_denoiser
+      tekapp-denoiser
         --model /dev/null
         --batchsize 4
         --nproc_sirt 2
@@ -221,7 +221,7 @@ services:
     volumes:
       - mofka-data:/mofka-data
     command: >
-      python -m tekapp.streamer_daq --mode 2
+      tekapp-daq --mode 2
         --num_sinograms 2
         --num_sinogram_columns 2560
         --num_sinogram_projections 16
@@ -238,7 +238,7 @@ services:
     volumes:
       - mofka-data:/mofka-data
     command: >
-      python -m tekapp.streamer_dist
+      tekapp-dist
         --cast_to_float32
         --normalize
         --beg_sinogram 1000
@@ -258,7 +258,7 @@ services:
       - mofka-data:/mofka-data
     # SIRT_RANKS=2 must match the partition counts for dist_sirt, handshake_d_s, sirt_den.
     command: >
-      mpiexec -n 2 sirt_stream
+      mpiexec -n 2 tekapp-sirt
         --write-freq 4
         --window-iter 1
         --window-step 4
@@ -279,7 +279,7 @@ services:
       - mofka-data:/mofka-data
     # --nproc_sirt must match the number of MPI ranks used by sirt-mofka above.
     command: >
-      python -m tekapp.streamer_denoiser
+      tekapp-denoiser
         --model /dev/null
         --batchsize 4
         --nproc_sirt 2

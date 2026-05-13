@@ -75,7 +75,7 @@ def process_directory(model, directory_path):
                 file_path = os.path.join(root, file)
                 process_file(model, file_path)
 
-def main(input_path, model_path, driver_type, driver_config_file, batchsize, nproc_sirt):
+def _run(input_path, model_path, driver_type, driver_config_file, batchsize, nproc_sirt):
     # Load the saved model
     # model = keras.models.load_model(model_path)
     driver_options = {}
@@ -164,7 +164,7 @@ def main(input_path, model_path, driver_type, driver_config_file, batchsize, npr
     del topic
     del thread_pool
     del driver
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(description='Denoise HDF5 files using a trained model.')
     parser.add_argument('--input', type=str, required=False, help='Input file or directory path.')
     parser.add_argument('--model', type=str, required=True, help='Path to the saved model.')
@@ -174,5 +174,9 @@ if __name__ == "__main__":
     parser.add_argument('--driver_config_file', type=str, default="", help='JSON config file for Diaspora Driver')
 
     args = parser.parse_args()
-    main(args.input, args.model, args.driver_type, args.driver_config_file, args.batchsize, args.nproc_sirt)
+    _run(args.input, args.model, args.driver_type, args.driver_config_file, args.batchsize, args.nproc_sirt)
+
+
+if __name__ == "__main__":
+    main()
 

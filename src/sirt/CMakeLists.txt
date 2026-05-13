@@ -94,3 +94,16 @@ install(TARGETS sirt_stream
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+
+# tekapp-sirt is a relative symlink to sirt_stream, kept in lockstep with the
+# python launchers (tekapp-daq, tekapp-dist, tekapp-denoiser) for naming.
+add_custom_command(TARGET sirt_stream POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E create_symlink
+            sirt_stream ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/tekapp-sirt
+    VERBATIM)
+
+install(CODE "
+    execute_process(COMMAND \${CMAKE_COMMAND} -E create_symlink
+                    sirt_stream
+                    \${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}/tekapp-sirt)
+")
