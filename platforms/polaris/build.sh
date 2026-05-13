@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #PBS -l select=1
-#PBS -l walltime=02:00:00
+#PBS -l walltime=01:00:00
 #PBS -N tekapp-build
-#PBS -q debug-scaling
+#PBS -q debug
 #PBS -l filesystems=home:eagle
 
 # Non-interactive build script for Polaris — submit with `qsub`.
@@ -11,8 +11,11 @@
 #   * If ./spack already exists, leave it alone.
 #   * If the APS spack env already exists, activate it.
 #   * Concretize + install only if the env's tekapp package isn't importable.
-#   * Always (re)run cmake configure + make against the local source tree
-#     so a working `build/bin/tekapp-*` is produced from this checkout.
+
+# This script needs to be run from the root of tekapp
+# (i.e. qsub platforms/polaris/build.sh)
+cd $PBS_O_WORKDIR
+SCRIPT_DIR=$(pwd)/platforms/polaris
 
 set -euo pipefail
 
@@ -23,11 +26,6 @@ export http_proxy="http://proxy.alcf.anl.gov:3128"
 export https_proxy="http://proxy.alcf.anl.gov:3128"
 export ftp_proxy="http://proxy.alcf.anl.gov:3128"
 export no_proxy="admin,polaris-adminvm-01,localhost,*.cm.polaris.alcf.anl.gov,polaris-*,*.polaris.alcf.anl.gov,*.alcf.anl.gov"
-
-# Resolve the project root (this script lives under platforms/polaris/).
-SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &>/dev/null && pwd )"
-PROJECT_ROOT="$( cd -- "$SCRIPT_DIR/../.." &>/dev/null && pwd )"
-cd "$PROJECT_ROOT"
 
 export SPACK_DISABLE_LOCAL_CONFIG=true
 

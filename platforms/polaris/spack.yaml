@@ -48,25 +48,19 @@ spack:
       buildable: false
       externals:
       - spec: cray-mpich@9.0.1
+        prefix: /opt/cray/pe/mpich/9.0.1/ofi/gnu/12.3/
         modules:
         - cray-mpich/9.0.1
-#    netcdf-c:
-#      buildable: false
-#      externals:
-#      - spec: netcdf-c@4.9.0.9
-#        prefix: /opt/cray/pe/netcdf/4.9.0.9/gnu/12.3/
-#        modules:
-#        - cray-netcdf/4.9.0.9
-#        - cce/17.0.0
-#        - cray-mpich/8.1.32
-#        - cray-hdf5/1.12.2.9
-#    hdf5:
-#      buildable: false
-#      externals:
-#      - spec: hdf5@1.14.3.7
-#        prefix: /opt/cray/pe/hdf5-parallel/1.12.2.9/gnu/12.3
-#        modules:
-#        - cray-hdf5-parallel/1.14.3.7
+        - libfabric/2.2.0rc1
+        - craype-network-ofi
+    python:
+      buildable: false
+      externals:
+      - spec: python@3.11.7
+        prefix: /opt/cray/pe/python/3.11.7
+        modules:
+        - PrgEnv-gnu/8.6.0
+        - cray-python/3.11.7
     mercury:
       require:
         - "@master" # TODO replace witgh 2.4.2 or greater once released
