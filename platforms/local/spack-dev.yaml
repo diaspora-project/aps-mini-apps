@@ -1,0 +1,46 @@
+# This is a Spack Environment file.
+#
+# It describes a set of packages to be installed, along with
+# configuration settings.
+spack:
+  specs:
+  - cmake
+  - flatbuffers
+  - mpi
+  - hdf5+mpi
+  - fmt
+  - diaspora-stream-api
+  - python
+  - py-numpy
+  - py-scipy
+  - py-tomopy
+  - py-matplotlib
+  - py-dxchange
+  - py-h5py
+  - py-flatbuffers
+  - py-pip
+  - swig
+  - mofka+python
+  view: true
+  concretizer:
+    unify: true
+  repos:
+    diaspora:
+      git: https://github.com/diaspora-project/diaspora-spack-packages.git
+      destination: $env/repos/diaspora
+      # if you want to use a specific commit, uncomment and change the following line
+      # commit: <commit-hash>
+    mochi:
+      git: https://github.com/mochi-hpc/mochi-spack-packages.git
+      destination: $env/repos/mochi
+      # if you want to use a specific commit, uncomment and change the following line
+      # commit: <commit-hash>
+  packages:
+    cmake:
+      require: "@3.20:"
+    python:
+      require: "@3:"
+    diaspora-stream-api:
+      require: "@0.5.6:"
+    py-tomopy:
+      require: "@1.11.0:"

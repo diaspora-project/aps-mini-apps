@@ -1,0 +1,148 @@
+# Usa spack from https://github.com/GueroudjiAmal/spack
+# This is a Spack Environment file.
+#
+# It describes a set of packages to be installed, along with
+# configuration settings.
+spack:
+  # add package specs to the `specs` list
+  specs:
+  - cmake
+  - flatbuffers
+  - mpi
+  - hdf5+mpi
+  - fmt
+  - diaspora-stream-api
+  - python
+  - py-numpy
+  - py-scipy
+  - py-tomopy
+  - py-matplotlib
+  - py-dxchange
+  - py-h5py
+  - py-flatbuffers
+  - py-pip
+  - swig
+  - mofka+python
+  view: true
+  concretizer:
+    unify: true
+  modules:
+    prefix_inspections:
+      lib: [LD_LIBRARY_PATH]
+      lib64: [LD_LIBRARY_PATH]
+  repos:
+    diaspora:
+      git: https://github.com/diaspora-project/diaspora-spack-packages.git
+      destination: $env/repos/diaspora
+      # if you want to use a specific commit, uncomment and change the following line
+      # commit: <commit-hash>
+    mochi:
+      git: https://github.com/mochi-hpc/mochi-spack-packages.git
+      destination: $env/repos/mochi
+      # if you want to use a specific commit, uncomment and change the following line
+      # commit: <commit-hash>
+  packages:
+    diaspora-stream-api:
+      require: "@0.5.6:"
+    py-tomopy:
+      require: "@1.11.0:"
+    gcc:
+      externals:
+      - spec: gcc@14.2.0 languages:='c,c++,fortran'
+        prefix: /opt/cray/pe/gcc-native/14
+        extra_attributes:
+          compilers:
+            c: /opt/cray/pe/gcc-native/14/bin/gcc
+            cxx: /opt/cray/pe/gcc-native/14/bin/g++
+            fortran: /opt/cray/pe/gcc-native/14/bin/gfortran
+        modules:
+        - PrgEnv-gnu/8.6.0
+    mpi:
+      require:
+      - cray-mpich
+    pkgconfig:
+      require:
+      - pkg-config
+    cray-mpich:
+      buildable: false
+      externals:
+      - spec: cray-mpich@9.0.1
+        prefix: /opt/cray/pe/mpich/9.0.1/ofi/gnu/12.3/
+        modules:
+        - cray-mpich/9.0.1
+        - libfabric/2.2.0rc1
+        - craype-network-ofi
+    python:
+      buildable: false
+      externals:
+      - spec: python@3.11.7
+        prefix: /opt/cray/pe/python/3.11.7
+        modules:
+        - PrgEnv-gnu/8.6.0
+        - cray-python/3.11.7
+    mercury:
+      require:
+        - "@master" # TODO replace witgh 2.4.2 or greater once released
+      buildable: true
+      variants: ~boostsys ~checksum
+    libfabric:
+      buildable: false
+      externals:
+      - spec: libfabric@2.2.0
+        modules:
+        - libfabric/2.2.0rc1
+    autoconf:
+      buildable: false
+      externals:
+      - spec: autoconf@2.69
+        prefix: /usr
+    automake:
+      buildable: false
+      externals:
+      - spec: automake@1.15.1
+        prefix: /usr
+    gmake:
+      buildable: false
+      externals:
+      - spec: gmake@4.2.1
+        prefix: /usr
+    cmake:
+      buildable: false
+      externals:
+      - spec: cmake@3.30.5
+        prefix: /soft/spack/pe/0.10.0/base/install/linux-sles15-x86_64/gcc-13.3.1/cmake-3.30.5-x6hbone32yqfjegmlb2zrf4xa6xbfx3y
+    libtool:
+      buildable: false
+      externals:
+      - spec: libtool@2.4.6
+        prefix: /usr
+    openssl:
+      buildable: false
+      externals:
+      - spec: openssl@1.1.1d
+        prefix: /usr
+    m4:
+      buildable: false
+      externals:
+      - spec: m4@1.4.18
+        prefix: /usr
+    zlib:
+      buildable: false
+      externals:
+      - spec: zlib@1.2.11
+        prefix: /usr
+    pkg-config:
+      buildable: false
+      externals:
+      - spec: pkg-config@0.29.2
+        prefix: /usr
+    git:
+      buildable: false
+      externals:
+      - spec: git@2.35.3
+        prefix: /usr
+    tar:
+      buildable: false
+      externals:
+      - spec: tar@1.34
+        prefix: /usr
