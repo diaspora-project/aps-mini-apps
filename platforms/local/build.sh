@@ -34,18 +34,8 @@ if spack -e tekapp-env python -c 'import tekapp' >/dev/null 2>&1; then
 else
     echo "    tekapp not importable — concretizing and installing"
     spack concretize -f
-    spack install --fail-fast
+    spack install --fail-fast $@ # $@ is added so we can do ./build.sh -j1
 fi
-
-# Uncomment the following to build from source
-
-#echo "==> Building local checkout (cmake + make)"
-#mkdir -p build
-#cd build
-#if [[ ! -f CMakeCache.txt ]]; then
-#    cmake ..
-#fi
-#make
 
 echo "==> Build complete"
 echo "    Local launchers: $PROJECT_ROOT/build/bin/tekapp-{daq,dist,sirt,denoiser}"

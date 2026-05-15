@@ -40,7 +40,7 @@ if [[ ! -f "$SPACK_ENV/spack.lock" ]]; then
 fi
 
 echo "==> Installing tekapp dependencies"
-spack install --fail-fast
+spack install --fail-fast $@ # $@ is added so we can do ./build.sh -j1
 
 echo "==> Building tekapp from source (cmake + make)"
 mkdir -p build

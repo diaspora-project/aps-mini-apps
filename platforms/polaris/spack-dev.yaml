@@ -41,11 +41,20 @@ spack:
       destination: $env/repos/mochi
       # if you want to use a specific commit, uncomment and change the following line
       # commit: <commit-hash>
+    builtin:
+      git: https://github.com/spack/spack-packages.git
+      destination: $env/repos/builtin
+      # if you want to use a specific commit, uncomment and change the following line
+      # commit: <commit-hash>
   packages:
     diaspora-stream-api:
-      require: "@0.5.6:"
+      require: "@0.5.7:"
     py-tomopy:
       require: "@1.11.0:"
+    cmake:
+      require: "@3.20:"
+    mochi-yokan:
+      require: "+rocksdb"
     gcc:
       externals:
       - spec: gcc@14.2.0 languages:='c,c++,fortran'

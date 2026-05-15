@@ -21,3 +21,19 @@ spack:
       destination: $env/repos/mochi
       # if you want to use a specific commit, uncomment and change the following line
       # commit: <commit-hash>
+    builtin:
+      git: https://github.com/spack/spack-packages.git
+      destination: $env/repos/builtin
+      # if you want to use a specific commit, uncomment and change the following line
+      # commit: <commit-hash>
+  packages:
+    mpi:
+      require: "mpich"
+    diaspora-stream-api:
+      require: "@0.5.7:"
+    mercury:
+      require: "~boostsys ~checksum"
+    libfabric:
+      require: "fabrics=tcp,rxm"
+    mochi-yokan:
+      require: "+rocksdb"
