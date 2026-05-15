@@ -21,12 +21,6 @@ set -euo pipefail
 
 export SPACK_DISABLE_LOCAL_CONFIG=true
 
-echo "==> Loading Improv modules"
-module load python
-module load gcc/13.2.0
-module load openmpi
-module load perl
-
 echo "==> Ensuring Spack is present"
 if [[ ! -d spack ]]; then
     git clone --depth 1 https://github.com/spack/spack.git
@@ -34,10 +28,10 @@ fi
 source spack/share/spack/setup-env.sh
 
 echo "==> Ensuring tekapp-improv Spack environment exists"
-if ! spack env list | awk '{print $1}' | grep -qx tekapp-improv; then
-    spack env create tekapp-improv "$SCRIPT_DIR/spack.yaml"
+if ! spack env list | awk '{print $1}' | grep -qx tekapp-env; then
+    spack env create tekapp-env "$SCRIPT_DIR/spack.yaml"
 fi
-spack env activate tekapp-improv
+spack env activate tekapp-env
 
 echo "==> Checking whether tekapp is already installed in the environment"
 if spack -e tekapp-improv python -c 'import tekapp' >/dev/null 2>&1; then
@@ -48,15 +42,5 @@ else
     spack install --fail-fast
 fi
 
-# Uncomment the following to also build from source
-
-#echo "==> Building local checkout (cmake + make)"
-#mkdir -p build
-#cd build
-#if [[ ! -f CMakeCache.txt ]]; then
-#    cmake .. -DCMAKE_CXX_COMPILER=mpicxx -DCMAKE_C_COMPILER=mpicc
-#fi
-#make
-
 echo "==> Build complete"
-echo "    Spack env: spack env activate tekapp-improv"
+echo "    Spack env: spack env activate tekapp-env"

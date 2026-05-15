@@ -10,13 +10,6 @@ spack:
   view: true
   concretizer:
     unify: true
-  mirrors:
-    mochi-buildcache:
-      url: oci://ghcr.io/mochi-hpc/mochi-spack-buildcache
-      signed: false
-  config:
-    install_tree:
-      padded_length: 128
   modules:
     prefix_inspections:
       lib: [LD_LIBRARY_PATH]
@@ -32,26 +25,22 @@ spack:
       destination: $env/repos/mochi
       # if you want to use a specific commit, uncomment and change the following line
       # commit: <commit-hash>
-  compilers:
-  - compiler:
-      spec: gcc@=13.2.0
-      paths:
-        cc: /gpfs/fs1/soft/improv/software/spack-built/linux-rhel8-x86_64/gcc-8.5.0/gcc-13.2.0-iyqxotb/bin/gcc
-        cxx: /gpfs/fs1/soft/improv/software/spack-built/linux-rhel8-x86_64/gcc-8.5.0/gcc-13.2.0-iyqxotb/bin/g++
-        f77: /gpfs/fs1/soft/improv/software/spack-built/linux-rhel8-x86_64/gcc-8.5.0/gcc-13.2.0-iyqxotb/bin/gfortran
-        fc: /gpfs/fs1/soft/improv/software/spack-built/linux-rhel8-x86_64/gcc-8.5.0/gcc-13.2.0-iyqxotb/bin/gfortran
-      flags: {}
-      operating_system: rhel8
-      target: x86_64
-      modules:
-      - gcc/13.2.0
-      environment: {}
-      extra_rpaths: []
+    builtin:
+      git: https://github.com/spack/spack-packages.git
+      destination: $env/repos/builtin
+      # if you want to use a specific commit, uncomment and change the following line
+      # commit: <commit-hash>
   packages:
+    diaspora-stream-api:
+      require: "@0.5.7:"
+    mochi-yokan:
+      require: "+rocksdb"
     gcc:
       externals:
       - spec: gcc@13.2.0 languages:='c,c++,fortran'
         prefix: /gpfs/fs1/soft/improv/software/spack-built/linux-rhel8-x86_64/gcc-8.5.0/gcc-13.2.0-iyqxotb
+        modules:
+        - gcc/13.2.0
         extra_attributes:
           compilers:
             c: /gpfs/fs1/soft/improv/software/spack-built/linux-rhel8-x86_64/gcc-8.5.0/gcc-13.2.0-iyqxotb/bin/gcc
@@ -70,9 +59,7 @@ spack:
       buildable: false
       externals:
       - spec: openmpi@5.0.2
-        modules:
-        - gcc/13.2.0
-        - openmpi/5.0.2-gcc-13.2.0
+        prefix: /gpfs/fs1/soft/improv/software/spack-built/linux-rhel8-zen3/gcc-13.2.0/openmpi-5.0.2-7bjpmj4
     libfabric:
       require:
       - "fabrics=rxm,verbs"
@@ -86,18 +73,6 @@ spack:
       externals:
       - spec: rdma-core@52.0
         prefix: /usr
-    python:
-      buildable: false
-      externals:
-      - spec: python@3.11.7
-        modules:
-        - python/3.11.7-gcc-12.3.0
-    perl:
-      buildable: false
-      externals:
-      - spec: perl@5.38.0
-        modules:
-        - perl/5.38.0
     cmake:
       externals:
       - spec: cmake@3.26.5
@@ -153,12 +128,6 @@ spack:
     openssh:
       externals:
       - spec: openssh@8.0p1
-        prefix: /usr
-    binutils:
-      externals:
-      - spec: binutils@2.41~gold+headers
-        prefix: /gpfs/fs1/soft/improv/software/custom-built/.binutils/2.41
-      - spec: binutils@2.30.123~gold~headers
         prefix: /usr
     sed:
       externals:
