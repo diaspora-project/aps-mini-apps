@@ -1,0 +1,48 @@
+# Spack environment file used to build a single Docker image containing
+# tekapp + mofka and all four launchers (tekapp-daq, tekapp-dist, tekapp-sirt,
+# tekapp-denoiser) plus diaspora-ctl.
+#
+# Build the image with platforms/docker/build.sh. Run the pipeline with
+# platforms/docker/run-with-files-driver.sh (or run-with-mofka-driver.sh).
+spack:
+  specs:
+  - tekapp
+  - mofka+python
+  concretizer:
+    unify: true
+  repos:
+    diaspora:
+      git: https://github.com/diaspora-project/diaspora-spack-packages.git
+      destination: $env/repos/diaspora
+      # if you want to use a specific commit, uncomment and change the following line
+      # commit: <commit-hash>
+    mochi:
+      git: https://github.com/mochi-hpc/mochi-spack-packages.git
+      destination: $env/repos/mochi
+      # if you want to use a specific commit, uncomment and change the following line
+      # commit: <commit-hash>
+    builtin:
+      git: https://github.com/spack/spack-packages.git
+      destination: $env/repos/builtin
+      # if you want to use a specific commit, uncomment and change the following line
+      # commit: <commit-hash>
+  packages:
+    mpi:
+      require: "mpich"
+    diaspora-stream-api:
+      require: "@0.5.7:"
+    mercury:
+      require: "~boostsys ~checksum"
+    libfabric:
+      require: "fabrics=tcp,rxm"
+    mochi-yokan:
+      require: "+rocksdb"
+  container:
+    format: docker
+    images:
+      os: "ubuntu:24.04"
+      spack: develop
+# Uncomment the following if you want to limit the number of jobs
+# when building the docker image.
+#  config:
+#    build_jobs: 2
