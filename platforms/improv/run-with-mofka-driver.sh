@@ -7,7 +7,14 @@
 #PBS -A radix-io
 
 # Improv run script using the Mofka driver.
-# Node layout: nodes[0]=MOFKA, [1]=DAQ, [2]=DIST, [3]=DEN, [4..]=SIRT.
+# Node layout: nodes[0:BEDROCK_NODES]=MOFKA, then DAQ, DIST, DEN, then SIRT.
+#
+# Prereq: run `bash scripts/configure-mofka.sh --platform improv` once to
+# generate mofka.json + mofka-config.env in the cwd. Use --from-file with the
+# saved mofka-answers.env for reproducible jobs.
+#
+# Note: the static `#PBS -l select=5` above must be >= BEDROCK_NODES + 3 +
+# ceil(SIRT_RANKS / 2). If BEDROCK_NODES > 1, edit `select=` to match.
 
 set -euo pipefail
 
@@ -44,60 +51,30 @@ if [ -d "$SCRIPT_DIR/../../build/bin" ]; then
     export PYTHONPATH="$SCRIPT_DIR/../../build/python:${PYTHONPATH:-}"
 fi
 
+if [[ ! -f mofka-config.env || ! -f mofka.json ]]; then
+    echo "ERROR: mofka-config.env / mofka.json missing in $(pwd)." >&2
+    echo "       Run: bash scripts/configure-mofka.sh --platform improv" >&2
+    exit 1
+fi
+source mofka-config.env
+
 echo "Defining workflow topology/mapping"
 nodes=($(cat "$PBS_NODEFILE"))
-node_mofka=${nodes[0]}
-node_daq=${nodes[1]}
-node_dist=${nodes[2]}
-node_den=${nodes[3]}
-node_sirt=("${nodes[@]:4}")
+mofka_nodes=("${nodes[@]:0:$BEDROCK_NODES}")
+node_daq=${nodes[$BEDROCK_NODES]}
+node_dist=${nodes[$((BEDROCK_NODES+1))]}
+node_den=${nodes[$((BEDROCK_NODES+2))]}
+node_sirt=("${nodes[@]:$((BEDROCK_NODES+3))}")
 
-echo "Mofka node: ${node_mofka}"
+echo "Mofka node(s): ${mofka_nodes[*]}"
 echo "DAQ node: ${node_daq}"
 echo "DIST node: ${node_dist}"
 echo "DEN node: ${node_den}"
 echo "SIRT node(s): ${node_sirt[@]}"
 
 nnodes=`wc -l < $PBS_NODEFILE`
-sirt_ranks=$(((nnodes - 4)*2))
+sirt_ranks=$(((nnodes - BEDROCK_NODES - 3)*2))
 printf "%s\n" "${node_sirt[@]}" > sirt_file
-
-echo "Creating Mofka configuration file (mofka.json)"
-cat >mofka.json <<EOL
-{
-    "libraries": [
-        "libflock-bedrock-module.so",
-        "libyokan-bedrock-module.so",
-        "libwarabi-bedrock-module.so",
-        "libmofka-bedrock-module.so"
-    ],
-    "providers": [
-        {
-            "name" : "group_manager",
-            "type" : "flock",
-            "provider_id" : 1,
-            "config": {
-                "bootstrap": "self",
-                "file": "mofka.flock",
-                "group": {
-                    "type": "static"
-                }
-            }
-        },
-        {
-            "name": "master",
-            "provider_id": 2,
-            "type": "yokan",
-            "tags" : [ "mofka:master" ],
-            "config" : {
-                "database" : {
-                    "type": "map"
-                }
-            }
-        }
-    ]
-}
-EOL
 
 simple_mpiexec() {
     # Used only before DAQ is launched; co-locates with node_daq.
@@ -105,31 +82,34 @@ simple_mpiexec() {
     mpiexec -n 1 -N 1 --bind-to none --host "${node_daq}" $@
 }
 
-rm mofka.flock || true
+rm -f "$MOFKA_FLOCK_FILE"
 
-echo "Deploying Mofka (verbs transport)"
-mpiexec -n 1 -N 1 --bind-to none --host $node_mofka \
-    bedrock verbs:// -c mofka.json 1> mofka.out 2> mofka.err &
+total_bedrock=$((BEDROCK_NODES * BEDROCK_PPN))
+mofka_host_list=$(IFS=,; echo "${mofka_nodes[*]}")
+echo "Deploying Mofka ($total_bedrock proc(s) on ${BEDROCK_NODES} node(s), protocol: $BEDROCK_PROTOCOL)"
+mpiexec -n "$total_bedrock" -N "$BEDROCK_PPN" --bind-to none --host "$mofka_host_list" \
+    bedrock "$BEDROCK_PROTOCOL" -c mofka.json 1> mofka.out 2> mofka.err &
 MOFKA_PID=$!
 
-echo "Waiting for mofka.flock file to be created"
-while [ ! -f "mofka.flock" ]; do
+echo "Waiting for $MOFKA_FLOCK_FILE file to be created"
+while [ ! -f "$MOFKA_FLOCK_FILE" ]; do
     sleep 1
 done
 sleep 5
 
-DIASPORA_CTL_DRIVER_ARGS="--driver mofka --driver.group_file mofka.flock"
+DIASPORA_CTL_DRIVER_ARGS="--driver mofka --driver.group_file $MOFKA_FLOCK_FILE"
 
 echo "Starting topic creations"
-simple_mpiexec diaspora-ctl topic create --name daq_dist $DIASPORA_CTL_DRIVER_ARGS --topic.partitions 1
-simple_mpiexec diaspora-ctl topic create --name dist_sirt $DIASPORA_CTL_DRIVER_ARGS --topic.partitions $sirt_ranks
-simple_mpiexec diaspora-ctl topic create --name handshake_s_d $DIASPORA_CTL_DRIVER_ARGS --topic.partitions 1
-simple_mpiexec diaspora-ctl topic create --name handshake_d_s $DIASPORA_CTL_DRIVER_ARGS --topic.partitions $sirt_ranks
-simple_mpiexec diaspora-ctl topic create --name sirt_den $DIASPORA_CTL_DRIVER_ARGS --topic.partitions $sirt_ranks
+for topic in "${MOFKA_TOPICS[@]}"; do
+    flags_var="MOFKA_TOPIC_FLAGS_${topic}"
+    echo "  creating topic '$topic'"
+    simple_mpiexec diaspora-ctl topic create --name "$topic" \
+        $DIASPORA_CTL_DRIVER_ARGS ${!flags_var}
+done
 
 echo "Completed topic creations"
 
-echo '{"group_file":"./mofka.flock"}' > diaspora-mofka-driver-config.json
+echo "{\"group_file\":\"./$MOFKA_FLOCK_FILE\"}" > diaspora-mofka-driver-config.json
 DRIVER_ARGS="--driver_type mofka --driver_config_file diaspora-mofka-driver-config.json"
 
 echo "Launching DAQ"
@@ -213,6 +193,6 @@ while ((${#running[@]})); do
 done
 
 echo "All components finished, shutting down Mofka"
-simple_mpiexec bedrock-shutdown verbs:// -f mofka.flock
+simple_mpiexec bedrock-shutdown "$BEDROCK_PROTOCOL" -f "$MOFKA_FLOCK_FILE"
 wait $MOFKA_PID || true
 echo "Run completed successfully"

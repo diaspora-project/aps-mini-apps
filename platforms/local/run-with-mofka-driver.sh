@@ -1,6 +1,7 @@
 #!/bin/bash
-
-PROTOCOL=${PROTOCOL:-"na+sm"}
+# Prereq: run `bash scripts/configure-mofka.sh --platform local` once to
+# generate mofka.json + mofka-config.env in the cwd. Use --from-file with the
+# saved mofka-answers.env for reproducible runs.
 
 eval `spack env activate --sh tekapp-env`
 
@@ -11,65 +12,30 @@ if [ -d "$SCRIPT_DIR/../../build/bin" ]; then
     export PYTHONPATH="$SCRIPT_DIR/../../build/python:${PYTHONPATH:-}"
 fi
 
-SIRT_RANKS=2
+if [[ ! -f mofka-config.env || ! -f mofka.json ]]; then
+    echo "ERROR: mofka-config.env / mofka.json missing in $(pwd)." >&2
+    echo "       Run: bash $SCRIPT_DIR/../../scripts/configure-mofka.sh --platform local" >&2
+    exit 1
+fi
+source mofka-config.env
 
-echo "Creating Mofka configuration file (mofka.json)"
-cat >mofka.json <<EOL
-{
-    "libraries": [
-        "libflock-bedrock-module.so",
-        "libyokan-bedrock-module.so",
-        "libwarabi-bedrock-module.so",
-        "libmofka-bedrock-module.so"
-    ],
-    "providers": [
-        {
-            "name" : "group_manager",
-            "type" : "flock",
-            "provider_id" : 1,
-            "config": {
-                "bootstrap": "self",
-                "file": "mofka.flock",
-                "group": {
-                    "type": "static"
-                }
-            }
-        },
-        {
-            "name": "master",
-            "provider_id": 2,
-            "type": "yokan",
-            "tags" : [ "mofka:master" ],
-            "config" : {
-                "database" : {
-                    "type": "map"
-                }
-            }
-        }
-    ]
-}
-EOL
+SIRT_RANKS="${SIRT_RANKS:-2}"
 
-echo "Deploying Mofka"
-bedrock $PROTOCOL -c mofka.json -v trace 1> mofka.out 2> mofka.err &
+echo "Deploying Mofka (protocol: $BEDROCK_PROTOCOL)"
+bedrock "$BEDROCK_PROTOCOL" -c mofka.json -v trace 1> mofka.out 2> mofka.err &
 MOFKA_PID=$!
 
 sleep 2
 
-DIASPORA_CTL_DRIVER_ARGS="--driver mofka --driver.group_file mofka.flock"
+DIASPORA_CTL_DRIVER_ARGS="--driver mofka --driver.group_file $MOFKA_FLOCK_FILE"
 
 echo "Starting topic creations"
-# setup topics and partitions
-# DAQ -> DIST topic
-diaspora-ctl topic create --name daq_dist $DIASPORA_CTL_DRIVER_ARGS --topic.partitions 1
-# DIST topics
-diaspora-ctl topic create --name dist_sirt $DIASPORA_CTL_DRIVER_ARGS --topic.partitions $SIRT_RANKS
-diaspora-ctl topic create --name handshake_s_d $DIASPORA_CTL_DRIVER_ARGS --topic.partitions 1
-diaspora-ctl topic create --name handshake_d_s $DIASPORA_CTL_DRIVER_ARGS --topic.partitions $SIRT_RANKS
-# SIRT -> DEN topic (one partition per SIRT rank to avoid concurrent write conflicts)
-diaspora-ctl topic create --name sirt_den $DIASPORA_CTL_DRIVER_ARGS --topic.partitions $SIRT_RANKS
+for topic in "${MOFKA_TOPICS[@]}"; do
+    flags_var="MOFKA_TOPIC_FLAGS_${topic}"
+    diaspora-ctl topic create --name "$topic" $DIASPORA_CTL_DRIVER_ARGS ${!flags_var}
+done
 
-echo '{"group_file":"./mofka.flock"}' > diaspora-mofka-driver-config.json
+echo "{\"group_file\":\"./$MOFKA_FLOCK_FILE\"}" > diaspora-mofka-driver-config.json
 DRIVER_ARGS="--driver_type mofka --driver_config_file diaspora-mofka-driver-config.json"
 
 echo "Completed topic creations"
@@ -161,6 +127,6 @@ while ((${#running[@]})); do
 done
 
 echo "All components finished, shutting down Mofka"
-bedrock-shutdown $PROTOCOL -f mofka.flock
+bedrock-shutdown "$BEDROCK_PROTOCOL" -f "$MOFKA_FLOCK_FILE"
 wait $MOFKA_PID || true
 echo "Run completed successfully"
