@@ -18,12 +18,17 @@
 #   * cmake configure runs only when CMakeCache.txt is missing; `make` always
 #     runs (incremental build).
 
-# This script needs to be submitted from the root of tekapp
-# (i.e. qsub platforms/improv/build-dev.sh)
-cd $PBS_O_WORKDIR
-SCRIPT_DIR=$(pwd)/platforms/improv
-
+# Can be submitted as a PBS job (`qsub platforms/improv/build-dev.sh`) or
+# invoked directly from a login node (`./platforms/improv/build-dev.sh`).
 set -euo pipefail
+if [[ -n "${PBS_O_WORKDIR:-}" ]]; then
+    cd "$PBS_O_WORKDIR"
+    SCRIPT_DIR="$PBS_O_WORKDIR/platforms/improv"
+else
+    SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &>/dev/null && pwd )"
+    cd "$SCRIPT_DIR/../.."
+fi
+PROJECT_ROOT="$(pwd)"
 
 export SPACK_DISABLE_LOCAL_CONFIG=true
 
@@ -60,5 +65,5 @@ fi
 make
 
 echo "==> Build complete"
-echo "    Local launchers: $PBS_O_WORKDIR/build/bin/tekapp-{daq,dist,sirt,denoiser}"
+echo "    Local launchers: $PROJECT_ROOT/build/bin/tekapp-{daq,dist,sirt,denoiser}"
 echo "    Spack env: spack env activate tekapp-env"

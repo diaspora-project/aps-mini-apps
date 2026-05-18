@@ -18,12 +18,17 @@
 #   * cmake configure runs only when CMakeCache.txt is missing; `make` always
 #     runs (incremental build).
 
-# This script needs to be submitted from the root of tekapp
-# (i.e. qsub platforms/polaris/build-dev.sh)
-cd $PBS_O_WORKDIR
-SCRIPT_DIR=$(pwd)/platforms/polaris
-
+# Can be submitted as a PBS job (`qsub platforms/polaris/build-dev.sh`) or
+# invoked directly from a login node (`./platforms/polaris/build-dev.sh`).
 set -euo pipefail
+if [[ -n "${PBS_O_WORKDIR:-}" ]]; then
+    cd "$PBS_O_WORKDIR"
+    SCRIPT_DIR="$PBS_O_WORKDIR/platforms/polaris"
+else
+    SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &>/dev/null && pwd )"
+    cd "$SCRIPT_DIR/../.."
+fi
+PROJECT_ROOT="$(pwd)"
 
 # Proxy settings
 export HTTP_PROXY="http://proxy.alcf.anl.gov:3128"
@@ -72,5 +77,5 @@ fi
 make
 
 echo "==> Build complete"
-echo "    Local launchers: $PBS_O_WORKDIR/build/bin/tekapp-{daq,dist,sirt,denoiser}"
+echo "    Local launchers: $PROJECT_ROOT/build/bin/tekapp-{daq,dist,sirt,denoiser}"
 echo "    Spack env: spack env activate APS-dev"

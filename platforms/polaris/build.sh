@@ -12,12 +12,17 @@
 #   * If the APS spack env already exists, activate it.
 #   * Concretize + install only if the env's tekapp package isn't importable.
 
-# This script needs to be run from the root of tekapp
-# (i.e. qsub platforms/polaris/build.sh)
-cd $PBS_O_WORKDIR
-SCRIPT_DIR=$(pwd)/platforms/polaris
-
+# Can be submitted as a PBS job (`qsub platforms/polaris/build.sh`) or
+# invoked directly from a login node (`./platforms/polaris/build.sh`). In
+# both cases we cd to the project root and resolve SCRIPT_DIR.
 set -euo pipefail
+if [[ -n "${PBS_O_WORKDIR:-}" ]]; then
+    cd "$PBS_O_WORKDIR"
+    SCRIPT_DIR="$PBS_O_WORKDIR/platforms/polaris"
+else
+    SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &>/dev/null && pwd )"
+    cd "$SCRIPT_DIR/../.."
+fi
 
 # Proxy settings
 export HTTP_PROXY="http://proxy.alcf.anl.gov:3128"
