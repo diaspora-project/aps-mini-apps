@@ -18,10 +18,8 @@ echo "Starting topic creations"
 # setup topics and partitions
 # DAQ -> DIST topic
 diaspora-ctl topic create --name daq_dist $DIASPORA_CTL_DRIVER_ARGS --topic.num_partitions 1
-# DIST topics
+# DIST -> SIRT topic (one partition per SIRT rank)
 diaspora-ctl topic create --name dist_sirt $DIASPORA_CTL_DRIVER_ARGS --topic.num_partitions $SIRT_RANKS
-diaspora-ctl topic create --name handshake_s_d $DIASPORA_CTL_DRIVER_ARGS --topic.num_partitions 1
-diaspora-ctl topic create --name handshake_d_s $DIASPORA_CTL_DRIVER_ARGS --topic.num_partitions $SIRT_RANKS
 # SIRT -> DEN topic (one partition per SIRT rank to avoid concurrent write conflicts)
 diaspora-ctl topic create --name sirt_den $DIASPORA_CTL_DRIVER_ARGS --topic.num_partitions $SIRT_RANKS
 
