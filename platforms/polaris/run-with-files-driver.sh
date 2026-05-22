@@ -10,6 +10,15 @@
 # (on Eagle/home) as the message store, so we save one node compared to
 # run-with-mofka-driver.sh.
 
+# Some Polaris nodes are occasionally assigned without a usable CXI (HPE
+# Slingshot) service, which breaks libfabric/mpich at startup. We probe
+# each node with `cxi_service list -s 1`; nodes where it fails are listed
+# on stdout. If IGNORE_NODES_WITHOUT_CXI_SERVICE=true, those nodes are
+# dropped from the workflow topology (provided enough viable nodes remain);
+# otherwise the script aborts.
+IGNORE_NODES_WITHOUT_CXI_SERVICE=true
+MIN_VIABLE_NODES=5
+
 set -euo pipefail
 
 echo "####################################################"
@@ -47,8 +56,41 @@ if [ -d "$SCRIPT_DIR/../../build/bin" ]; then
     export PYTHONPATH="$SCRIPT_DIR/../../build/python:${PYTHONPATH:-}"
 fi
 
+echo "Probing CXI service on each allocated node"
+all_nodes=($(cat "$PBS_NODEFILE"))
+viable_nodes=()
+bad_nodes=()
+for n in "${all_nodes[@]}"; do
+    if ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
+            "$n" 'cxi_service list -s 1' >/dev/null 2>&1; then
+        viable_nodes+=("$n")
+    else
+        bad_nodes+=("$n")
+    fi
+done
+
+if (( ${#bad_nodes[@]} > 0 )); then
+    echo "Nodes without functional CXI service:"
+    printf '  %s\n' "${bad_nodes[@]}"
+    if [[ "${IGNORE_NODES_WITHOUT_CXI_SERVICE}" != "true" ]]; then
+        echo "ERROR: IGNORE_NODES_WITHOUT_CXI_SERVICE is not true; aborting." >&2
+        exit 1
+    fi
+    if (( ${#viable_nodes[@]} < MIN_VIABLE_NODES )); then
+        echo "ERROR: only ${#viable_nodes[@]} viable node(s) remain after filtering;" >&2
+        echo "       need at least ${MIN_VIABLE_NODES} to run the workflow." >&2
+        exit 1
+    fi
+    echo "Continuing with ${#viable_nodes[@]} viable node(s) after filtering."
+    # Rewrite PBS_NODEFILE so any downstream tool (mpiexec --hostfile, etc.)
+    # sees only the viable subset.
+    PBS_NODEFILE="$PBS_O_WORKDIR/pbs_nodefile.filtered"
+    printf '%s\n' "${viable_nodes[@]}" > "$PBS_NODEFILE"
+    export PBS_NODEFILE
+fi
+
 echo "Defining workflow topology/mapping"
-nodes=($(cat "$PBS_NODEFILE"))
+nodes=("${viable_nodes[@]}")
 node_daq=${nodes[0]}
 node_dist=${nodes[1]}
 node_den=${nodes[2]}
