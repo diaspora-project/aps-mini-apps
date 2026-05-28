@@ -221,24 +221,38 @@ fi
 # --- topics -------------------------------------------------------------------
 
 section "Topics"
-explain "tekapp uses three topics:"
-explain "  daq_dist  — raw projections from DAQ to DIST (always 1 partition)"
-explain "  dist_sirt — preprocessed sinograms from DIST to SIRT (one partition per SIRT rank)"
-explain "  sirt_den  — reconstructed slices from SIRT to DEN (one partition per SIRT rank)"
-ask SIRT_RANKS "Number of SIRT ranks (sets dist_sirt and sirt_den partition counts)" \
+explain "tekapp uses five topics:"
+explain "  daq_dist      — raw projections from DAQ to DIST (always 1 partition)"
+explain "  dist_sirt     — preprocessed sinograms from DIST to SIRT (one partition per SIRT rank)"
+explain "  handshake_s_d — SIRT→DIST handshake (always 1 partition, in-memory)"
+explain "  handshake_d_s — DIST→SIRT handshake (one partition per SIRT rank, in-memory)"
+explain "  sirt_den      — reconstructed slices from SIRT to DEN (one partition per SIRT rank)"
+ask SIRT_RANKS "Number of SIRT ranks (sets dist_sirt, handshake_d_s, sirt_den partition counts)" \
     "${SIRT_RANKS_FLAG:-2}"
 
 # Fixed partition counts per topic — derived, not asked.
-TOPICS=(daq_dist dist_sirt sirt_den)
+TOPICS=(daq_dist dist_sirt handshake_s_d handshake_d_s sirt_den)
 declare -A TOPIC_PARTS=(
     [daq_dist]=1
     [dist_sirt]="$SIRT_RANKS"
+    [handshake_s_d]=1
+    [handshake_d_s]="$SIRT_RANKS"
     [sirt_den]="$SIRT_RANKS"
+)
+
+# Handshake topics are tiny control messages; always in-memory, no user prompt.
+declare -A FORCE_MEMORY=(
+    [handshake_s_d]=1
+    [handshake_d_s]=1
 )
 
 any_default_partition=no
 last_type="memory"   # carries forward to the next topic's default
 for t in "${TOPICS[@]}"; do
+    if [[ -n "${FORCE_MEMORY[$t]:-}" ]]; then
+        eval "${t}_TYPE=memory"
+        continue
+    fi
     echo
     subhead "Topic: $t"
     explain "  Partition manager:"
