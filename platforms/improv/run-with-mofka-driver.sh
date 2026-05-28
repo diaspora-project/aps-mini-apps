@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#PBS -l select=5
+#PBS -l select=5:ncpus=128:mpiprocs=128
 #PBS -l place=scatter
 #PBS -l walltime=01:00:00
 #PBS -N APS
@@ -42,7 +42,7 @@ module load openmpi/5.0.2-gcc-13.2.0
 echo "Activating environment"
 export SPACK_DISABLE_LOCAL_CONFIG=true
 source spack/share/spack/setup-env.sh
-spack env activate tekapp-improv
+spack env activate tekapp-env
 
 # Use the build tree if present; otherwise rely on the installed tekapp-* on PATH.
 SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &>/dev/null && pwd )"
