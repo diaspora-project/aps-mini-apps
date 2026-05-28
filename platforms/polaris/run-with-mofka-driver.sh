@@ -10,7 +10,9 @@
 # saved mofka-answers.env for reproducible jobs.
 #
 # Note: the static `#PBS -l select=6` above must be >= BEDROCK_NODES + 3 +
-# ceil(SIRT_RANKS / 2). If BEDROCK_NODES > 1, edit `select=` to match.
+# SIRT_NODES (DAQ/DIST/DEN take one node each). Edit `select=` to match
+# whenever BEDROCK_NODES or SIRT_NODES change. SIRT_NODES and SIRT_PPN come
+# from mofka-config.env (see scripts/configure-mofka.sh --sirt-nodes / --sirt-ppn).
 
 # Some Polaris nodes are occasionally assigned without a usable CXI (HPE
 # Slingshot) service, which breaks libfabric/mpich at startup. We probe
@@ -99,21 +101,35 @@ if (( ${#bad_nodes[@]} > 0 )); then
 fi
 
 echo "Defining workflow topology/mapping"
+# SIRT_NODES/SIRT_PPN/SIRT_RANKS come from mofka-config.env. They also drive
+# the dist_sirt / handshake_d_s / sirt_den topic partition counts created by
+# configure-mofka.sh, so launched ranks and partitions can never drift apart.
+: "${SIRT_NODES:?missing in mofka-config.env — rerun configure-mofka.sh}"
+: "${SIRT_PPN:?missing in mofka-config.env — rerun configure-mofka.sh}"
+: "${SIRT_RANKS:?missing in mofka-config.env — rerun configure-mofka.sh}"
+
 nodes=("${viable_nodes[@]}")
+nnodes=${#nodes[@]}
+required_nodes=$((BEDROCK_NODES + 3 + SIRT_NODES))
+if (( nnodes < required_nodes )); then
+    echo "ERROR: $nnodes viable node(s) available, but the workflow needs $required_nodes" >&2
+    echo "       (BEDROCK_NODES=$BEDROCK_NODES + 3 for DAQ/DIST/DEN + SIRT_NODES=$SIRT_NODES)." >&2
+    echo "       Edit '#PBS -l select=...' or rerun configure-mofka.sh with smaller --sirt-nodes." >&2
+    exit 1
+fi
+
 mofka_nodes=("${nodes[@]:0:$BEDROCK_NODES}")
 node_daq=${nodes[$BEDROCK_NODES]}
 node_dist=${nodes[$((BEDROCK_NODES+1))]}
 node_den=${nodes[$((BEDROCK_NODES+2))]}
-node_sirt=("${nodes[@]:$((BEDROCK_NODES+3))}")
+node_sirt=("${nodes[@]:$((BEDROCK_NODES+3)):$SIRT_NODES}")
 
 echo "Mofka node(s): ${mofka_nodes[*]}"
 echo "DAQ node: ${node_daq}"
 echo "DIST node: ${node_dist}"
 echo "DEN node: ${node_den}"
-echo "SIRT node(s): ${node_sirt[@]}"
+echo "SIRT node(s): ${node_sirt[*]}  (SIRT_NODES=$SIRT_NODES, SIRT_PPN=$SIRT_PPN, SIRT_RANKS=$SIRT_RANKS)"
 
-nnodes=`wc -l < $PBS_NODEFILE`
-sirt_ranks=$(((nnodes - BEDROCK_NODES - 3)*2))
 printf "%s\n" "${node_sirt[@]}" > sirt_file
 
 simple_mpiexec() {
@@ -175,7 +191,7 @@ echo "DIST launched with PID $DIST_PID"
 
 echo "Launching SIRT"
 # Launch SIRT
-mpiexec --single-node-vni -n $sirt_ranks --ppn 2 --line-buffer -l -d 16 --hostfile sirt_file \
+mpiexec --single-node-vni -n "$SIRT_RANKS" --ppn "$SIRT_PPN" --line-buffer -l -d 16 --hostfile sirt_file \
     tekapp-sirt --write-freq 4  \
         --window-iter 1 --window-step 4 --window-length 4 -t 4 -c 1427 \
         $DRIVER_ARGS --batchsize 4 1>sirt.out 2>sirt.err &
@@ -187,7 +203,7 @@ echo "Launching DEN"
 mpiexec --single-node-vni -n 1 --ppn 1 -d 16 --hosts $node_den \
     tekapp-denoiser \
         --model testA40GPU-it07500.h5 \
-        $DRIVER_ARGS --batchsize 4 --nproc_sirt 2 1>den.out 2>den.err &
+        $DRIVER_ARGS --batchsize 4 --nproc_sirt "$SIRT_RANKS" 1>den.out 2>den.err &
 DEN_PID=$!
 echo "DEN launched with PID $DEN_PID"
 

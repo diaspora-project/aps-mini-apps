@@ -11,28 +11,47 @@
 # Usage:
 #   bash scripts/configure-mofka.sh                        # interactive, generic defaults
 #   bash scripts/configure-mofka.sh --platform polaris     # platform-tuned defaults
+#   bash scripts/configure-mofka.sh --sirt-nodes 4 --sirt-ppn 2   # non-interactive
 #   bash scripts/configure-mofka.sh --from-file mofka-answers.env \
 #                                   --out-dir /path/to/job-cwd
+#
+# Flags:
+#   --platform local|polaris|improv
+#   --from-file <answers.env>   replay a prior run (skips prompts)
+#   --out-dir <dir>             where to write mofka.json / mofka-config.env
+#   --sirt-nodes N              number of SIRT nodes (default 1)
+#   --sirt-ppn N                SIRT ranks per node (default 2)
+#   --sirt-ranks N              legacy shortcut: SIRT_NODES=1, SIRT_PPN=N
 
 set -euo pipefail
 
 PLATFORM=""
 FROM_FILE=""
 OUT_DIR="$(pwd)"
-SIRT_RANKS_FLAG=""
+SIRT_NODES_FLAG=""
+SIRT_PPN_FLAG=""
+SIRT_RANKS_FLAG=""   # legacy: implies SIRT_NODES=1, SIRT_PPN=<value>
 
-usage() { sed -n '2,16p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,24p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --platform)   PLATFORM="$2"; shift 2 ;;
         --from-file)  FROM_FILE="$2"; shift 2 ;;
         --out-dir)    OUT_DIR="$2"; shift 2 ;;
+        --sirt-nodes) SIRT_NODES_FLAG="$2"; shift 2 ;;
+        --sirt-ppn)   SIRT_PPN_FLAG="$2"; shift 2 ;;
         --sirt-ranks) SIRT_RANKS_FLAG="$2"; shift 2 ;;
         -h|--help)    usage; exit 0 ;;
         *) echo "ERROR: unknown flag '$1' (use --help)" >&2; exit 1 ;;
     esac
 done
+
+# Legacy --sirt-ranks compatibility: 1 node, N ranks on it (single-host default).
+if [[ -n "$SIRT_RANKS_FLAG" && -z "$SIRT_PPN_FLAG" ]]; then
+    SIRT_PPN_FLAG="$SIRT_RANKS_FLAG"
+    SIRT_NODES_FLAG="${SIRT_NODES_FLAG:-1}"
+fi
 
 mkdir -p "$OUT_DIR"
 
@@ -227,8 +246,30 @@ explain "  dist_sirt     — preprocessed sinograms from DIST to SIRT (one parti
 explain "  handshake_s_d — SIRT→DIST handshake (always 1 partition, in-memory)"
 explain "  handshake_d_s — DIST→SIRT handshake (one partition per SIRT rank, in-memory)"
 explain "  sirt_den      — reconstructed slices from SIRT to DEN (one partition per SIRT rank)"
-ask SIRT_RANKS "Number of SIRT ranks (sets dist_sirt, handshake_d_s, sirt_den partition counts)" \
-    "${SIRT_RANKS_FLAG:-2}"
+echo
+explain "SIRT spans SIRT_NODES nodes with SIRT_PPN ranks per node."
+explain "Total SIRT ranks = SIRT_NODES × SIRT_PPN — drives the partition count of"
+explain "dist_sirt, handshake_d_s and sirt_den, and also drives the run script's"
+explain "mpiexec -n / -N and DEN's --nproc_sirt. Keep these two values in sync"
+explain "with #PBS -l select=... in the HPC run scripts."
+
+# Back-compat: pick defaults from a legacy mofka-answers.env that only set SIRT_RANKS.
+if [[ -z "${SIRT_NODES:-}" && -n "${SIRT_RANKS:-}" ]]; then
+    SIRT_NODES=1
+    SIRT_PPN="$SIRT_RANKS"
+fi
+
+ask SIRT_NODES "Number of SIRT nodes" "${SIRT_NODES_FLAG:-1}"
+ask SIRT_PPN   "SIRT ranks per node"   "${SIRT_PPN_FLAG:-2}"
+
+# Validate: both must be positive integers.
+for v in SIRT_NODES SIRT_PPN; do
+    if ! [[ "${!v}" =~ ^[1-9][0-9]*$ ]]; then
+        echo "ERROR: $v must be a positive integer (got '${!v}')" >&2
+        exit 1
+    fi
+done
+SIRT_RANKS=$(( SIRT_NODES * SIRT_PPN ))
 
 # Fixed partition counts per topic — derived, not asked.
 TOPICS=(daq_dist dist_sirt handshake_s_d handshake_d_s sirt_den)
@@ -326,6 +367,8 @@ ANSWERS="$OUT_DIR/mofka-answers.env"
     echo "MOFKA_FLOCK_FILE=$MOFKA_FLOCK_FILE"
     echo "MASTER_DB_TYPE=$MASTER_DB_TYPE"
     [[ "$MASTER_DB_TYPE" == "rocksdb" ]] && echo "MASTER_DB_PATH=$MASTER_DB_PATH"
+    echo "SIRT_NODES=$SIRT_NODES"
+    echo "SIRT_PPN=$SIRT_PPN"
     echo "SIRT_RANKS=$SIRT_RANKS"
     echo "USE_PROGRESS_THREAD=$USE_PROGRESS_THREAD"
     echo "RPC_THREAD_COUNT=$RPC_THREAD_COUNT"
@@ -464,6 +507,8 @@ CFG="$OUT_DIR/mofka-config.env"
     echo "BEDROCK_NODES=$BEDROCK_NODES"
     echo "BEDROCK_PPN=$BEDROCK_PPN"
     echo "MOFKA_FLOCK_FILE=\"$MOFKA_FLOCK_FILE\""
+    echo "SIRT_NODES=$SIRT_NODES"
+    echo "SIRT_PPN=$SIRT_PPN"
     echo "SIRT_RANKS=$SIRT_RANKS"
     echo "MOFKA_TOPICS=(${TOPICS[*]})"
     for t in "${TOPICS[@]}"; do

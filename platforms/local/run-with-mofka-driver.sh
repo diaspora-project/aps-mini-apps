@@ -19,7 +19,13 @@ if [[ ! -f mofka-config.env || ! -f mofka.json ]]; then
 fi
 source mofka-config.env
 
-SIRT_RANKS="${SIRT_RANKS:-2}"
+# Single-host platform: SIRT_NODES is always 1; only SIRT_RANKS (= SIRT_PPN)
+# matters here. mofka-config.env carries the value chosen at configure time.
+: "${SIRT_RANKS:?missing in mofka-config.env — rerun configure-mofka.sh}"
+if [[ -n "${SIRT_NODES:-}" && "$SIRT_NODES" != "1" ]]; then
+    echo "WARNING: SIRT_NODES=$SIRT_NODES in mofka-config.env but the 'local'" >&2
+    echo "         platform always runs on one host; ignoring (will use SIRT_RANKS=$SIRT_RANKS)." >&2
+fi
 
 echo "Deploying Mofka (protocol: $BEDROCK_PROTOCOL)"
 bedrock "$BEDROCK_PROTOCOL" -c mofka.json -v trace 1> mofka.out 2> mofka.err &
@@ -73,7 +79,7 @@ echo "Launching DEN"
 # Launch DEN
 tekapp-denoiser \
     --model testA40GPU-it07500.h5 \
-    $DRIVER_ARGS --batchsize 4 --nproc_sirt 2 1>den.out 2>den.err &
+    $DRIVER_ARGS --batchsize 4 --nproc_sirt "$SIRT_RANKS" 1>den.out 2>den.err &
 DEN_PID=$!
 echo "DEN launched with PID $DEN_PID"
 
