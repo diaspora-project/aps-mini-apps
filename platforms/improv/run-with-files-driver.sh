@@ -161,8 +161,19 @@ trap cleanup EXIT INT TERM
 running=("$DAQ_PID" "$DIST_PID" "$SIRT_PID" "$DEN_PID")
 
 while ((${#running[@]})); do
-    wait -n -p exited_pid "${running[@]}"
+    # `wait -n -p var` is bash 5.1+; the compute nodes ship an older bash.
+    # Wait for any to exit, then scan to find which PID is gone.
+    wait -n "${running[@]}"
     status=$?
+
+    exited_pid=""
+    for pid in "${running[@]}"; do
+        if ! kill -0 "$pid" 2>/dev/null; then
+            exited_pid=$pid
+            break
+        fi
+    done
+    [[ -z "$exited_pid" ]] && continue
 
     name=${NAME[$exited_pid]}
     errfile=${ERR[$exited_pid]}
