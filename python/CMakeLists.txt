@@ -1,7 +1,11 @@
 include(GNUInstallDirs)
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
+# Pure-python content always goes under lib/, never lib64/ — Spack's
+# `extends("python")` view linker only inspects <prefix>/lib/pythonX.Y/
+# site-packages, and on RHEL/Rocky systems (e.g. Improv) GNUInstallDirs
+# resolves CMAKE_INSTALL_LIBDIR to lib64, which would orphan the module.
 set(APS_PY_SITE
-    ${CMAKE_INSTALL_LIBDIR}/python${Python3_VERSION_MAJOR}.${Python3_VERSION_MINOR}/site-packages)
+    lib/python${Python3_VERSION_MAJOR}.${Python3_VERSION_MINOR}/site-packages)
 
 # Build-tree copy so run-local-*.sh and the build-tree dev workflow work
 # without `make install` (PYTHONPATH=build/python picks up tekapp from here).
