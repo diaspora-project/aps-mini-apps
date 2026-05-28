@@ -45,25 +45,44 @@ if [ -d "$SCRIPT_DIR/../../build/bin" ]; then
 fi
 
 echo "Defining workflow topology/mapping"
-nodes=($(cat "$PBS_NODEFILE"))
+# PBS_NODEFILE on Improv lists each node once per core, with the FQDN
+# (e.g. "i006.lcrc.anl.gov"). openmpi's mpiexec wants short names and
+# explicit slot counts ("--host node:N" or "node slots=N" in a hostfile),
+# otherwise it counts one slot per --host occurrence and refuses to launch.
+declare -A SLOTS_PER_NODE
+nodes=()
+while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    short="${line%%.*}"
+    if [[ -z "${SLOTS_PER_NODE[$short]:-}" ]]; then
+        nodes+=("$short")
+        SLOTS_PER_NODE[$short]=1
+    else
+        SLOTS_PER_NODE[$short]=$((SLOTS_PER_NODE[$short]+1))
+    fi
+done < "$PBS_NODEFILE"
+
 node_daq=${nodes[0]}
 node_dist=${nodes[1]}
 node_den=${nodes[2]}
 node_sirt=("${nodes[@]:3}")
 
-echo "DAQ node: ${node_daq}"
-echo "DIST node: ${node_dist}"
-echo "DEN node: ${node_den}"
+echo "DAQ node: ${node_daq} (${SLOTS_PER_NODE[$node_daq]} slots)"
+echo "DIST node: ${node_dist} (${SLOTS_PER_NODE[$node_dist]} slots)"
+echo "DEN node: ${node_den} (${SLOTS_PER_NODE[$node_den]} slots)"
 echo "SIRT node(s): ${node_sirt[@]}"
 
-nnodes=`wc -l < $PBS_NODEFILE`
+nnodes=${#nodes[@]}
 sirt_ranks=$(((nnodes - 3)*2))
-printf "%s\n" "${node_sirt[@]}" > sirt_file
+: > sirt_file
+for n in "${node_sirt[@]}"; do
+    echo "$n slots=${SLOTS_PER_NODE[$n]}" >> sirt_file
+done
 
 simple_mpiexec() {
     # Used only before DAQ is launched; co-locates with node_daq.
     # --bind-to none is required by Mochi components that spawn extra threads.
-    mpiexec -n 1 -N 1 --bind-to none --host "${node_daq}" $@
+    mpiexec -n 1 -N 1 --bind-to none --host "${node_daq}:${SLOTS_PER_NODE[$node_daq]}" $@
 }
 
 # Shared message store for the files driver. Must live on a filesystem
@@ -86,7 +105,7 @@ echo "{\"root_path\":\"$DATA_ROOT\"}" > diaspora-files-driver-config.json
 DRIVER_ARGS="--driver_type files --driver_config_file diaspora-files-driver-config.json"
 
 echo "Launching DAQ"
-mpiexec -n 1 -N 1 --bind-to none --host $node_daq \
+mpiexec -n 1 -N 1 --bind-to none --host "${node_daq}:${SLOTS_PER_NODE[$node_daq]}" \
     tekapp-daq --mode 1 --simulation_file \
         ./data/tomo_00058_all_subsampled1p_s1079s1081.h5 --d_iteration 1  --batchsize 4 \
         --publisher_addr tcp://0.0.0.0:50000 --iteration_sleep 1 --synch_addr tcp://0.0.0.0:50001 \
@@ -95,7 +114,7 @@ DAQ_PID=$!
 echo "DAQ launched with PID $DAQ_PID"
 
 echo "Launching DIST"
-mpiexec -n 1 -N 1 --bind-to none --host $node_dist \
+mpiexec -n 1 -N 1 --bind-to none --host "${node_dist}:${SLOTS_PER_NODE[$node_dist]}" \
     tekapp-dist  --cast_to_float32 \
         --normalize --beg_sinogram 1000 --num_sinograms 2 --num_columns 2560  --batchsize 4 \
         $DRIVER_ARGS 1>dist.out 2>dist.err &
@@ -111,7 +130,7 @@ SIRT_PID=$!
 echo "SIRT launched with PID $SIRT_PID"
 
 echo "Launching DEN"
-mpiexec -n 1 -N 1 --bind-to none --host $node_den \
+mpiexec -n 1 -N 1 --bind-to none --host "${node_den}:${SLOTS_PER_NODE[$node_den]}" \
     tekapp-denoiser \
         --model testA40GPU-it07500.h5 \
         $DRIVER_ARGS --batchsize 4 --nproc_sirt 2 1>den.out 2>den.err &

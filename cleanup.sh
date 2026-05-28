@@ -1,1 +1,1 @@
-rm -rf aps-miniapp-data Daq_push.csv daq.err daq.out den.err den.out dist.err dist.out mofka.* sirt.err sirt.out metadata.csv diaspora-driver.json diaspora-mofka-driver-config.json *.h5 *.ts.txt
+rm -rf aps-miniapp-data Daq_push.csv daq.err daq.out den.err den.out dist.err dist.out mofka.out mofka.err mofka.flock sirt.err sirt.out metadata.csv diaspora-driver.json diaspora-mofka-driver-config.json *.h5 *.ts.txt

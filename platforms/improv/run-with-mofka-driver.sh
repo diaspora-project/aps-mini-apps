@@ -59,7 +59,23 @@ fi
 source mofka-config.env
 
 echo "Defining workflow topology/mapping"
-nodes=($(cat "$PBS_NODEFILE"))
+# PBS_NODEFILE on Improv lists each node once per core, with the FQDN
+# (e.g. "i006.lcrc.anl.gov"). openmpi's mpiexec wants short names and
+# explicit slot counts ("--host node:N" or "node slots=N" in a hostfile),
+# otherwise it counts one slot per --host occurrence and refuses to launch.
+declare -A SLOTS_PER_NODE
+nodes=()
+while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    short="${line%%.*}"
+    if [[ -z "${SLOTS_PER_NODE[$short]:-}" ]]; then
+        nodes+=("$short")
+        SLOTS_PER_NODE[$short]=1
+    else
+        SLOTS_PER_NODE[$short]=$((SLOTS_PER_NODE[$short]+1))
+    fi
+done < "$PBS_NODEFILE"
+
 mofka_nodes=("${nodes[@]:0:$BEDROCK_NODES}")
 node_daq=${nodes[$BEDROCK_NODES]}
 node_dist=${nodes[$((BEDROCK_NODES+1))]}
@@ -67,25 +83,32 @@ node_den=${nodes[$((BEDROCK_NODES+2))]}
 node_sirt=("${nodes[@]:$((BEDROCK_NODES+3))}")
 
 echo "Mofka node(s): ${mofka_nodes[*]}"
-echo "DAQ node: ${node_daq}"
-echo "DIST node: ${node_dist}"
-echo "DEN node: ${node_den}"
+echo "DAQ node: ${node_daq} (${SLOTS_PER_NODE[$node_daq]} slots)"
+echo "DIST node: ${node_dist} (${SLOTS_PER_NODE[$node_dist]} slots)"
+echo "DEN node: ${node_den} (${SLOTS_PER_NODE[$node_den]} slots)"
 echo "SIRT node(s): ${node_sirt[@]}"
 
-nnodes=`wc -l < $PBS_NODEFILE`
+nnodes=${#nodes[@]}
 sirt_ranks=$(((nnodes - BEDROCK_NODES - 3)*2))
-printf "%s\n" "${node_sirt[@]}" > sirt_file
+: > sirt_file
+for n in "${node_sirt[@]}"; do
+    echo "$n slots=${SLOTS_PER_NODE[$n]}" >> sirt_file
+done
 
 simple_mpiexec() {
     # Used only before DAQ is launched; co-locates with node_daq.
     # --bind-to none is required by Mochi components that spawn extra threads.
-    mpiexec -n 1 -N 1 --bind-to none --host "${node_daq}" $@
+    mpiexec -n 1 -N 1 --bind-to none --host "${node_daq}:${SLOTS_PER_NODE[$node_daq]}" $@
 }
 
 rm -f "$MOFKA_FLOCK_FILE"
 
 total_bedrock=$((BEDROCK_NODES * BEDROCK_PPN))
-mofka_host_list=$(IFS=,; echo "${mofka_nodes[*]}")
+mofka_host_entries=()
+for n in "${mofka_nodes[@]}"; do
+    mofka_host_entries+=("${n}:${SLOTS_PER_NODE[$n]}")
+done
+mofka_host_list=$(IFS=,; echo "${mofka_host_entries[*]}")
 echo "Deploying Mofka ($total_bedrock proc(s) on ${BEDROCK_NODES} node(s), protocol: $BEDROCK_PROTOCOL)"
 mpiexec -n "$total_bedrock" -N "$BEDROCK_PPN" --bind-to none --host "$mofka_host_list" \
     bedrock "$BEDROCK_PROTOCOL" -c mofka.json 1> mofka.out 2> mofka.err &
@@ -113,7 +136,7 @@ echo "{\"group_file\":\"./$MOFKA_FLOCK_FILE\"}" > diaspora-mofka-driver-config.j
 DRIVER_ARGS="--driver_type mofka --driver_config_file diaspora-mofka-driver-config.json"
 
 echo "Launching DAQ"
-mpiexec -n 1 -N 1 --bind-to none --host $node_daq \
+mpiexec -n 1 -N 1 --bind-to none --host "${node_daq}:${SLOTS_PER_NODE[$node_daq]}" \
     tekapp-daq --mode 1 --simulation_file \
         ./data/tomo_00058_all_subsampled1p_s1079s1081.h5 --d_iteration 1  --batchsize 4 \
         --publisher_addr tcp://0.0.0.0:50000 --iteration_sleep 1 --synch_addr tcp://0.0.0.0:50001 \
@@ -122,7 +145,7 @@ DAQ_PID=$!
 echo "DAQ launched with PID $DAQ_PID"
 
 echo "Launching DIST"
-mpiexec -n 1 -N 1 --bind-to none --host $node_dist \
+mpiexec -n 1 -N 1 --bind-to none --host "${node_dist}:${SLOTS_PER_NODE[$node_dist]}" \
     tekapp-dist  --cast_to_float32 \
         --normalize --beg_sinogram 1000 --num_sinograms 2 --num_columns 2560  --batchsize 4 \
         $DRIVER_ARGS 1>dist.out 2>dist.err &
@@ -138,7 +161,7 @@ SIRT_PID=$!
 echo "SIRT launched with PID $SIRT_PID"
 
 echo "Launching DEN"
-mpiexec -n 1 -N 1 --bind-to none --host $node_den \
+mpiexec -n 1 -N 1 --bind-to none --host "${node_den}:${SLOTS_PER_NODE[$node_den]}" \
     tekapp-denoiser \
         --model testA40GPU-it07500.h5 \
         $DRIVER_ARGS --batchsize 4 --nproc_sirt 2 1>den.out 2>den.err &
