@@ -154,6 +154,8 @@ for topic in "${MOFKA_TOPICS[@]}"; do
 done
 
 echo "Completed topic creations"
+echo "Checking the list of topics"
+simple_mpiexec diaspora-ctl topic list $DIASPORA_CTL_DRIVER_ARGS
 
 echo "{\"group_file\":\"./$MOFKA_FLOCK_FILE\"}" > diaspora-mofka-driver-config.json
 DRIVER_ARGS="--driver_type mofka --driver_config_file diaspora-mofka-driver-config.json"
