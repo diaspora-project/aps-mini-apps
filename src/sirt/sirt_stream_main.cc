@@ -134,13 +134,17 @@ int main(int argc, char **argv)
   DISPCommBase<float> *comm =
         new DISPCommMPI<float>(&argc, &argv);
   TraceRuntimeConfig config(argc, argv, comm->rank(), comm->size());
+  std::cerr << "[sirt.main rank=" << comm->rank() << "/" << comm->size()
+            << "] constructing DiasporaStream" << std::endl;
   DiasporaStream ms = DiasporaStream{ config.driver_type,
                                       config.driver_config_file,
                                       config.batchsize,
                                       static_cast<uint32_t>(config.window_len),
                                       comm->rank(),
                                       comm->size()};
+  std::cerr << "[sirt.main rank=" << comm->rank() << "] entering handshake" << std::endl;
   ms.handshake(comm->rank(), comm->size());
+  std::cerr << "[sirt.main rank=" << comm->rank() << "] handshake returned" << std::endl;
   std::string consuming_topic = "dist_sirt";
   std::string producing_topic = "sirt_den";
   std::vector<size_t> targets = {static_cast<size_t>(comm->rank())};

@@ -105,7 +105,10 @@ DiasporaStream::DiasporaStream(
       } else if (driver_type == "files") {
         driver_options = json::parse("{\"root_path\":\"./diaspora-data\"}");
       }
+      std::cerr << "[sirt.ctor rank=" << rank << "/" << size
+                << "] creating driver type=" << driver_type << std::endl;
       driver = diaspora::Driver::New(driver_type.c_str(), driver_options);
+      std::cerr << "[sirt.ctor rank=" << rank << "] driver created" << std::endl;
   }
 
 
@@ -114,30 +117,51 @@ DiasporaStream::DiasporaStream(
 * @param size: MPI size
 */
 void DiasporaStream::handshake(int rank, int size){
+  std::cerr << "[sirt.handshake rank=" << rank << "/" << size
+            << "] opening producer on handshake_s_d" << std::endl;
   std::string topic_name = "handshake_s_d";
   // Send comm size to dist_streamer
   diaspora::Producer hs_producer = getProducer(topic_name, "hs_p");
 
+  std::cerr << "[sirt.handshake rank=" << rank << "] pushing comm_size=" << size << std::endl;
   json md = {{"comm_size", size}};
   diaspora::Metadata metadata{md};
   hs_producer.push(metadata);
+  std::cerr << "[sirt.handshake rank=" << rank
+            << "] flush().wait(-1) on handshake_s_d" << std::endl;
   hs_producer.flush().wait(-1);  // ensure comm_size is on disk before waiting for DIST's reply
+  std::cerr << "[sirt.handshake rank=" << rank << "] flush done" << std::endl;
 
   // Receive metadata info
   topic_name = "handshake_d_s";
   std::vector<size_t> targets = {static_cast<size_t>(rank)};
+  std::cerr << "[sirt.handshake rank=" << rank
+            << "] opening topic handshake_d_s, target partition=" << rank << std::endl;
   diaspora::TopicHandle topic = driver.openTopic(topic_name);
+  std::cerr << "[sirt.handshake rank=" << rank << "] creating consumer hs_c" << std::endl;
   diaspora::Consumer hs_consumer = topic.consumer( "hs_c",
                                                 batchSize,
                                                 threadCount,
                                                 targets);
+  std::cerr << "[sirt.handshake rank=" << rank
+            << "] waiting for assignment on handshake_d_s[" << rank << "]" << std::endl;
   std::optional<diaspora::Event> event;
+  int attempt = 0;
   while(!event) {
+    ++attempt;
+    std::cerr << "[sirt.handshake rank=" << rank
+              << "] pull attempt #" << attempt << " (wait -1)" << std::endl;
     event = hs_consumer.pull().wait(-1);
+    if(!event) {
+      std::cerr << "[sirt.handshake rank=" << rank
+                << "] pull #" << attempt << " returned empty" << std::endl;
+    }
   }
+  std::cerr << "[sirt.handshake rank=" << rank << "] got assignment, parsing" << std::endl;
   diaspora::Metadata m = event->metadata();
   json mdata = m.json();
   setInfo(mdata);
+  std::cerr << "[sirt.handshake rank=" << rank << "] handshake complete" << std::endl;
 }
 
 /* Publish reconstructed image
