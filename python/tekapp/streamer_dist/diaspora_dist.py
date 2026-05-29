@@ -128,9 +128,12 @@ class DiasporaDist:
         else:
             self.nranks = nproc_sirt
             print(f"[dist.handshake] nproc_sirt provided as arg, nranks={self.nranks}", flush=True)
-        print("[dist.handshake] opening producer on handshake_d_s", flush=True)
+        print("[dist.handshake] opening producer on handshake_d_s (batch_size=1, unbuffered)", flush=True)
         topic_name = "handshake_d_s"
-        producer = self.producer(topic_name, "handshaker")
+        topic = self.driver.open_topic(topic_name)
+        producer = topic.producer("handshaker",
+                                  batch_size=1,
+                                  ordering=diaspora.Ordering.Strict)
         # distribute data info
         print(f"[dist.handshake] pushing {self.nranks} assignment messages on handshake_d_s", flush=True)
         for p in range(self.nranks):

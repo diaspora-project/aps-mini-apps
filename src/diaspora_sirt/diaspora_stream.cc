@@ -118,10 +118,17 @@ DiasporaStream::DiasporaStream(
 */
 void DiasporaStream::handshake(int rank, int size){
   std::cerr << "[sirt.handshake rank=" << rank << "/" << size
-            << "] opening producer on handshake_s_d" << std::endl;
+            << "] opening producer on handshake_s_d (batch_size=1, unbuffered)" << std::endl;
   std::string topic_name = "handshake_s_d";
-  // Send comm size to dist_streamer
-  diaspora::Producer hs_producer = getProducer(topic_name, "hs_p");
+  // Send comm size to dist_streamer.
+  // Use batch_size=1 unconditionally: handshake is a single control message
+  // and we cannot tolerate it sitting in a producer-side buffer.
+  auto hs_topic = driver.openTopic(topic_name);
+  diaspora::Producer hs_producer = hs_topic.producer(
+      "hs_p",
+      diaspora::BatchSize{1},
+      threadCount,
+      ordering);
 
   std::cerr << "[sirt.handshake rank=" << rank << "] pushing comm_size=" << size << std::endl;
   json md = {{"comm_size", size}};
