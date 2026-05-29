@@ -5,6 +5,11 @@
 #PBS -q debug-scaling
 #PBS -l filesystems=home:eagle
 
+# Variant selector: 'tekapp' (real pipeline) or 'fakapp' (protocol-only
+# stand-in built from src/fake_sirt + python/fakapp). Override on the
+# command line, e.g.: APP_NAME=fakapp qsub platforms/polaris/run-with-files-driver.sh
+APP_NAME="${APP_NAME:-tekapp}"
+
 # Polaris run script using the diaspora "files" driver instead of Mofka.
 # No bedrock server is needed — the files driver uses a shared directory
 # (on Eagle/home) as the message store, so we save one node compared to
@@ -135,7 +140,7 @@ DRIVER_ARGS="--driver_type files --driver_config_file diaspora-files-driver-conf
 
 echo "Launching DAQ"
 mpiexec --single-node-vni -n 1 --ppn 1 -d 16 --hosts $node_daq \
-    tekapp-daq --mode 1 --simulation_file \
+    ${APP_NAME}-daq --mode 1 --simulation_file \
         ./data/tomo_00058_all_subsampled1p_s1079s1081.h5 --d_iteration 1  --batchsize 4 \
         --publisher_addr tcp://0.0.0.0:50000 --iteration_sleep 1 --synch_addr tcp://0.0.0.0:50001 \
         --synch_count 1 $DRIVER_ARGS 1>daq.out 2>daq.err &
@@ -144,7 +149,7 @@ echo "DAQ launched with PID $DAQ_PID"
 
 echo "Launching DIST"
 mpiexec --single-node-vni -n 1 --ppn 1 -d 16 --hosts $node_dist \
-    tekapp-dist  --cast_to_float32 \
+    ${APP_NAME}-dist  --cast_to_float32 \
         --normalize --beg_sinogram 1000 --num_sinograms 2 --num_columns 2560  --batchsize 4 \
         $DRIVER_ARGS 1>dist.out 2>dist.err &
 DIST_PID=$!
@@ -152,7 +157,7 @@ echo "DIST launched with PID $DIST_PID"
 
 echo "Launching SIRT"
 mpiexec --single-node-vni -n $sirt_ranks --ppn 2 --line-buffer -l -d 16 --hostfile sirt_file \
-    tekapp-sirt --write-freq 4  \
+    ${APP_NAME}-sirt --write-freq 4  \
         --window-iter 1 --window-step 4 --window-length 4 -t 4 -c 1427 \
         $DRIVER_ARGS --batchsize 4 1>sirt.out 2>sirt.err &
 SIRT_PID=$!
@@ -160,7 +165,7 @@ echo "SIRT launched with PID $SIRT_PID"
 
 echo "Launching DEN"
 mpiexec --single-node-vni -n 1 --ppn 1 -d 16 --hosts $node_den \
-    tekapp-denoiser \
+    ${APP_NAME}-denoiser \
         --model testA40GPU-it07500.h5 \
         $DRIVER_ARGS --batchsize 4 --nproc_sirt 2 1>den.out 2>den.err &
 DEN_PID=$!

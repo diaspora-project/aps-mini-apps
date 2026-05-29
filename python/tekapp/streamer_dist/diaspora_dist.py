@@ -101,14 +101,23 @@ class DiasporaDist:
     def handshake(self, nproc_sirt: int,  row: int, col: int) -> str :
         # Figure out how many ranks are there at the remote location
         if nproc_sirt == 0:
+            print("[dist.handshake] opening topic handshake_s_d", flush=True)
             topic_name = "handshake_s_d"
             topic = self.driver.open_topic(topic_name)
+            print("[dist.handshake] creating consumer 'handshaker' on handshake_s_d", flush=True)
             hs_kwargs = dict(name="handshaker", batch_size=self.batch)
             consumer = topic.consumer(**hs_kwargs)
+            print("[dist.handshake] waiting for SIRT to publish comm_size...", flush=True)
             event = None
+            attempt = 0
             while event is None:
+                attempt += 1
+                print(f"[dist.handshake] pull attempt #{attempt} (timeout=300s)", flush=True)
                 event = consumer.pull().wait(timeout_ms=300000)
+                if event is None:
+                    print(f"[dist.handshake] pull #{attempt} timed out, retrying", flush=True)
             self.nranks = event.metadata["comm_size"]
+            print(f"[dist.handshake] received comm_size={self.nranks}", flush=True)
             self.seq += 1
             del event
             consumer.unsubscribe()
@@ -118,23 +127,32 @@ class DiasporaDist:
             raise ValueError('Number of reconstruction processes cannot be negative')
         else:
             self.nranks = nproc_sirt
+            print(f"[dist.handshake] nproc_sirt provided as arg, nranks={self.nranks}", flush=True)
+        print("[dist.handshake] opening producer on handshake_d_s", flush=True)
         topic_name = "handshake_d_s"
         producer = self.producer(topic_name, "handshaker")
         # distribute data info
+        print(f"[dist.handshake] pushing {self.nranks} assignment messages on handshake_d_s", flush=True)
         for p in range(self.nranks):
             info = assign_data(p, self.nranks, row, col)
             f = producer.push(info)
+        print("[dist.handshake] flushing handshake_d_s producer (timeout=300s)", flush=True)
         producer.flush().wait(timeout_ms=300000)
+        print("[dist.handshake] flush done", flush=True)
         self.seq += 1
         del producer
         return "Done"
 
     def pull_image(self, consumer: diaspora.Consumer):
         self.ts.record("PULL_START topic=daq_dist")
+        print("[dist.pull_image] calling consumer.pull() on daq_dist", flush=True)
         f = consumer.pull()
         self.ts.record("PULL_END topic=daq_dist")
         self.ts.record("PULL_WAIT_START topic=daq_dist")
+        print("[dist.pull_image] waiting (timeout=300s)", flush=True)
         event = f.wait(timeout_ms=300000)
+        if event is None:
+            print("[dist.pull_image] WAIT TIMED OUT (no event from daq_dist in 300s)", flush=True)
         data_size = len(event.data[0]) if event.data else 0
         self.ts.record(f"PULL_WAIT_END topic=daq_dist,event_id={event.event_id},data_size={data_size}")
         metadata = event.metadata

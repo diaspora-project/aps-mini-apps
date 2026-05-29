@@ -58,15 +58,23 @@ def parse_arguments():
 
 def main():
   args = parse_arguments()
+  print(f"[dist] main: starting, driver_type={args.driver_type}, nproc_sirt={args.nproc_sirt}", flush=True)
   # Setup Diaspora
+  print("[dist] main: constructing DiasporaDist (driver init)", flush=True)
   diaspora_dist = DiasporaDist(driver_type=args.driver_type,
                                driver_config_file=args.driver_config_file,
                                batchsize=args.batchsize)
+  print("[dist] main: DiasporaDist constructed", flush=True)
   # Handshake with Sirt
+  print(f"[dist] main: entering handshake(nproc_sirt={args.nproc_sirt})", flush=True)
   diaspora_dist.handshake(args.nproc_sirt, args.num_sinograms, args.num_columns)
+  print(f"[dist] main: handshake done, nranks={diaspora_dist.nranks}", flush=True)
 
+  print("[dist] main: opening consumer daq_dist", flush=True)
   consumer = diaspora_dist.consumer(topic_name="daq_dist", consumer_name="dist")
+  print("[dist] main: opening producer dist_sirt", flush=True)
   producer = diaspora_dist.producer(topic_name="dist_sirt", producer_name="producer_dist")
+  print("[dist] main: entering pull loop", flush=True)
   # Setup serializer
   serializer = TraceSerializer.ImageSerializer()
 

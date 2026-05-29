@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# Variant selector: 'tekapp' (real pipeline) or 'fakapp' (protocol-only
+# stand-in built from src/fake_sirt + python/fakapp). Override on the
+# command line, e.g.: APP_NAME=fakapp bash platforms/apptainer/run-with-files-driver.sh
+APP_NAME="${APP_NAME:-tekapp}"
+
 # Run the tekapp pipeline (DAQ -> DIST -> SIRT -> DEN) using the Apptainer
 # image built by platforms/apptainer/build.sh, with the diaspora "files"
 # driver. SIRT uses host mpiexec with per-rank `apptainer exec` (host MPI
@@ -42,28 +47,28 @@ DRIVER_ARGS="--driver_type files --driver_config_file diaspora-files-driver-conf
 echo "Completed topic creations"
 
 echo "Launching DAQ"
-$APP tekapp-daq --mode 2 \
+$APP ${APP_NAME}-daq --mode 2 \
     --num_sinograms 2 --num_sinogram_columns 2560 --num_sinogram_projections 16 \
     --batchsize 4 $DRIVER_ARGS 1>daq.out 2>daq.err &
 DAQ_PID=$!
 echo "DAQ launched with PID $DAQ_PID"
 
 echo "Launching DIST"
-$APP tekapp-dist --cast_to_float32 \
+$APP ${APP_NAME}-dist --cast_to_float32 \
     --normalize --beg_sinogram 1000 --num_sinograms 2 --num_columns 2560 --batchsize 4 \
     $DRIVER_ARGS 1>dist.out 2>dist.err &
 DIST_PID=$!
 echo "DIST launched with PID $DIST_PID"
 
 echo "Launching SIRT (host mpiexec, apptainer exec per rank)"
-mpiexec -n $SIRT_RANKS $APP tekapp-sirt --write-freq 4 \
+mpiexec -n $SIRT_RANKS $APP ${APP_NAME}-sirt --write-freq 4 \
     --window-iter 1 --window-step 4 --window-length 4 -t 4 -c 1427 \
     $DRIVER_ARGS --batchsize 4 1>sirt.out 2>sirt.err &
 SIRT_PID=$!
 echo "SIRT launched with PID $SIRT_PID"
 
 echo "Launching DEN"
-$APP tekapp-denoiser \
+$APP ${APP_NAME}-denoiser \
     --model testA40GPU-it07500.h5 \
     $DRIVER_ARGS --batchsize 4 --nproc_sirt 2 1>den.out 2>den.err &
 DEN_PID=$!
