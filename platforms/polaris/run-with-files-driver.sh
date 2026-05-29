@@ -125,13 +125,13 @@ DIASPORA_CTL_DRIVER_ARGS="--driver files --driver.root_path $DATA_ROOT"
 
 echo "Starting topic creations"
 echo "Creating DAQ -> DIST topic"
-simple_mpiexec diaspora-ctl topic create --name daq_dist $DIASPORA_CTL_DRIVER_ARGS --topic.partitions 1
+simple_mpiexec diaspora-ctl topic create --name daq_dist $DIASPORA_CTL_DRIVER_ARGS --topic.num_partitions 1
 echo "Creating DIST topics (dist_sirt, handshake_s_d, handshake_d_s)"
-simple_mpiexec diaspora-ctl topic create --name dist_sirt $DIASPORA_CTL_DRIVER_ARGS --topic.partitions $sirt_ranks
-simple_mpiexec diaspora-ctl topic create --name handshake_s_d $DIASPORA_CTL_DRIVER_ARGS --topic.partitions 1
-simple_mpiexec diaspora-ctl topic create --name handshake_d_s $DIASPORA_CTL_DRIVER_ARGS --topic.partitions $sirt_ranks
+simple_mpiexec diaspora-ctl topic create --name dist_sirt $DIASPORA_CTL_DRIVER_ARGS --topic.num_partitions $sirt_ranks
+simple_mpiexec diaspora-ctl topic create --name handshake_s_d $DIASPORA_CTL_DRIVER_ARGS --topic.num_partitions 1
+simple_mpiexec diaspora-ctl topic create --name handshake_d_s $DIASPORA_CTL_DRIVER_ARGS --topic.num_partitions $sirt_ranks
 echo "Creating SIRT -> DEN topic (one partition per SIRT rank to avoid concurrent write conflicts)"
-simple_mpiexec diaspora-ctl topic create --name sirt_den $DIASPORA_CTL_DRIVER_ARGS --topic.partitions $sirt_ranks
+simple_mpiexec diaspora-ctl topic create --name sirt_den $DIASPORA_CTL_DRIVER_ARGS --topic.num_partitions $sirt_ranks
 
 echo "Completed topic creations"
 
