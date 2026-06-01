@@ -108,14 +108,20 @@ class DiasporaDist:
             hs_kwargs = dict(name="handshaker", batch_size=self.batch)
             consumer = topic.consumer(**hs_kwargs)
             print("[dist.handshake] waiting for SIRT to publish comm_size...", flush=True)
+            # Correct pattern: pull() once to issue the request, then wait()
+            # on the SAME future until it resolves. Calling pull() inside the
+            # retry loop creates a new pending future each iteration and
+            # discards the previous one, so an event delivered to attempt N's
+            # future is lost when attempt N+1 replaces it.
+            future = consumer.pull()
             event = None
             attempt = 0
             while event is None:
                 attempt += 1
-                print(f"[dist.handshake] pull attempt #{attempt} (timeout=300s)", flush=True)
-                event = consumer.pull().wait(timeout_ms=300000)
+                print(f"[dist.handshake] wait attempt #{attempt}", flush=True)
+                event = future.wait(timeout_ms=-1)
                 if event is None:
-                    print(f"[dist.handshake] pull #{attempt} timed out, retrying", flush=True)
+                    time.sleep(0.1)
             self.nranks = event.metadata["comm_size"]
             print(f"[dist.handshake] received comm_size={self.nranks}", flush=True)
             self.seq += 1
@@ -139,8 +145,8 @@ class DiasporaDist:
         for p in range(self.nranks):
             info = assign_data(p, self.nranks, row, col)
             f = producer.push(info)
-        print("[dist.handshake] flushing handshake_d_s producer (timeout=300s)", flush=True)
-        producer.flush().wait(timeout_ms=300000)
+        print("[dist.handshake] flushing handshake_d_s producer (wait -1)", flush=True)
+        producer.flush().wait(timeout_ms=-1)
         print("[dist.handshake] flush done", flush=True)
         self.seq += 1
         del producer
@@ -149,13 +155,17 @@ class DiasporaDist:
     def pull_image(self, consumer: diaspora.Consumer):
         self.ts.record("PULL_START topic=daq_dist")
         print("[dist.pull_image] calling consumer.pull() on daq_dist", flush=True)
+        # pull() once, then wait() on that single future until it resolves.
+        # Calling pull() each iteration would orphan the prior future and
+        # lose any event already destined for it.
         f = consumer.pull()
         self.ts.record("PULL_END topic=daq_dist")
         self.ts.record("PULL_WAIT_START topic=daq_dist")
-        print("[dist.pull_image] waiting (timeout=300s)", flush=True)
-        event = f.wait(timeout_ms=300000)
-        if event is None:
-            print("[dist.pull_image] WAIT TIMED OUT (no event from daq_dist in 300s)", flush=True)
+        event = None
+        while event is None:
+            event = f.wait(timeout_ms=-1)
+            if event is None:
+                time.sleep(0.1)
         data_size = len(event.data[0]) if event.data else 0
         self.ts.record(f"PULL_WAIT_END topic=daq_dist,event_id={event.event_id},data_size={data_size}")
         metadata = event.metadata

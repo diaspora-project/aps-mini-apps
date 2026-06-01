@@ -8,7 +8,7 @@ APP_NAME="${APP_NAME:-tekapp}"
 # generate mofka.json + mofka-config.env in the cwd. Use --from-file with the
 # saved mofka-answers.env for reproducible runs.
 
-eval `spack env activate --sh tekapp-env`
+eval `spack env activate --sh tekapp-dev-env`
 
 # Use the build tree if present; otherwise rely on the installed tekapp-* on PATH.
 SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &>/dev/null && pwd )"
@@ -50,6 +50,8 @@ echo "{\"group_file\":\"./$MOFKA_FLOCK_FILE\"}" > diaspora-mofka-driver-config.j
 DRIVER_ARGS="--driver_type mofka --driver_config_file diaspora-mofka-driver-config.json"
 
 echo "Completed topic creations"
+
+export PYTHONUNBUFFERED=1
 
 echo "Launching DAQ"
 # Launch DAQ in "mode 1" (data coming from an HDF5 file)
