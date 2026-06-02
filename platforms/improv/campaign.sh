@@ -7,16 +7,16 @@
 #PBS -A radix-io
 
 # Campaign driver: run platforms/improv/run-with-<DRIVER>-driver.sh
-# NUM_RUNS times, each from its own per-run directory under
-# $PBS_O_WORKDIR/campaigns/<jobid>/run-NNN/. A failed run is recorded
-# but does not abort the campaign.
+# NUM_RUNS times from $PBS_O_WORKDIR (same cwd the inner scripts already
+# use). After each run, the per-component logs (*.out, *.err, *.ts.txt)
+# are moved into $PBS_O_WORKDIR/campaigns/<jobid>/run-NNN/, and
+# cleanup.sh is run between iterations to reset the workdir state.
+# A failed run is recorded but does not abort the campaign.
 #
 # Prereq for DRIVER=mofka: run `bash scripts/configure-mofka.sh
-# --platform improv` once in $PBS_O_WORKDIR before submitting; the
-# resulting mofka.json + mofka-config.env are symlinked into every
-# run dir. The #PBS -l select=5 above must be >= what
-# run-with-mofka-driver.sh needs (BEDROCK_NODES + 3 + SIRT_NODES);
-# for a files-only campaign 4 nodes are enough.
+# --platform improv` once in $PBS_O_WORKDIR before submitting.
+# Node count: #PBS -l select=5 must be >= what the mofka inner script
+# needs (BEDROCK_NODES + 3 + SIRT_NODES); 4 is enough for files-only.
 
 # === Campaign configuration (edit before submitting) ===
 NUM_RUNS=5
@@ -33,7 +33,9 @@ case "$DRIVER" in
 esac
 
 INNER_SCRIPT="$PBS_O_WORKDIR/platforms/improv/run-with-${DRIVER}-driver.sh"
-[[ -r "$INNER_SCRIPT" ]] || { echo "ERROR: $INNER_SCRIPT not found" >&2; exit 2; }
+CLEANUP_SCRIPT="$PBS_O_WORKDIR/cleanup.sh"
+[[ -r "$INNER_SCRIPT" ]]   || { echo "ERROR: $INNER_SCRIPT not found" >&2; exit 2; }
+[[ -r "$CLEANUP_SCRIPT" ]] || { echo "ERROR: $CLEANUP_SCRIPT not found" >&2; exit 2; }
 
 if [[ "$DRIVER" == "mofka" ]]; then
     if [[ ! -f mofka.json || ! -f mofka-config.env ]]; then
@@ -54,30 +56,34 @@ SUMMARY="$CAMPAIGN_DIR/summary.txt"
     echo
 } | tee "$SUMMARY"
 
-# Shared inputs the inner script references via relative paths from cwd.
-# Symlinked into each run dir so the inner script's references resolve.
-SHARED_LINKS=(spack data)
-[[ "$DRIVER" == "mofka" ]] && SHARED_LINKS+=(mofka.json mofka-config.env)
-
 for ((i=1; i<=NUM_RUNS; i++)); do
     RUN_DIR="$CAMPAIGN_DIR/run-$(printf '%03d' "$i")"
-    mkdir -p "$RUN_DIR"
-
-    for f in "${SHARED_LINKS[@]}"; do
-        if [[ -e "$PBS_O_WORKDIR/$f" ]]; then
-            ln -sfn "$PBS_O_WORKDIR/$f" "$RUN_DIR/$f"
-        else
-            echo "WARNING: $PBS_O_WORKDIR/$f does not exist; not symlinking" | tee -a "$SUMMARY"
-        fi
-    done
 
     echo "========== Run $i / $NUM_RUNS  ($RUN_DIR) ==========" | tee -a "$SUMMARY"
     start=$(date +%s)
-    RUN_DIR="$RUN_DIR" bash "$INNER_SCRIPT" \
-        > "$RUN_DIR/campaign-run.out" 2> "$RUN_DIR/campaign-run.err"
+    bash "$INNER_SCRIPT" > "campaign-run.out" 2> "campaign-run.err"
     rc=$?
     elapsed=$(( $(date +%s) - start ))
     echo "run $i: rc=$rc elapsed=${elapsed}s" | tee -a "$SUMMARY"
+
+    # Stash this run's outputs before cleanup wipes them.
+    mkdir -p "$RUN_DIR"
+    for f in daq.out daq.err dist.out dist.err sirt.out sirt.err \
+             den.out den.err mofka.out mofka.err \
+             campaign-run.out campaign-run.err; do
+        [[ -e "$f" ]] && mv "$f" "$RUN_DIR/" || true
+    done
+    # *.ts.txt timestamps (per component, may be ranked: sirt.0.ts.txt etc.)
+    for f in *.ts.txt; do
+        [[ -e "$f" ]] && mv "$f" "$RUN_DIR/" || true
+    done
+
+    # Reset workdir state for the next run (removes the files the inner
+    # script left behind: aps-miniapp-data/, *.h5, mofka.flock, etc.)
+    if (( i < NUM_RUNS )); then
+        echo "running cleanup.sh" | tee -a "$SUMMARY"
+        bash "$CLEANUP_SCRIPT" >> "$RUN_DIR/cleanup.out" 2>> "$RUN_DIR/cleanup.err" || true
+    fi
 done
 
 echo | tee -a "$SUMMARY"

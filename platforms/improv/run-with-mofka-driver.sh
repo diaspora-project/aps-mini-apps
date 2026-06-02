@@ -40,7 +40,7 @@ echo "The Job is being executed on the following node:"
 cat ${PBS_NODEFILE}
 echo "####################################################"
 
-cd "${RUN_DIR:-$PBS_O_WORKDIR}"
+cd $PBS_O_WORKDIR
 
 echo "Loading modules"
 module load gcc/13.2.0
