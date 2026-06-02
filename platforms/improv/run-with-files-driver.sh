@@ -31,7 +31,7 @@ echo "The Job is being executed on the following node:"
 cat ${PBS_NODEFILE}
 echo "####################################################"
 
-cd $PBS_O_WORKDIR
+cd "${RUN_DIR:-$PBS_O_WORKDIR}"
 
 echo "Loading modules"
 module load gcc/13.2.0
@@ -92,7 +92,7 @@ simple_mpiexec() {
 
 # Shared message store for the files driver. Must live on a filesystem
 # visible from every node — $PBS_O_WORKDIR is on /gpfs/fs1 on Improv.
-DATA_ROOT="$PBS_O_WORKDIR/aps-miniapp-data"
+DATA_ROOT="$PWD/aps-miniapp-data"
 rm -rf "$DATA_ROOT"
 
 DIASPORA_CTL_DRIVER_ARGS="--driver files --driver.root_path $DATA_ROOT"
