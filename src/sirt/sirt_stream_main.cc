@@ -295,9 +295,14 @@ int main(int argc, char **argv)
       //delete curr_slices->metadata(); //TODO Check for memory leak
       delete curr_slices;
   }
-  ms.recordTs("FLUSH_START topic=sirt_den");
-  producer.flush().wait(-1);
-  ms.recordTs("FLUSH_END topic=sirt_den");
+  {
+    ms.recordTs("FLUSH_START topic=sirt_den");
+    auto fflush = producer.flush();
+    ms.recordTs("FLUSH_END topic=sirt_den");
+    ms.recordTs("FLUSH_WAIT_START topic=sirt_den");
+    fflush.wait(-1);
+    ms.recordTs("FLUSH_WAIT_END topic=sirt_den");
+  }
 
 
   // try {
@@ -320,9 +325,14 @@ int main(int argc, char **argv)
   producer.push(diaspora::Metadata{md}, diaspora::DataView{&d,sizeof(float)},
                 static_cast<size_t>(comm->rank()));
   ms.recordTs("PUSH_END topic=sirt_den");
-  ms.recordTs("FLUSH_WAIT_START topic=sirt_den");
-  producer.flush().wait(-1);
-  ms.recordTs("FLUSH_WAIT_END topic=sirt_den");
+  {
+    ms.recordTs("FLUSH_START topic=sirt_den");
+    auto fflush_fin = producer.flush();
+    ms.recordTs("FLUSH_END topic=sirt_den");
+    ms.recordTs("FLUSH_WAIT_START topic=sirt_den");
+    fflush_fin.wait(-1);
+    ms.recordTs("FLUSH_WAIT_END topic=sirt_den");
+  }
 
   /**************************/
   #ifdef TIMERON

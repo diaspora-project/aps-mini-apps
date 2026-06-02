@@ -213,8 +213,11 @@ class DiasporaDist:
     def last_flush(self, producer):
         if len(self.buffer)> 0:
             self.ts.record("FLUSH_START topic=dist_sirt")
-            producer.flush()
+            f = producer.flush()
             self.ts.record("FLUSH_END topic=dist_sirt")
+            self.ts.record("FLUSH_WAIT_START topic=dist_sirt")
+            f.wait(timeout_ms=-1)
+            self.ts.record("FLUSH_WAIT_END topic=dist_sirt")
             self.seq += 1
 
     def done_image(self, producer) -> int:
@@ -225,8 +228,11 @@ class DiasporaDist:
             producer.push(msg_metadata, bytearray(1))
             self.ts.record("PUSH_END topic=dist_sirt")
         self.ts.record("FLUSH_START topic=dist_sirt")
-        producer.flush()
+        f = producer.flush()
         self.ts.record("FLUSH_END topic=dist_sirt")
+        self.ts.record("FLUSH_WAIT_START topic=dist_sirt")
+        f.wait(timeout_ms=-1)
+        self.ts.record("FLUSH_WAIT_END topic=dist_sirt")
         self.seq += 1
         return 0
 

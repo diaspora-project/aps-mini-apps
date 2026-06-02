@@ -237,8 +237,11 @@ def simulate_daq(producer,
   #Last flush if buffer was not full
   if len(buffer)>0:
     if ts is not None: ts.record("FLUSH_START topic=daq_dist")
-    producer.flush()
+    f = producer.flush()
     if ts is not None: ts.record("FLUSH_END topic=daq_dist")
+    if ts is not None: ts.record("FLUSH_WAIT_START topic=daq_dist")
+    f.wait(timeout_ms=-1)
+    if ts is not None: ts.record("FLUSH_WAIT_END topic=daq_dist")
   time1 = time.time()
 
   elapsed_time = time1-time0
@@ -461,8 +464,11 @@ def main():
   producer.push({"Type": "FIN"}, bytearray(1))
   ts.record("PUSH_END topic=daq_dist")
   ts.record("FLUSH_START topic=daq_dist")
-  producer.flush().wait(timeout_ms=300000)
+  f = producer.flush()
   ts.record("FLUSH_END topic=daq_dist")
+  ts.record("FLUSH_WAIT_START topic=daq_dist")
+  f.wait(timeout_ms=-1)
+  ts.record("FLUSH_WAIT_END topic=daq_dist")
   ts.write("daq.0.ts.txt")
   time1 = time.time()
   print("Total time (s): {:.2f}".format(time1-time0))
