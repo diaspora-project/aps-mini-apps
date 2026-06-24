@@ -78,10 +78,19 @@ class DiasporaDist:
         self.driver_type = driver_type
         self.seq = 0
         self.nranks = 1
-        self.buffer = []
-        self.counter = 0
         self.batch = batchsize
-        self.futures = deque()
+        # The most recently pushed batch is held alive on the Python side
+        # until its push futures resolve. The C++ producer batch queue
+        # runs on a background Argobots ULT and holds refs to the pushed
+        # bytearrays until the batch is sent. If Python drops its refs
+        # while C++ still holds them, the C++ release becomes the last
+        # one and bytearray_dealloc runs on the producer thread without
+        # the GIL — pymalloc is not thread-safe and the heap corrupts.
+        # Holding one batch behind lets pull+compute on the next loop
+        # iteration overlap with the producer ULT, so the subsequent
+        # wait() is typically a no-op.
+        self.prev_msgs = None
+        self.prev_futures = None
         self.ts = TimestampCollector()
 
     def producer(self, topic_name: str, producer_name: str) -> diaspora.Producer:
@@ -176,6 +185,17 @@ class DiasporaDist:
     def push_image(self, data: np.ndarray, row :int, col: int,
                    theta: float, projection_id: int, center: float,
                    producer: diaspora.Producer) -> int :
+        # Drain the previous batch first: by the time the caller has
+        # done pull+preprocess and re-entered push_image, the producer
+        # ULT has had ample time to send it, so this wait is usually
+        # a no-op. We MUST wait before dropping prev_msgs — see the
+        # rationale in __init__.
+        if self.prev_futures is not None:
+            for f in self.prev_futures:
+                f.wait(timeout_ms=-1)
+            self.prev_futures = None
+            self.prev_msgs = None
+
         dims = [row, col]
 
         center = (dims[1] / 2.0) if center == 0.0 else center
@@ -189,29 +209,29 @@ class DiasporaDist:
                                     self.nranks,
                                     center,
                                     self.seq)
-        self.buffer.append(msgs)
         # Send data to workers
+        futures = []
         for i in range(self.nranks):
-            data_sz = len(self.buffer[self.counter][i][1])
+            data_sz = len(msgs[i][1])
             self.ts.record(f"PUSH_START topic=dist_sirt,data_size={data_sz}")
-            producer.push(self.buffer[self.counter][i][0], self.buffer[self.counter][i][1])
+            futures.append(producer.push(msgs[i][0], msgs[i][1]))
             self.ts.record("PUSH_END topic=dist_sirt")
 
+        # Hold strong refs to the bytearrays and their futures until
+        # the next call (or last_flush) drains them.
+        self.prev_msgs = msgs
+        self.prev_futures = futures
         self.seq += 1
-        self.counter += 1
-
-        if self.counter == 2*self.batch:
-            # ts = time.perf_counter()
-            # #producer.flush()
-            # for i in range(self.nranks):
-            #     self.futures[0].wait(timeout_ms=300000)
-            #     self.futures.popleft()
-            #     diaspora_t.append(["wait", projection_id, ts, time.perf_counter(), time.perf_counter() - ts, self.nranks*len(self.buffer)* len(str(self.buffer[self.counter-1][0][0])), self.nranks*len(self.buffer)*len(self.buffer[self.counter-1][0][1])])
-            self.buffer = self.buffer[self.batch:]
-            self.counter = self.counter - self.batch
 
     def last_flush(self, producer):
-        if len(self.buffer)> 0:
+        # Drain the final pending batch from push_image() before the
+        # flush — both to release Python refs safely (main thread, GIL
+        # held) and so the flush sees no leftover queued work.
+        if self.prev_futures is not None:
+            for f in self.prev_futures:
+                f.wait(timeout_ms=-1)
+            self.prev_futures = None
+            self.prev_msgs = None
             self.ts.record("FLUSH_START topic=dist_sirt")
             f = producer.flush()
             self.ts.record("FLUSH_END topic=dist_sirt")
@@ -222,10 +242,16 @@ class DiasporaDist:
 
     def done_image(self, producer) -> int:
         msg_metadata = {"Type": "FIN" }
+        # Hold strong refs to the FIN bytearrays until after flush
+        # completes — otherwise the C++ release on the producer ULT
+        # would trigger bytearray_dealloc without the GIL.
+        fin_buffers = []
         # Send Fin message to workers
         for _ in range(self.nranks):
+            b = bytearray(1)
+            fin_buffers.append(b)
             self.ts.record("PUSH_START topic=dist_sirt,data_size=1")
-            producer.push(msg_metadata, bytearray(1))
+            producer.push(msg_metadata, b)
             self.ts.record("PUSH_END topic=dist_sirt")
         self.ts.record("FLUSH_START topic=dist_sirt")
         f = producer.flush()
@@ -234,8 +260,10 @@ class DiasporaDist:
         f.wait(timeout_ms=-1)
         self.ts.record("FLUSH_WAIT_END topic=dist_sirt")
         self.seq += 1
+        # fin_buffers (and its bytearrays) released here on the main
+        # thread with the GIL held — safe; the producer ULT has already
+        # dropped its C++ refs during flush.
         return 0
 
     def finalize(self):
         del self.driver
-        del self.buffer
