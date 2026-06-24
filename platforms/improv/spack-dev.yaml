@@ -71,7 +71,7 @@ spack:
       - pkgconf
     mercury:
       require:
-      - "~boostsys ~checksum +ofi ~ucx +hwloc"
+      - "~boostsys ~checksum +ofi ~ucx +hwloc ~sm"
     openmpi:
       buildable: false
       externals:
