@@ -188,9 +188,16 @@ def simulate_daq(producer,
   nelems_per_subset = 16
   indices = ordered_subset(serialized_data.shape[0],
                               nelems_per_subset)
-  buffer = []
-  i = 0
-  futures = deque()
+  # Pipeline: hold the most recently pushed payload alive on the
+  # Python side until the next loop iteration waits on its future.
+  # The C++ producer batch queue runs on a background Argobots ULT
+  # and holds refs to pushed buffers until the batch is sent. If
+  # Python drops its ref while C++ still holds one, the C++ release
+  # becomes the last one and bytearray_dealloc runs on the producer
+  # thread without the GIL — pymalloc is not thread-safe and the
+  # heap corrupts.
+  prev_payload = None
+  prev_future = None
   for it in range(iteration): # Simulate data acquisition
     print("Current iteration over dataset: {}/{}".format(it+1, iteration))
     for index in indices:
@@ -207,41 +214,36 @@ def simulate_daq(producer,
           bsignal = False
           print("Continue streaming projections.")
 
+      # Drain the previous push and release its payload now (on this
+      # thread, GIL held) before issuing the next push.
+      if prev_future is not None:
+        prev_future.wait(timeout_ms=-1)
+        prev_future = None
+        prev_payload = None
+
       print("Sending projection {}".format(index))
       time.sleep(prj_slp)
-      # diaspora send
-      buffer.append(serialized_data[index])
+      payload = serialized_data[index]
       md = {"index": int(index), "Type" : "DATA"}
-      if ts is not None: ts.record(f"PUSH_START topic=daq_dist,data_size={len(buffer[i])}")
-      f = producer.push(md, buffer[i])
+      if ts is not None: ts.record(f"PUSH_START topic=daq_dist,data_size={len(payload)}")
+      prev_future = producer.push(md, payload)
       if ts is not None: ts.record("PUSH_END topic=daq_dist")
-      #f.wait(timeout_ms=-1)
-      # if seq % batchsize == 0:
-      #   futures.append(f)
-      tot_transfer_size+=len(buffer[i])
+      prev_payload = payload
+      tot_transfer_size+=len(payload)
       seq+=1
-      i+=1
-
-      if i == 2*batchsize:
-        # ts = time.perf_counter()
-        # producer.flush()
-        # futures[0].wait(timeout_ms=-1)
-        # futures.popleft()
-        buffer = buffer[batchsize:]
-        i = i - batchsize
-        # diaspora_t.append(["wait", index, ts, time.perf_counter(), time.perf_counter() - ts, batchsize*len(str(md)), len(buffer)*len(buffer[i-1])])
-
-
 
     time.sleep(slp)
-  #Last flush if buffer was not full
-  if len(buffer)>0:
-    if ts is not None: ts.record("FLUSH_START topic=daq_dist")
-    f = producer.flush()
-    if ts is not None: ts.record("FLUSH_END topic=daq_dist")
-    if ts is not None: ts.record("FLUSH_WAIT_START topic=daq_dist")
-    f.wait(timeout_ms=-1)
-    if ts is not None: ts.record("FLUSH_WAIT_END topic=daq_dist")
+  # Drain the final pending push, then flush.
+  if prev_future is not None:
+    prev_future.wait(timeout_ms=-1)
+    prev_future = None
+    prev_payload = None
+  if ts is not None: ts.record("FLUSH_START topic=daq_dist")
+  f = producer.flush()
+  if ts is not None: ts.record("FLUSH_END topic=daq_dist")
+  if ts is not None: ts.record("FLUSH_WAIT_START topic=daq_dist")
+  f.wait(timeout_ms=-1)
+  if ts is not None: ts.record("FLUSH_WAIT_END topic=daq_dist")
   time1 = time.time()
 
   elapsed_time = time1-time0
@@ -269,15 +271,29 @@ def test_daq(producer,
 
   serializer = TraceSerializer.ImageSerializer()
 
+  # See simulate_daq for the rationale of the one-push-behind pattern.
+  prev_payload = None
+  prev_future = None
   for uniqueId in range(num_sinogram_projections):
+    if prev_future is not None:
+      prev_future.wait(timeout_ms=-1)
+      prev_future = None
+      prev_payload = None
     serialized_data = serializer.serialize(image=image, uniqueId=uniqueId+7,
                                       itype=serializer.ITypes.Projection,
                                       rotation_step=rotation_step, seq=seq)
     seq+=1
     if ts is not None: ts.record(f"PUSH_START topic=daq_dist,data_size={len(serialized_data)}")
-    producer.push({"index": uniqueId, "Type": "DATA"}, serialized_data)
+    prev_future = producer.push({"index": uniqueId, "Type": "DATA"}, serialized_data)
     if ts is not None: ts.record("PUSH_END topic=daq_dist")
+    prev_payload = serialized_data
     time.sleep(slp)
+
+  # Drain the final pending push before returning so its payload can
+  # be released on this thread (main()'s flush below will then send
+  # any remaining queued batch with no Python refs at risk).
+  if prev_future is not None:
+    prev_future.wait(timeout_ms=-1)
 
   return seq
 
@@ -460,8 +476,12 @@ def main():
               ts=ts)
   else:
     print("Unknown mode: {}".format(args.mode))
+  # Hold a strong ref to the FIN payload until after flush completes —
+  # otherwise the C++ release on the producer ULT would trigger
+  # bytearray_dealloc without the GIL.
+  fin_buf = bytearray(1)
   ts.record("PUSH_START topic=daq_dist,data_size=1")
-  producer.push({"Type": "FIN"}, bytearray(1))
+  producer.push({"Type": "FIN"}, fin_buf)
   ts.record("PUSH_END topic=daq_dist")
   ts.record("FLUSH_START topic=daq_dist")
   f = producer.flush()
@@ -469,6 +489,7 @@ def main():
   ts.record("FLUSH_WAIT_START topic=daq_dist")
   f.wait(timeout_ms=-1)
   ts.record("FLUSH_WAIT_END topic=daq_dist")
+  del fin_buf
   ts.write("daq.0.ts.txt")
   time1 = time.time()
   print("Total time (s): {:.2f}".format(time1-time0))
